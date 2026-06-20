@@ -717,6 +717,12 @@ tr:hover td { background: var(--bg3); }
       <div id="dlt-recommend"></div>
     </div>
 
+    <!-- 智能预测推荐（AI模型） -->
+    <div class="card" id="dlt-smart-card">
+      <div class="card-title"><span class="icon">&#129302;</span> 智能预测推荐（AI模型）</div>
+      <div id="dlt-smart-recommend"></div>
+    </div>
+
     <!-- 上期选号复盘 -->
     <div class="card">
       <div class="card-title"><span class="icon">&#128260;</span> 上期选号复盘</div>
@@ -855,6 +861,12 @@ tr:hover td { background: var(--bg3); }
     <div class="card">
       <div class="card-title"><span class="icon">&#127919;</span> 综合推荐号码</div>
       <div id="ssq-recommend"></div>
+    </div>
+
+    <!-- 智能预测推荐（AI模型） -->
+    <div class="card" id="ssq-smart-card">
+      <div class="card-title"><span class="icon">&#129302;</span> 智能预测推荐（AI模型）</div>
+      <div id="ssq-smart-recommend"></div>
     </div>
 
     <!-- 上期选号复盘 -->
@@ -999,6 +1011,12 @@ tr:hover td { background: var(--bg3); }
       <div id="kl8-recommend"></div>
     </div>
 
+    <!-- 智能预测推荐（AI模型） -->
+    <div class="card" id="kl8-smart-card">
+      <div class="card-title"><span class="icon">&#129302;</span> 智能预测推荐（AI模型）</div>
+      <div id="kl8-smart-recommend"></div>
+    </div>
+
     <!-- 上期选号复盘 -->
     <div class="card">
       <div class="card-title"><span class="icon">&#128260;</span> 上期选号复盘</div>
@@ -1113,6 +1131,12 @@ tr:hover td { background: var(--bg3); }
       <div id="pl3-recommend"></div>
     </div>
 
+    <!-- 智能预测推荐（AI模型） -->
+    <div class="card" id="pl3-smart-card">
+      <div class="card-title"><span class="icon">&#129302;</span> 智能预测推荐（AI模型）</div>
+      <div id="pl3-smart-recommend"></div>
+    </div>
+
     <!-- 上期选号复盘 -->
     <div class="card">
       <div class="card-title"><span class="icon">&#128260;</span> 上期选号复盘</div>
@@ -1225,6 +1249,12 @@ tr:hover td { background: var(--bg3); }
     <div class="card">
       <div class="card-title"><span class="icon">&#127919;</span> 综合推荐号码</div>
       <div id="pl5-recommend"></div>
+    </div>
+
+    <!-- 智能预测推荐（AI模型） -->
+    <div class="card" id="pl5-smart-card">
+      <div class="card-title"><span class="icon">&#129302;</span> 智能预测推荐（AI模型）</div>
+      <div id="pl5-smart-recommend"></div>
     </div>
 
     <!-- 上期选号复盘 -->
@@ -1373,6 +1403,9 @@ window.addEventListener('DOMContentLoaded', function() {
     autoReviewPL3();
     autoReviewPL5();
   }, 1000);
+  setTimeout(function() {
+    renderSmartRecommendations();
+  }, 1500);
 });
 </script>
 
