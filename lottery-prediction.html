@@ -728,6 +728,12 @@ tr:hover td { background: var(--bg3); }
       </div>
       <div id="dlt-review-result"></div>
     </div>
+
+    <!-- 模型自动复盘与优化 -->
+    <div class="card" id="dlt-auto-review-card" style="display:none">
+      <div class="card-title"><span class="icon">&#128736;</span> 模型自动复盘与优化</div>
+      <div id="dlt-auto-review"></div>
+    </div>
   </div>
 
   <!-- 空状态 -->
@@ -861,6 +867,12 @@ tr:hover td { background: var(--bg3); }
         <button class="btn btn-secondary" onclick="reviewSSQ()" style="margin-left:0.5rem">复盘对比</button>
       </div>
       <div id="ssq-review-result"></div>
+    </div>
+
+    <!-- 模型自动复盘与优化 -->
+    <div class="card" id="ssq-auto-review-card" style="display:none">
+      <div class="card-title"><span class="icon">&#128736;</span> 模型自动复盘与优化</div>
+      <div id="ssq-auto-review"></div>
     </div>
   </div>
 
@@ -997,6 +1009,12 @@ tr:hover td { background: var(--bg3); }
       </div>
       <div id="kl8-review-result"></div>
     </div>
+
+    <!-- 模型自动复盘与优化 -->
+    <div class="card" id="kl8-auto-review-card" style="display:none">
+      <div class="card-title"><span class="icon">&#128736;</span> 模型自动复盘与优化</div>
+      <div id="kl8-auto-review"></div>
+    </div>
   </div>
 
   <div id="kl8-empty" class="empty-state">
@@ -1104,6 +1122,12 @@ tr:hover td { background: var(--bg3); }
         <button class="btn btn-secondary" onclick="reviewPL3()" style="margin-left:0.5rem">复盘对比</button>
       </div>
       <div id="pl3-review-result"></div>
+    </div>
+
+    <!-- 模型自动复盘与优化 -->
+    <div class="card" id="pl3-auto-review-card" style="display:none">
+      <div class="card-title"><span class="icon">&#128736;</span> 模型自动复盘与优化</div>
+      <div id="pl3-auto-review"></div>
     </div>
   </div>
 
@@ -1213,6 +1237,12 @@ tr:hover td { background: var(--bg3); }
       </div>
       <div id="pl5-review-result"></div>
     </div>
+
+    <!-- 模型自动复盘与优化 -->
+    <div class="card" id="pl5-auto-review-card" style="display:none">
+      <div class="card-title"><span class="icon">&#128736;</span> 模型自动复盘与优化</div>
+      <div id="pl5-auto-review"></div>
+    </div>
   </div>
 
   <div id="pl5-empty" class="empty-state">
@@ -1308,6 +1338,7 @@ tr:hover td { background: var(--bg3); }
 <script src="assets/engine.js?v=3"></script>
 <script src="assets/pl-data.js?v=3"></script>
 <script src="assets/pl-engine.js?v=3"></script>
+<script src="assets/auto-review.js?v=3"></script>
 <script>
 // Tab switching
 document.querySelectorAll('.tab-btn').forEach(function(btn) {
@@ -1335,6 +1366,13 @@ window.addEventListener('DOMContentLoaded', function() {
     analyzePL3();
     analyzePL5();
   }, 500);
+  setTimeout(function() {
+    autoReviewDLT();
+    autoReviewSSQ();
+    autoReviewKL8();
+    autoReviewPL3();
+    autoReviewPL5();
+  }, 1000);
 });
 </script>
 
