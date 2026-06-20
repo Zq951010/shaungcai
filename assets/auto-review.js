@@ -170,7 +170,7 @@ function smartRecommendBack(allBacks, lastBack, maxNum, pickCount, set) {
   return picks;
 }
 
-// ==================== 大乐透智能推荐 ====================
+// ==================== 大乐透智能推荐（胆拖模式） ====================
 function smartRecommendDLT(history, lastDraw) {
   var allFronts = [];
   var allBacks = [];
@@ -186,58 +186,87 @@ function smartRecommendDLT(history, lastDraw) {
   var trend = trendMomentumAnalysis(allFronts, 35);
   var fused = bayesianFusion(markov, cooc, pos, trend, 35);
 
-  var recommendations = [];
-  var globalUsedFront = {}; // 跨方案排除已选号码
+  // 计算平均融合分
+  var avgScore = 0;
+  for (var i = 0; i < fused.length; i++) avgScore += fused[i].score;
+  avgScore = avgScore / fused.length;
 
-  for (var set = 0; set < 3; set++) {
-    var frontPicks = [];
-    var used = {};
-    var startOffset = set * 2; // 每组从不同起始位置选号
+  // 选胆码：融合分 >= 平均分*1.3 且至少被2种算法看好，最多2个
+  var danma = [];
+  for (var i = 0; i < fused.length && danma.length < 2; i++) {
+    var f = fused[i];
+    var algoCount = 0;
+    if (f.markov > 0) algoCount++;
+    if (f.cooc > 0) algoCount++;
+    if (f.pos > 0) algoCount++;
+    if (f.trend > 0) algoCount++;
+    if (f.score >= avgScore * 1.3 && algoCount >= 2) {
+      danma.push(f.num);
+    }
+  }
+  // 如果不够2个，取top scorer补足
+  while (danma.length < 2) {
+    danma.push(fused[danma.length].num);
+  }
 
-    // 第一组：从top scorer开始；第二组：偏移2位；第三组：偏移4位
-    for (var i = startOffset; i < fused.length && frontPicks.length < 5; i++) {
-      var n = fused[i].num;
-      if (used[n] || globalUsedFront[n]) continue;
+  // 选拖码池：排除胆码后的top 8
+  var danmaSet = {};
+  for (var i = 0; i < danma.length; i++) danmaSet[danma[i]] = true;
+  var tuomaPool = [];
+  for (var i = 0; i < fused.length && tuomaPool.length < 8; i++) {
+    if (!danmaSet[fused[i].num]) {
+      tuomaPool.push(fused[i].num);
+    }
+  }
 
-      var posIdx = frontPicks.length;
-      var isReasonable = true;
-      if (posIdx === 0 && n > 20) isReasonable = false;
-      if (posIdx === 4 && n < 15) isReasonable = false;
-
-      if (isReasonable || frontPicks.length >= 3) {
-        frontPicks.push(n);
-        used[n] = true;
+  // 后区胆拖
+  var backFused = [];
+  for (var n = 1; n <= 12; n++) {
+    var score = 0;
+    for (var j = 0; j < lastDraw.back.length; j++) {
+      for (var i = 1; i < allBacks.length; i++) {
+        if (allBacks[i-1].indexOf(lastDraw.back[j]) >= 0 && allBacks[i].indexOf(n) >= 0) score++;
       }
     }
-    // 如果不够5个，从头部补充
-    for (var i = 0; i < fused.length && frontPicks.length < 5; i++) {
-      var n = fused[i].num;
-      if (used[n] || globalUsedFront[n]) continue;
-      frontPicks.push(n);
-      used[n] = true;
-    }
+    backFused.push({num: n, score: score});
+  }
+  backFused.sort(function(a, b) { return b.score - a.score; });
+  var backDan = backFused[0].num;
+  var backTuoma = [];
+  for (var i = 1; i < backFused.length && backTuoma.length < 3; i++) {
+    backTuoma.push(backFused[i].num);
+  }
 
+  // 生成3组方案
+  var recommendations = [];
+  for (var set = 0; set < 3; set++) {
+    var tuomaOffset = set;
+    var frontPicks = danma.slice();
+    for (var i = tuomaOffset; i < tuomaOffset + 3 && i < tuomaPool.length; i++) {
+      frontPicks.push(tuomaPool[i]);
+    }
     frontPicks.sort(function(a, b) { return a - b; });
 
-    // 标记已使用
-    for (var i = 0; i < frontPicks.length; i++) {
-      globalUsedFront[frontPicks[i]] = true;
-    }
-
-    var backRec = smartRecommendBack(allBacks, lastDraw.back, 12, 2, set);
+    var backPicks = [backDan, backTuoma[set % backTuoma.length]];
+    backPicks.sort(function(a, b) { return a - b; });
 
     recommendations.push({
       front: frontPicks,
-      back: backRec,
+      back: backPicks,
+      danma: danma.slice(),
+      tuoma: frontPicks.filter(function(n) { return danmaSet[n] ? false : true; }),
+      backDan: backDan,
+      backTuoma: backPicks.filter(function(n) { return n !== backDan; }),
       topScore: fused[0],
-      scores: fused.slice(0, 10)
+      scores: fused.slice(0, 10),
+      avgScore: avgScore
     });
   }
 
   return recommendations;
 }
 
-// ==================== 双色球智能推荐 ====================
+// ==================== 双色球智能推荐（胆拖模式） ====================
 function smartRecommendSSQ(history, lastDraw) {
   var allReds = [];
   var allBlues = [];
@@ -253,53 +282,72 @@ function smartRecommendSSQ(history, lastDraw) {
   var trend = trendMomentumAnalysis(allReds, 33);
   var fused = bayesianFusion(markov, cooc, pos, trend, 33);
 
+  // 计算平均融合分
+  var avgScore = 0;
+  for (var i = 0; i < fused.length; i++) avgScore += fused[i].score;
+  avgScore = avgScore / fused.length;
+
+  // 选胆码：融合分 >= 平均分*1.3 且至少被2种算法看好，最多2个
+  var danma = [];
+  for (var i = 0; i < fused.length && danma.length < 2; i++) {
+    var f = fused[i];
+    var algoCount = 0;
+    if (f.markov > 0) algoCount++;
+    if (f.cooc > 0) algoCount++;
+    if (f.pos > 0) algoCount++;
+    if (f.trend > 0) algoCount++;
+    if (f.score >= avgScore * 1.3 && algoCount >= 2) {
+      danma.push(f.num);
+    }
+  }
+  // 如果不够2个，取top scorer补足
+  while (danma.length < 2) {
+    danma.push(fused[danma.length].num);
+  }
+
+  // 选拖码池：排除胆码后的top 8
+  var danmaSet = {};
+  for (var i = 0; i < danma.length; i++) danmaSet[danma[i]] = true;
+  var tuomaPool = [];
+  for (var i = 0; i < fused.length && tuomaPool.length < 8; i++) {
+    if (!danmaSet[fused[i].num]) {
+      tuomaPool.push(fused[i].num);
+    }
+  }
+
+  // 蓝球：取融合分最高的1个
+  var blueMarkov = markovTransitionProb(allBlues.map(function(b) { return [b]; }), [lastDraw.blue], 16, 1);
+  var blueCooc = cooccurrenceAnalysis(allBlues.map(function(b) { return [b]; }), 16);
+  var bluePos = positionPatternLearning(allBlues.map(function(b) { return [b]; }), 16, 1);
+  var blueTrend = trendMomentumAnalysis(allBlues.map(function(b) { return [b]; }), 16);
+  var blueFused = bayesianFusion(blueMarkov, blueCooc, bluePos, blueTrend, 16);
+  var bluePick = blueFused[0].num;
+
+  // 生成3组方案
   var recommendations = [];
-  var globalUsed = {};
-
   for (var set = 0; set < 3; set++) {
-    var redPicks = [];
-    var used = {};
-    var startOffset = set * 3;
-
-    for (var i = startOffset; i < fused.length && redPicks.length < 6; i++) {
-      var n = fused[i].num;
-      if (used[n] || globalUsed[n]) continue;
-
-      var posIdx = redPicks.length;
-      var isReasonable = true;
-      if (posIdx === 0 && n > 18) isReasonable = false;
-      if (posIdx === 5 && n < 12) isReasonable = false;
-
-      if (isReasonable || redPicks.length >= 4) {
-        redPicks.push(n);
-        used[n] = true;
-      }
+    var tuomaOffset = set;
+    var redPicks = danma.slice();
+    for (var i = tuomaOffset; i < tuomaOffset + 4 && i < tuomaPool.length; i++) {
+      redPicks.push(tuomaPool[i]);
     }
-    for (var i = 0; i < fused.length && redPicks.length < 6; i++) {
-      var n = fused[i].num;
-      if (used[n] || globalUsed[n]) continue;
-      redPicks.push(n);
-      used[n] = true;
-    }
-
     redPicks.sort(function(a, b) { return a - b; });
-
-    for (var i = 0; i < redPicks.length; i++) globalUsed[redPicks[i]] = true;
-
-    var blueRec = smartRecommendBack(allBlues, [lastDraw.blue], 16, 1, set);
 
     recommendations.push({
       red: redPicks,
-      blue: blueRec[0] || 1,
+      blue: bluePick,
+      danma: danma.slice(),
+      tuoma: redPicks.filter(function(n) { return danmaSet[n] ? false : true; }),
       topScore: fused[0],
-      scores: fused.slice(0, 10)
+      scores: fused.slice(0, 10),
+      avgScore: avgScore
     });
   }
 
   return recommendations;
 }
 
-// ==================== 快乐8智能推荐 ====================
+// ==================== 快乐8智能推荐（胆拖模式） ====================
 function smartRecommendKL8(history, lastDraw) {
   var allNums = [];
   for (var i = 0; i < history.length; i++) {
@@ -312,47 +360,63 @@ function smartRecommendKL8(history, lastDraw) {
   var trend = trendMomentumAnalysis(allNums, 80);
   var fused = bayesianFusion(markov, cooc, pos, trend, 80);
 
+  // 计算平均融合分
+  var avgScore = 0;
+  for (var i = 0; i < fused.length; i++) avgScore += fused[i].score;
+  avgScore = avgScore / fused.length;
+
+  // 选胆码：融合分 >= 平均分*1.3 且至少被2种算法看好，最多3个
+  var danma = [];
+  for (var i = 0; i < fused.length && danma.length < 3; i++) {
+    var f = fused[i];
+    var algoCount = 0;
+    if (f.markov > 0) algoCount++;
+    if (f.cooc > 0) algoCount++;
+    if (f.pos > 0) algoCount++;
+    if (f.trend > 0) algoCount++;
+    if (f.score >= avgScore * 1.3 && algoCount >= 2) {
+      danma.push(f.num);
+    }
+  }
+  // 如果不够3个，取top scorer补足
+  while (danma.length < 3) {
+    danma.push(fused[danma.length].num);
+  }
+
+  // 选拖码池：排除胆码后的top 12
+  var danmaSet = {};
+  for (var i = 0; i < danma.length; i++) danmaSet[danma[i]] = true;
+  var tuomaPool = [];
+  for (var i = 0; i < fused.length && tuomaPool.length < 12; i++) {
+    if (!danmaSet[fused[i].num]) {
+      tuomaPool.push(fused[i].num);
+    }
+  }
+
+  // 生成3组方案
   var recommendations = [];
-  var globalUsedKL8 = {};
-
   for (var set = 0; set < 3; set++) {
-    var picks = [];
-    var used = {};
-    var zoneCounts = [0, 0, 0, 0];
-    var startOffset = set * 5;
-
-    for (var i = startOffset; i < fused.length && picks.length < 10; i++) {
-      var n = fused[i].num;
-      if (used[n] || globalUsedKL8[n]) continue;
-
-      var z = n <= 20 ? 0 : n <= 40 ? 1 : n <= 60 ? 2 : 3;
-      if (zoneCounts[z] >= 4) continue;
-
-      picks.push(n);
-      used[n] = true;
-      zoneCounts[z]++;
+    var tuomaOffset = set * 2;
+    var picks = danma.slice();
+    for (var i = tuomaOffset; i < tuomaOffset + 7 && i < tuomaPool.length; i++) {
+      picks.push(tuomaPool[i]);
     }
-    for (var i = 0; i < fused.length && picks.length < 10; i++) {
-      var n = fused[i].num;
-      if (used[n] || globalUsedKL8[n]) continue;
-      picks.push(n);
-      used[n] = true;
-    }
-
     picks.sort(function(a, b) { return a - b; });
-    for (var i = 0; i < picks.length; i++) globalUsedKL8[picks[i]] = true;
 
     recommendations.push({
       picks: picks,
+      danma: danma.slice(),
+      tuoma: picks.filter(function(n) { return danmaSet[n] ? false : true; }),
       topScore: fused[0],
-      scores: fused.slice(0, 10)
+      scores: fused.slice(0, 10),
+      avgScore: avgScore
     });
   }
 
   return recommendations;
 }
 
-// ==================== 排列三智能推荐 ====================
+// ==================== 排列三智能推荐（胆拖模式） ====================
 function smartRecommendPL3(history, lastDraw) {
   var allNums = [];
   for (var i = 0; i < history.length; i++) {
@@ -365,42 +429,63 @@ function smartRecommendPL3(history, lastDraw) {
   var trend = trendMomentumAnalysis(allNums, 9);
   var fused = bayesianFusion(markov, cooc, pos, trend, 9);
 
+  // 计算平均融合分
+  var avgScore = 0;
+  for (var i = 0; i < fused.length; i++) avgScore += fused[i].score;
+  avgScore = avgScore / fused.length;
+
+  // 选胆码：融合分 >= 平均分*1.3 且至少被2种算法看好，最多1个
+  var danma = [];
+  for (var i = 0; i < fused.length && danma.length < 1; i++) {
+    var f = fused[i];
+    var algoCount = 0;
+    if (f.markov > 0) algoCount++;
+    if (f.cooc > 0) algoCount++;
+    if (f.pos > 0) algoCount++;
+    if (f.trend > 0) algoCount++;
+    if (f.score >= avgScore * 1.3 && algoCount >= 2) {
+      danma.push(f.num);
+    }
+  }
+  // 如果不够1个，取top scorer补足
+  while (danma.length < 1) {
+    danma.push(fused[danma.length].num);
+  }
+
+  // 选拖码池：排除胆码后的top 5
+  var danmaSet = {};
+  for (var i = 0; i < danma.length; i++) danmaSet[danma[i]] = true;
+  var tuomaPool = [];
+  for (var i = 0; i < fused.length && tuomaPool.length < 5; i++) {
+    if (!danmaSet[fused[i].num]) {
+      tuomaPool.push(fused[i].num);
+    }
+  }
+
+  // 生成3组方案
   var recommendations = [];
-  var globalUsedPL3 = {};
-
   for (var set = 0; set < 3; set++) {
-    var picks = [];
-    var used = {};
-    var startOffset = set;
-
-    for (var i = startOffset; i < fused.length && picks.length < 3; i++) {
-      var n = fused[i].num;
-      if (!used[n] && !globalUsedPL3[n]) {
-        picks.push(n);
-        used[n] = true;
-      }
+    var tuomaOffset = set;
+    var picks = danma.slice();
+    for (var i = tuomaOffset; i < tuomaOffset + 2 && i < tuomaPool.length; i++) {
+      picks.push(tuomaPool[i]);
     }
-    for (var i = 0; i < fused.length && picks.length < 3; i++) {
-      var n = fused[i].num;
-      if (!used[n] && !globalUsedPL3[n]) {
-        picks.push(n);
-        used[n] = true;
-      }
-    }
-
-    for (var i = 0; i < picks.length; i++) globalUsedPL3[picks[i]] = true;
+    picks.sort(function(a, b) { return a - b; });
 
     recommendations.push({
       picks: picks,
+      danma: danma.slice(),
+      tuoma: picks.filter(function(n) { return danmaSet[n] ? false : true; }),
       topScore: fused[0],
-      scores: fused.slice(0, 10)
+      scores: fused.slice(0, 10),
+      avgScore: avgScore
     });
   }
 
   return recommendations;
 }
 
-// ==================== 排列五智能推荐 ====================
+// ==================== 排列五智能推荐（胆拖模式） ====================
 function smartRecommendPL5(history, lastDraw) {
   var allNums = [];
   for (var i = 0; i < history.length; i++) {
@@ -413,76 +498,135 @@ function smartRecommendPL5(history, lastDraw) {
   var trend = trendMomentumAnalysis(allNums, 9);
   var fused = bayesianFusion(markov, cooc, pos, trend, 9);
 
+  // 计算平均融合分
+  var avgScore = 0;
+  for (var i = 0; i < fused.length; i++) avgScore += fused[i].score;
+  avgScore = avgScore / fused.length;
+
+  // 选胆码：融合分 >= 平均分*1.3 且至少被2种算法看好，最多2个
+  var danma = [];
+  for (var i = 0; i < fused.length && danma.length < 2; i++) {
+    var f = fused[i];
+    var algoCount = 0;
+    if (f.markov > 0) algoCount++;
+    if (f.cooc > 0) algoCount++;
+    if (f.pos > 0) algoCount++;
+    if (f.trend > 0) algoCount++;
+    if (f.score >= avgScore * 1.3 && algoCount >= 2) {
+      danma.push(f.num);
+    }
+  }
+  // 如果不够2个，取top scorer补足
+  while (danma.length < 2) {
+    danma.push(fused[danma.length].num);
+  }
+
+  // 选拖码池：排除胆码后的top 6
+  var danmaSet = {};
+  for (var i = 0; i < danma.length; i++) danmaSet[danma[i]] = true;
+  var tuomaPool = [];
+  for (var i = 0; i < fused.length && tuomaPool.length < 6; i++) {
+    if (!danmaSet[fused[i].num]) {
+      tuomaPool.push(fused[i].num);
+    }
+  }
+
+  // 生成3组方案
   var recommendations = [];
-  var globalUsedPL5 = {};
-
   for (var set = 0; set < 3; set++) {
-    var picks = [];
-    var used = {};
-    var startOffset = set * 2;
-
-    for (var i = startOffset; i < fused.length && picks.length < 5; i++) {
-      var n = fused[i].num;
-      if (!used[n] && !globalUsedPL5[n]) {
-        picks.push(n);
-        used[n] = true;
-      }
+    var tuomaOffset = set;
+    var picks = danma.slice();
+    for (var i = tuomaOffset; i < tuomaOffset + 3 && i < tuomaPool.length; i++) {
+      picks.push(tuomaPool[i]);
     }
-    for (var i = 0; i < fused.length && picks.length < 5; i++) {
-      var n = fused[i].num;
-      if (!used[n] && !globalUsedPL5[n]) {
-        picks.push(n);
-        used[n] = true;
-      }
-    }
-
-    for (var i = 0; i < picks.length; i++) globalUsedPL5[picks[i]] = true;
+    picks.sort(function(a, b) { return a - b; });
 
     recommendations.push({
       picks: picks,
+      danma: danma.slice(),
+      tuoma: picks.filter(function(n) { return danmaSet[n] ? false : true; }),
       topScore: fused[0],
-      scores: fused.slice(0, 10)
+      scores: fused.slice(0, 10),
+      avgScore: avgScore
     });
   }
 
   return recommendations;
 }
 
-// ==================== 渲染智能推荐结果 ====================
+// ==================== 渲染智能推荐结果（胆拖模式） ====================
 function renderSmartRecommendations() {
+  // 胆拖模式说明HTML（通用）
+  function danmaExplainHTML() {
+    var h = '';
+    h += '<div style="margin-bottom:0.75rem;padding:0.5rem;background:var(--bg2);border-radius:8px;border-left:3px solid var(--accent)">';
+    h += '<div style="font-weight:700;font-size:0.85rem;margin-bottom:0.25rem">胆拖模式说明</div>';
+    h += '<div style="font-size:0.78rem;color:var(--muted)">';
+    h += '<span class="ball gold" style="display:inline-block;width:22px;height:22px;font-size:0.7rem;line-height:22px">金</span> = 胆码（AI高置信度必选）&nbsp;&nbsp;';
+    h += '<span class="ball red" style="display:inline-block;width:22px;height:22px;font-size:0.7rem;line-height:22px">红</span> = 拖码（候选号码）';
+    h += '</div></div>';
+    return h;
+  }
+
+  // AI分析面板HTML
+  function aiAnalysisHTML(scores) {
+    var h = '';
+    h += '<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--muted);background:var(--bg3);border:1px solid var(--rule);border-radius:6px;padding:0.5rem">';
+    h += '<div style="font-weight:700;margin-bottom:0.3rem;color:var(--accent)">AI模型分析</div>';
+    var topNums = scores.slice(0, 5);
+    for (var k = 0; k < topNums.length; k++) {
+      var s = topNums[k];
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem">';
+      h += '<span>号码 ' + pad(s.num) + '</span>';
+      h += '<span style="color:var(--muted)">转移:' + s.markov.toFixed(2) + ' 关联:' + s.cooc.toFixed(2) + ' 位置:' + s.pos.toFixed(2) + ' 动量:' + s.trend.toFixed(2) + ' 融合:' + s.score.toFixed(4) + '</span>';
+      h += '</div>';
+    }
+    h += '</div>';
+    return h;
+  }
+
   // 大乐透
   if (typeof dltSampleHistory !== 'undefined' && dltSampleHistory.length > 0) {
     var lastParts = dltSampleHistory[0].split('|');
     var lastDraw = { front: lastParts[0].split(',').map(Number), back: lastParts[1].split(',').map(Number) };
     var recs = smartRecommendDLT(dltSampleHistory, lastDraw);
 
-    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合</div>';
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
+    html += danmaExplainHTML();
 
     for (var i = 0; i < recs.length; i++) {
       html += '<div style="margin-bottom:1rem">';
       html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">智能方案 ' + (i + 1) + '</div>';
+      html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">前区 胆码: ';
+      for (var j = 0; j < recs[i].danma.length; j++) {
+        html += '<span style="font-weight:700">' + pad(recs[i].danma[j]) + '</span>';
+        if (j < recs[i].danma.length - 1) html += ', ';
+      }
+      html += ' | 拖码: ';
+      for (var j = 0; j < recs[i].tuoma.length; j++) {
+        html += pad(recs[i].tuoma[j]);
+        if (j < recs[i].tuoma.length - 1) html += ', ';
+      }
+      html += '</div>';
+      html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">后区 胆码: ' + pad(recs[i].backDan) + ' | 拖码: ';
+      for (var j = 0; j < recs[i].backTuoma.length; j++) {
+        html += pad(recs[i].backTuoma[j]);
+        if (j < recs[i].backTuoma.length - 1) html += ', ';
+      }
+      html += '</div>';
       html += '<div class="ball-row">';
       for (var j = 0; j < recs[i].front.length; j++) {
-        html += '<div class="ball red">' + pad(recs[i].front[j]) + '</div>';
+        var isDan = recs[i].danma.indexOf(recs[i].front[j]) >= 0;
+        html += '<div class="ball ' + (isDan ? 'gold' : 'red') + '">' + pad(recs[i].front[j]) + '</div>';
       }
       html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
       for (var j = 0; j < recs[i].back.length; j++) {
-        html += '<div class="ball blue">' + pad(recs[i].back[j]) + '</div>';
+        var isBackDan = recs[i].back[j] === recs[i].backDan;
+        html += '<div class="ball ' + (isBackDan ? 'gold' : 'blue') + '">' + pad(recs[i].back[j]) + '</div>';
       }
       html += '</div>';
 
-      // AI思考过程
-      html += '<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--muted);background:var(--bg3);border:1px solid var(--rule);border-radius:6px;padding:0.5rem">';
-      html += '<div style="font-weight:700;margin-bottom:0.3rem;color:var(--accent)">AI模型分析</div>';
-      var topNums = recs[i].scores.slice(0, 5);
-      for (var k = 0; k < topNums.length; k++) {
-        var s = topNums[k];
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem">';
-        html += '<span>号码 ' + pad(s.num) + '</span>';
-        html += '<span style="color:var(--muted)">转移:' + s.markov.toFixed(2) + ' 关联:' + s.cooc.toFixed(2) + ' 位置:' + s.pos.toFixed(2) + ' 动量:' + s.trend.toFixed(2) + ' 融合:' + s.score.toFixed(4) + '</span>';
-        html += '</div>';
-      }
-      html += '</div>';
+      html += aiAnalysisHTML(recs[i].scores);
       html += '</div>';
     }
 
@@ -496,30 +640,33 @@ function renderSmartRecommendations() {
     var lastDraw = { red: lastParts[0].split(',').map(Number), blue: parseInt(lastParts[1], 10) };
     var recs = smartRecommendSSQ(ssqSampleHistory, lastDraw);
 
-    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合</div>';
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
+    html += danmaExplainHTML();
 
     for (var i = 0; i < recs.length; i++) {
       html += '<div style="margin-bottom:1rem">';
       html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">智能方案 ' + (i + 1) + '</div>';
+      html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">胆码: ';
+      for (var j = 0; j < recs[i].danma.length; j++) {
+        html += '<span style="font-weight:700">' + pad(recs[i].danma[j]) + '</span>';
+        if (j < recs[i].danma.length - 1) html += ', ';
+      }
+      html += ' | 拖码: ';
+      for (var j = 0; j < recs[i].tuoma.length; j++) {
+        html += pad(recs[i].tuoma[j]);
+        if (j < recs[i].tuoma.length - 1) html += ', ';
+      }
+      html += '</div>';
       html += '<div class="ball-row">';
       for (var j = 0; j < recs[i].red.length; j++) {
-        html += '<div class="ball red">' + pad(recs[i].red[j]) + '</div>';
+        var isDan = recs[i].danma.indexOf(recs[i].red[j]) >= 0;
+        html += '<div class="ball ' + (isDan ? 'gold' : 'red') + '">' + pad(recs[i].red[j]) + '</div>';
       }
       html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
       html += '<div class="ball blue">' + pad(recs[i].blue) + '</div>';
       html += '</div>';
 
-      html += '<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--muted);background:var(--bg3);border:1px solid var(--rule);border-radius:6px;padding:0.5rem">';
-      html += '<div style="font-weight:700;margin-bottom:0.3rem;color:var(--accent)">AI模型分析</div>';
-      var topNums = recs[i].scores.slice(0, 5);
-      for (var k = 0; k < topNums.length; k++) {
-        var s = topNums[k];
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem">';
-        html += '<span>号码 ' + pad(s.num) + '</span>';
-        html += '<span style="color:var(--muted)">转移:' + s.markov.toFixed(2) + ' 关联:' + s.cooc.toFixed(2) + ' 位置:' + s.pos.toFixed(2) + ' 动量:' + s.trend.toFixed(2) + ' 融合:' + s.score.toFixed(4) + '</span>';
-        html += '</div>';
-      }
-      html += '</div>';
+      html += aiAnalysisHTML(recs[i].scores);
       html += '</div>';
     }
 
@@ -532,28 +679,31 @@ function renderSmartRecommendations() {
     var lastDraw = kl8SampleHistory[0].split(',').map(Number).sort(function(a, b) { return a - b; });
     var recs = smartRecommendKL8(kl8SampleHistory, lastDraw);
 
-    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合</div>';
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
+    html += danmaExplainHTML();
 
     for (var i = 0; i < recs.length; i++) {
       html += '<div style="margin-bottom:1rem">';
       html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">智能方案 ' + (i + 1) + '（选10）</div>';
+      html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">胆码: ';
+      for (var j = 0; j < recs[i].danma.length; j++) {
+        html += '<span style="font-weight:700">' + pad(recs[i].danma[j]) + '</span>';
+        if (j < recs[i].danma.length - 1) html += ', ';
+      }
+      html += ' | 拖码: ';
+      for (var j = 0; j < recs[i].tuoma.length; j++) {
+        html += pad(recs[i].tuoma[j]);
+        if (j < recs[i].tuoma.length - 1) html += ', ';
+      }
+      html += '</div>';
       html += '<div class="ball-row">';
       for (var j = 0; j < recs[i].picks.length; j++) {
-        html += '<div class="ball gold" style="width:36px;height:36px;font-size:0.75rem">' + pad(recs[i].picks[j]) + '</div>';
+        var isDan = recs[i].danma.indexOf(recs[i].picks[j]) >= 0;
+        html += '<div class="ball ' + (isDan ? 'gold' : 'red') + '" style="width:36px;height:36px;font-size:0.75rem">' + pad(recs[i].picks[j]) + '</div>';
       }
       html += '</div>';
 
-      html += '<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--muted);background:var(--bg3);border:1px solid var(--rule);border-radius:6px;padding:0.5rem">';
-      html += '<div style="font-weight:700;margin-bottom:0.3rem;color:var(--accent)">AI模型分析</div>';
-      var topNums = recs[i].scores.slice(0, 5);
-      for (var k = 0; k < topNums.length; k++) {
-        var s = topNums[k];
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem">';
-        html += '<span>号码 ' + pad(s.num) + '</span>';
-        html += '<span style="color:var(--muted)">转移:' + s.markov.toFixed(2) + ' 关联:' + s.cooc.toFixed(2) + ' 位置:' + s.pos.toFixed(2) + ' 动量:' + s.trend.toFixed(2) + ' 融合:' + s.score.toFixed(4) + '</span>';
-        html += '</div>';
-      }
-      html += '</div>';
+      html += aiAnalysisHTML(recs[i].scores);
       html += '</div>';
     }
 
@@ -566,28 +716,31 @@ function renderSmartRecommendations() {
     var lastDraw = PL3_HISTORY[0].numbers;
     var recs = smartRecommendPL3(PL3_HISTORY, lastDraw);
 
-    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合</div>';
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
+    html += danmaExplainHTML();
 
     for (var i = 0; i < recs.length; i++) {
       html += '<div style="margin-bottom:1rem">';
       html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">智能方案 ' + (i + 1) + '</div>';
+      html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">胆码: ';
+      for (var j = 0; j < recs[i].danma.length; j++) {
+        html += '<span style="font-weight:700">' + recs[i].danma[j] + '</span>';
+        if (j < recs[i].danma.length - 1) html += ', ';
+      }
+      html += ' | 拖码: ';
+      for (var j = 0; j < recs[i].tuoma.length; j++) {
+        html += recs[i].tuoma[j];
+        if (j < recs[i].tuoma.length - 1) html += ', ';
+      }
+      html += '</div>';
       html += '<div class="ball-row">';
       for (var j = 0; j < recs[i].picks.length; j++) {
-        html += '<div class="ball red">' + recs[i].picks[j] + '</div>';
+        var isDan = recs[i].danma.indexOf(recs[i].picks[j]) >= 0;
+        html += '<div class="ball ' + (isDan ? 'gold' : 'red') + '">' + recs[i].picks[j] + '</div>';
       }
       html += '</div>';
 
-      html += '<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--muted);background:var(--bg3);border:1px solid var(--rule);border-radius:6px;padding:0.5rem">';
-      html += '<div style="font-weight:700;margin-bottom:0.3rem;color:var(--accent)">AI模型分析</div>';
-      var topNums = recs[i].scores.slice(0, 5);
-      for (var k = 0; k < topNums.length; k++) {
-        var s = topNums[k];
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem">';
-        html += '<span>号码 ' + s.num + '</span>';
-        html += '<span style="color:var(--muted)">转移:' + s.markov.toFixed(2) + ' 关联:' + s.cooc.toFixed(2) + ' 位置:' + s.pos.toFixed(2) + ' 动量:' + s.trend.toFixed(2) + ' 融合:' + s.score.toFixed(4) + '</span>';
-        html += '</div>';
-      }
-      html += '</div>';
+      html += aiAnalysisHTML(recs[i].scores);
       html += '</div>';
     }
 
@@ -600,28 +753,31 @@ function renderSmartRecommendations() {
     var lastDraw = PL5_HISTORY[0].numbers;
     var recs = smartRecommendPL5(PL5_HISTORY, lastDraw);
 
-    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合</div>';
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
+    html += danmaExplainHTML();
 
     for (var i = 0; i < recs.length; i++) {
       html += '<div style="margin-bottom:1rem">';
       html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">智能方案 ' + (i + 1) + '</div>';
+      html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">胆码: ';
+      for (var j = 0; j < recs[i].danma.length; j++) {
+        html += '<span style="font-weight:700">' + recs[i].danma[j] + '</span>';
+        if (j < recs[i].danma.length - 1) html += ', ';
+      }
+      html += ' | 拖码: ';
+      for (var j = 0; j < recs[i].tuoma.length; j++) {
+        html += recs[i].tuoma[j];
+        if (j < recs[i].tuoma.length - 1) html += ', ';
+      }
+      html += '</div>';
       html += '<div class="ball-row">';
       for (var j = 0; j < recs[i].picks.length; j++) {
-        html += '<div class="ball red">' + recs[i].picks[j] + '</div>';
+        var isDan = recs[i].danma.indexOf(recs[i].picks[j]) >= 0;
+        html += '<div class="ball ' + (isDan ? 'gold' : 'red') + '">' + recs[i].picks[j] + '</div>';
       }
       html += '</div>';
 
-      html += '<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--muted);background:var(--bg3);border:1px solid var(--rule);border-radius:6px;padding:0.5rem">';
-      html += '<div style="font-weight:700;margin-bottom:0.3rem;color:var(--accent)">AI模型分析</div>';
-      var topNums = recs[i].scores.slice(0, 5);
-      for (var k = 0; k < topNums.length; k++) {
-        var s = topNums[k];
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem">';
-        html += '<span>号码 ' + s.num + '</span>';
-        html += '<span style="color:var(--muted)">转移:' + s.markov.toFixed(2) + ' 关联:' + s.cooc.toFixed(2) + ' 位置:' + s.pos.toFixed(2) + ' 动量:' + s.trend.toFixed(2) + ' 融合:' + s.score.toFixed(4) + '</span>';
-        html += '</div>';
-      }
-      html += '</div>';
+      html += aiAnalysisHTML(recs[i].scores);
       html += '</div>';
     }
 
