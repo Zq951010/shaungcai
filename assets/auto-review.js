@@ -187,13 +187,17 @@ function smartRecommendDLT(history, lastDraw) {
   var fused = bayesianFusion(markov, cooc, pos, trend, 35);
 
   var recommendations = [];
+  var globalUsedFront = {}; // 跨方案排除已选号码
+
   for (var set = 0; set < 3; set++) {
     var frontPicks = [];
     var used = {};
+    var startOffset = set * 2; // 每组从不同起始位置选号
 
-    for (var i = 0; i < fused.length && frontPicks.length < 5; i++) {
+    // 第一组：从top scorer开始；第二组：偏移2位；第三组：偏移4位
+    for (var i = startOffset; i < fused.length && frontPicks.length < 5; i++) {
       var n = fused[i].num;
-      if (used[n]) continue;
+      if (used[n] || globalUsedFront[n]) continue;
 
       var posIdx = frontPicks.length;
       var isReasonable = true;
@@ -205,8 +209,20 @@ function smartRecommendDLT(history, lastDraw) {
         used[n] = true;
       }
     }
+    // 如果不够5个，从头部补充
+    for (var i = 0; i < fused.length && frontPicks.length < 5; i++) {
+      var n = fused[i].num;
+      if (used[n] || globalUsedFront[n]) continue;
+      frontPicks.push(n);
+      used[n] = true;
+    }
 
     frontPicks.sort(function(a, b) { return a - b; });
+
+    // 标记已使用
+    for (var i = 0; i < frontPicks.length; i++) {
+      globalUsedFront[frontPicks[i]] = true;
+    }
 
     var backRec = smartRecommendBack(allBacks, lastDraw.back, 12, 2, set);
 
@@ -238,13 +254,16 @@ function smartRecommendSSQ(history, lastDraw) {
   var fused = bayesianFusion(markov, cooc, pos, trend, 33);
 
   var recommendations = [];
+  var globalUsed = {};
+
   for (var set = 0; set < 3; set++) {
     var redPicks = [];
     var used = {};
+    var startOffset = set * 3;
 
-    for (var i = 0; i < fused.length && redPicks.length < 6; i++) {
+    for (var i = startOffset; i < fused.length && redPicks.length < 6; i++) {
       var n = fused[i].num;
-      if (used[n]) continue;
+      if (used[n] || globalUsed[n]) continue;
 
       var posIdx = redPicks.length;
       var isReasonable = true;
@@ -256,8 +275,16 @@ function smartRecommendSSQ(history, lastDraw) {
         used[n] = true;
       }
     }
+    for (var i = 0; i < fused.length && redPicks.length < 6; i++) {
+      var n = fused[i].num;
+      if (used[n] || globalUsed[n]) continue;
+      redPicks.push(n);
+      used[n] = true;
+    }
 
     redPicks.sort(function(a, b) { return a - b; });
+
+    for (var i = 0; i < redPicks.length; i++) globalUsed[redPicks[i]] = true;
 
     var blueRec = smartRecommendBack(allBlues, [lastDraw.blue], 16, 1, set);
 
@@ -286,14 +313,17 @@ function smartRecommendKL8(history, lastDraw) {
   var fused = bayesianFusion(markov, cooc, pos, trend, 80);
 
   var recommendations = [];
+  var globalUsedKL8 = {};
+
   for (var set = 0; set < 3; set++) {
     var picks = [];
     var used = {};
     var zoneCounts = [0, 0, 0, 0];
+    var startOffset = set * 5;
 
-    for (var i = set; i < fused.length && picks.length < 10; i++) {
+    for (var i = startOffset; i < fused.length && picks.length < 10; i++) {
       var n = fused[i].num;
-      if (used[n]) continue;
+      if (used[n] || globalUsedKL8[n]) continue;
 
       var z = n <= 20 ? 0 : n <= 40 ? 1 : n <= 60 ? 2 : 3;
       if (zoneCounts[z] >= 4) continue;
@@ -302,8 +332,15 @@ function smartRecommendKL8(history, lastDraw) {
       used[n] = true;
       zoneCounts[z]++;
     }
+    for (var i = 0; i < fused.length && picks.length < 10; i++) {
+      var n = fused[i].num;
+      if (used[n] || globalUsedKL8[n]) continue;
+      picks.push(n);
+      used[n] = true;
+    }
 
     picks.sort(function(a, b) { return a - b; });
+    for (var i = 0; i < picks.length; i++) globalUsedKL8[picks[i]] = true;
 
     recommendations.push({
       picks: picks,
@@ -329,17 +366,29 @@ function smartRecommendPL3(history, lastDraw) {
   var fused = bayesianFusion(markov, cooc, pos, trend, 9);
 
   var recommendations = [];
+  var globalUsedPL3 = {};
+
   for (var set = 0; set < 3; set++) {
     var picks = [];
     var used = {};
+    var startOffset = set;
 
-    for (var i = set; i < fused.length && picks.length < 3; i++) {
+    for (var i = startOffset; i < fused.length && picks.length < 3; i++) {
       var n = fused[i].num;
-      if (!used[n]) {
+      if (!used[n] && !globalUsedPL3[n]) {
         picks.push(n);
         used[n] = true;
       }
     }
+    for (var i = 0; i < fused.length && picks.length < 3; i++) {
+      var n = fused[i].num;
+      if (!used[n] && !globalUsedPL3[n]) {
+        picks.push(n);
+        used[n] = true;
+      }
+    }
+
+    for (var i = 0; i < picks.length; i++) globalUsedPL3[picks[i]] = true;
 
     recommendations.push({
       picks: picks,
@@ -365,17 +414,29 @@ function smartRecommendPL5(history, lastDraw) {
   var fused = bayesianFusion(markov, cooc, pos, trend, 9);
 
   var recommendations = [];
+  var globalUsedPL5 = {};
+
   for (var set = 0; set < 3; set++) {
     var picks = [];
     var used = {};
+    var startOffset = set * 2;
 
-    for (var i = set; i < fused.length && picks.length < 5; i++) {
+    for (var i = startOffset; i < fused.length && picks.length < 5; i++) {
       var n = fused[i].num;
-      if (!used[n]) {
+      if (!used[n] && !globalUsedPL5[n]) {
         picks.push(n);
         used[n] = true;
       }
     }
+    for (var i = 0; i < fused.length && picks.length < 5; i++) {
+      var n = fused[i].num;
+      if (!used[n] && !globalUsedPL5[n]) {
+        picks.push(n);
+        used[n] = true;
+      }
+    }
+
+    for (var i = 0; i < picks.length; i++) globalUsedPL5[picks[i]] = true;
 
     recommendations.push({
       picks: picks,
