@@ -1,7 +1,7 @@
 /**
- * 自动复盘 + 模型优化 + 精准推荐
- * 对所有彩票类型（大乐透、双色球、快乐8、排列三、排列五）进行自动复盘
- * 根据复盘结果动态调整评分因子权重，生成优化后的精准推荐
+ * 智能预测引擎 v2.0
+ * 基于多模型融合的彩票号码预测
+ * 算法：马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合
  */
 
 // ==================== 工具函数 ====================
@@ -18,7 +18,558 @@ function unique(arr) {
   return result;
 }
 
-// ==================== 大乐透自动复盘 ====================
+function arrayContains(arr, val) {
+  for (var i = 0; i < arr.length; i++) {
+    if (arr[i] === val) return true;
+  }
+  return false;
+}
+
+function sum(arr) { var s = 0; for (var i = 0; i < arr.length; i++) s += arr[i]; return s; }
+function max(arr) { return Math.max.apply(null, arr); }
+function min(arr) { return Math.min.apply(null, arr); }
+function span(arr) { return arr.length ? max(arr) - min(arr) : 0; }
+
+// ==================== 算法1：马尔可夫转移概率 ====================
+function markovTransitionProb(history, lastDraw, maxNum, pickCount) {
+  var scores = {};
+  for (var n = 1; n <= maxNum; n++) {
+    var score = 0;
+    for (var j = 0; j < lastDraw.length; j++) {
+      var prevNum = lastDraw[j];
+      var transitions = 0;
+      var total = 0;
+      for (var i = 1; i < history.length; i++) {
+        if (arrayContains(history[i - 1], prevNum)) {
+          total++;
+          if (arrayContains(history[i], n)) transitions++;
+        }
+      }
+      if (total > 0) score += transitions / total;
+    }
+    scores[n] = score;
+  }
+  return scores;
+}
+
+// ==================== 算法2：号码共现关联分析 ====================
+function cooccurrenceAnalysis(history, maxNum) {
+  var scores = {};
+  for (var n = 1; n <= maxNum; n++) {
+    var score = 0;
+    for (var m = 1; m <= maxNum; m++) {
+      if (m === n) continue;
+      var coocCount = 0;
+      var totalCount = 0;
+      for (var i = 0; i < history.length; i++) {
+        var hasM = arrayContains(history[i], m);
+        var hasN = arrayContains(history[i], n);
+        if (hasM) totalCount++;
+        if (hasM && hasN) coocCount++;
+      }
+      if (totalCount > 0) score += coocCount / totalCount;
+    }
+    scores[n] = score;
+  }
+  return scores;
+}
+
+// ==================== 算法3：位置模式学习 ====================
+function positionPatternLearning(history, maxNum, pickCount) {
+  var scores = {};
+  for (var n = 1; n <= maxNum; n++) {
+    var score = 0;
+    for (var pos = 0; pos < pickCount; pos++) {
+      var posCount = 0;
+      for (var i = 0; i < history.length; i++) {
+        if (history[i][pos] === n) posCount++;
+      }
+      score += posCount / history.length;
+    }
+    scores[n] = score;
+  }
+  return scores;
+}
+
+// ==================== 算法4：趋势动量分析 ====================
+function trendMomentumAnalysis(history, maxNum) {
+  var scores = {};
+  var half = Math.floor(history.length / 2);
+  if (half < 1) half = 1;
+  for (var n = 1; n <= maxNum; n++) {
+    var recent = 0, older = 0;
+    for (var i = 0; i < half && i < history.length; i++) {
+      if (arrayContains(history[i], n)) recent++;
+    }
+    for (var i = half; i < history.length; i++) {
+      if (arrayContains(history[i], n)) older++;
+    }
+    var momentum = (recent / half) - (older / Math.max(1, history.length - half));
+    scores[n] = momentum > 0 ? momentum * 1.5 : Math.abs(momentum) * 0.8;
+  }
+  return scores;
+}
+
+// ==================== 算法5：贝叶斯融合决策 ====================
+function bayesianFusion(markovScores, coocScores, posScores, trendScores, maxNum) {
+  var totalM = 0, totalC = 0, totalP = 0, totalT = 0;
+  for (var k = 1; k <= maxNum; k++) {
+    totalM += markovScores[k] || 0;
+    totalC += coocScores[k] || 0;
+    totalP += posScores[k] || 0;
+    totalT += trendScores[k] || 0;
+  }
+
+  var results = [];
+  for (var n = 1; n <= maxNum; n++) {
+    var mScore = markovScores[n] || 0;
+    var cScore = coocScores[n] || 0;
+    var pScore = posScores[n] || 0;
+    var tScore = trendScores[n] || 0;
+
+    var nm = totalM > 0 ? mScore / totalM : 0;
+    var nc = totalC > 0 ? cScore / totalC : 0;
+    var np = totalP > 0 ? pScore / totalP : 0;
+    var nt = totalT > 0 ? tScore / totalT : 0;
+
+    var fusion = Math.pow(nm + 0.01, 0.3) * Math.pow(nc + 0.01, 0.3) * Math.pow(np + 0.01, 0.2) * Math.pow(nt + 0.01, 0.2);
+
+    results.push({
+      num: n,
+      score: fusion,
+      markov: mScore,
+      cooc: cScore,
+      pos: pScore,
+      trend: tScore
+    });
+  }
+
+  results.sort(function(a, b) { return b.score - a.score; });
+  return results;
+}
+
+// ==================== 后区/蓝球智能推荐（通用） ====================
+function smartRecommendBack(allBacks, lastBack, maxNum, pickCount, set) {
+  var markov = markovTransitionProb(allBacks, lastBack, maxNum, pickCount);
+  var cooc = cooccurrenceAnalysis(allBacks, maxNum);
+  var pos = positionPatternLearning(allBacks, maxNum, lastBack.length);
+  var trend = trendMomentumAnalysis(allBacks, maxNum);
+  var fused = bayesianFusion(markov, cooc, pos, trend, maxNum);
+
+  var picks = [];
+  var used = {};
+  var start = set;
+  for (var i = start; i < fused.length && picks.length < pickCount; i++) {
+    var n = fused[i].num;
+    if (!used[n]) {
+      picks.push(n);
+      used[n] = true;
+    }
+  }
+  picks.sort(function(a, b) { return a - b; });
+  return picks;
+}
+
+// ==================== 大乐透智能推荐 ====================
+function smartRecommendDLT(history, lastDraw) {
+  var allFronts = [];
+  var allBacks = [];
+  for (var i = 0; i < history.length; i++) {
+    var parts = history[i].split('|');
+    allFronts.push(parts[0].split(',').map(Number));
+    allBacks.push(parts[1].split(',').map(Number));
+  }
+
+  var markov = markovTransitionProb(allFronts, lastDraw.front, 35, 5);
+  var cooc = cooccurrenceAnalysis(allFronts, 35);
+  var pos = positionPatternLearning(allFronts, 35, 5);
+  var trend = trendMomentumAnalysis(allFronts, 35);
+  var fused = bayesianFusion(markov, cooc, pos, trend, 35);
+
+  var recommendations = [];
+  for (var set = 0; set < 3; set++) {
+    var frontPicks = [];
+    var used = {};
+
+    for (var i = 0; i < fused.length && frontPicks.length < 5; i++) {
+      var n = fused[i].num;
+      if (used[n]) continue;
+
+      var posIdx = frontPicks.length;
+      var isReasonable = true;
+      if (posIdx === 0 && n > 20) isReasonable = false;
+      if (posIdx === 4 && n < 15) isReasonable = false;
+
+      if (isReasonable || frontPicks.length >= 3) {
+        frontPicks.push(n);
+        used[n] = true;
+      }
+    }
+
+    frontPicks.sort(function(a, b) { return a - b; });
+
+    var backRec = smartRecommendBack(allBacks, lastDraw.back, 12, 2, set);
+
+    recommendations.push({
+      front: frontPicks,
+      back: backRec,
+      topScore: fused[0],
+      scores: fused.slice(0, 10)
+    });
+  }
+
+  return recommendations;
+}
+
+// ==================== 双色球智能推荐 ====================
+function smartRecommendSSQ(history, lastDraw) {
+  var allReds = [];
+  var allBlues = [];
+  for (var i = 0; i < history.length; i++) {
+    var parts = history[i].split('|');
+    allReds.push(parts[0].split(',').map(Number));
+    allBlues.push(parseInt(parts[1], 10));
+  }
+
+  var markov = markovTransitionProb(allReds, lastDraw.red, 33, 6);
+  var cooc = cooccurrenceAnalysis(allReds, 33);
+  var pos = positionPatternLearning(allReds, 33, 6);
+  var trend = trendMomentumAnalysis(allReds, 33);
+  var fused = bayesianFusion(markov, cooc, pos, trend, 33);
+
+  var recommendations = [];
+  for (var set = 0; set < 3; set++) {
+    var redPicks = [];
+    var used = {};
+
+    for (var i = 0; i < fused.length && redPicks.length < 6; i++) {
+      var n = fused[i].num;
+      if (used[n]) continue;
+
+      var posIdx = redPicks.length;
+      var isReasonable = true;
+      if (posIdx === 0 && n > 18) isReasonable = false;
+      if (posIdx === 5 && n < 12) isReasonable = false;
+
+      if (isReasonable || redPicks.length >= 4) {
+        redPicks.push(n);
+        used[n] = true;
+      }
+    }
+
+    redPicks.sort(function(a, b) { return a - b; });
+
+    var blueRec = smartRecommendBack(allBlues, [lastDraw.blue], 16, 1, set);
+
+    recommendations.push({
+      red: redPicks,
+      blue: blueRec[0] || 1,
+      topScore: fused[0],
+      scores: fused.slice(0, 10)
+    });
+  }
+
+  return recommendations;
+}
+
+// ==================== 快乐8智能推荐 ====================
+function smartRecommendKL8(history, lastDraw) {
+  var allNums = [];
+  for (var i = 0; i < history.length; i++) {
+    allNums.push(history[i].split(',').map(Number).sort(function(a, b) { return a - b; }));
+  }
+
+  var markov = markovTransitionProb(allNums, lastDraw, 80, 20);
+  var cooc = cooccurrenceAnalysis(allNums, 80);
+  var pos = positionPatternLearning(allNums, 80, 20);
+  var trend = trendMomentumAnalysis(allNums, 80);
+  var fused = bayesianFusion(markov, cooc, pos, trend, 80);
+
+  var recommendations = [];
+  for (var set = 0; set < 3; set++) {
+    var picks = [];
+    var used = {};
+    var zoneCounts = [0, 0, 0, 0];
+
+    for (var i = set; i < fused.length && picks.length < 10; i++) {
+      var n = fused[i].num;
+      if (used[n]) continue;
+
+      var z = n <= 20 ? 0 : n <= 40 ? 1 : n <= 60 ? 2 : 3;
+      if (zoneCounts[z] >= 4) continue;
+
+      picks.push(n);
+      used[n] = true;
+      zoneCounts[z]++;
+    }
+
+    picks.sort(function(a, b) { return a - b; });
+
+    recommendations.push({
+      picks: picks,
+      topScore: fused[0],
+      scores: fused.slice(0, 10)
+    });
+  }
+
+  return recommendations;
+}
+
+// ==================== 排列三智能推荐 ====================
+function smartRecommendPL3(history, lastDraw) {
+  var allNums = [];
+  for (var i = 0; i < history.length; i++) {
+    allNums.push(history[i].numbers);
+  }
+
+  var markov = markovTransitionProb(allNums, lastDraw, 9, 3);
+  var cooc = cooccurrenceAnalysis(allNums, 9);
+  var pos = positionPatternLearning(allNums, 9, 3);
+  var trend = trendMomentumAnalysis(allNums, 9);
+  var fused = bayesianFusion(markov, cooc, pos, trend, 9);
+
+  var recommendations = [];
+  for (var set = 0; set < 3; set++) {
+    var picks = [];
+    var used = {};
+
+    for (var i = set; i < fused.length && picks.length < 3; i++) {
+      var n = fused[i].num;
+      if (!used[n]) {
+        picks.push(n);
+        used[n] = true;
+      }
+    }
+
+    recommendations.push({
+      picks: picks,
+      topScore: fused[0],
+      scores: fused.slice(0, 10)
+    });
+  }
+
+  return recommendations;
+}
+
+// ==================== 排列五智能推荐 ====================
+function smartRecommendPL5(history, lastDraw) {
+  var allNums = [];
+  for (var i = 0; i < history.length; i++) {
+    allNums.push(history[i].numbers);
+  }
+
+  var markov = markovTransitionProb(allNums, lastDraw, 9, 5);
+  var cooc = cooccurrenceAnalysis(allNums, 9);
+  var pos = positionPatternLearning(allNums, 9, 5);
+  var trend = trendMomentumAnalysis(allNums, 9);
+  var fused = bayesianFusion(markov, cooc, pos, trend, 9);
+
+  var recommendations = [];
+  for (var set = 0; set < 3; set++) {
+    var picks = [];
+    var used = {};
+
+    for (var i = set; i < fused.length && picks.length < 5; i++) {
+      var n = fused[i].num;
+      if (!used[n]) {
+        picks.push(n);
+        used[n] = true;
+      }
+    }
+
+    recommendations.push({
+      picks: picks,
+      topScore: fused[0],
+      scores: fused.slice(0, 10)
+    });
+  }
+
+  return recommendations;
+}
+
+// ==================== 渲染智能推荐结果 ====================
+function renderSmartRecommendations() {
+  // 大乐透
+  if (typeof dltSampleHistory !== 'undefined' && dltSampleHistory.length > 0) {
+    var lastParts = dltSampleHistory[0].split('|');
+    var lastDraw = { front: lastParts[0].split(',').map(Number), back: lastParts[1].split(',').map(Number) };
+    var recs = smartRecommendDLT(dltSampleHistory, lastDraw);
+
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合</div>';
+
+    for (var i = 0; i < recs.length; i++) {
+      html += '<div style="margin-bottom:1rem">';
+      html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">智能方案 ' + (i + 1) + '</div>';
+      html += '<div class="ball-row">';
+      for (var j = 0; j < recs[i].front.length; j++) {
+        html += '<div class="ball red">' + pad(recs[i].front[j]) + '</div>';
+      }
+      html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
+      for (var j = 0; j < recs[i].back.length; j++) {
+        html += '<div class="ball blue">' + pad(recs[i].back[j]) + '</div>';
+      }
+      html += '</div>';
+
+      // AI思考过程
+      html += '<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--muted);background:var(--bg3);border:1px solid var(--rule);border-radius:6px;padding:0.5rem">';
+      html += '<div style="font-weight:700;margin-bottom:0.3rem;color:var(--accent)">AI模型分析</div>';
+      var topNums = recs[i].scores.slice(0, 5);
+      for (var k = 0; k < topNums.length; k++) {
+        var s = topNums[k];
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem">';
+        html += '<span>号码 ' + pad(s.num) + '</span>';
+        html += '<span style="color:var(--muted)">转移:' + s.markov.toFixed(2) + ' 关联:' + s.cooc.toFixed(2) + ' 位置:' + s.pos.toFixed(2) + ' 动量:' + s.trend.toFixed(2) + ' 融合:' + s.score.toFixed(4) + '</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+    }
+
+    var el = document.getElementById('dlt-smart-recommend');
+    if (el) el.innerHTML = html;
+  }
+
+  // 双色球
+  if (typeof ssqSampleHistory !== 'undefined' && ssqSampleHistory.length > 0) {
+    var lastParts = ssqSampleHistory[0].split('|');
+    var lastDraw = { red: lastParts[0].split(',').map(Number), blue: parseInt(lastParts[1], 10) };
+    var recs = smartRecommendSSQ(ssqSampleHistory, lastDraw);
+
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合</div>';
+
+    for (var i = 0; i < recs.length; i++) {
+      html += '<div style="margin-bottom:1rem">';
+      html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">智能方案 ' + (i + 1) + '</div>';
+      html += '<div class="ball-row">';
+      for (var j = 0; j < recs[i].red.length; j++) {
+        html += '<div class="ball red">' + pad(recs[i].red[j]) + '</div>';
+      }
+      html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
+      html += '<div class="ball blue">' + pad(recs[i].blue) + '</div>';
+      html += '</div>';
+
+      html += '<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--muted);background:var(--bg3);border:1px solid var(--rule);border-radius:6px;padding:0.5rem">';
+      html += '<div style="font-weight:700;margin-bottom:0.3rem;color:var(--accent)">AI模型分析</div>';
+      var topNums = recs[i].scores.slice(0, 5);
+      for (var k = 0; k < topNums.length; k++) {
+        var s = topNums[k];
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem">';
+        html += '<span>号码 ' + pad(s.num) + '</span>';
+        html += '<span style="color:var(--muted)">转移:' + s.markov.toFixed(2) + ' 关联:' + s.cooc.toFixed(2) + ' 位置:' + s.pos.toFixed(2) + ' 动量:' + s.trend.toFixed(2) + ' 融合:' + s.score.toFixed(4) + '</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+    }
+
+    var el = document.getElementById('ssq-smart-recommend');
+    if (el) el.innerHTML = html;
+  }
+
+  // 快乐8
+  if (typeof kl8SampleHistory !== 'undefined' && kl8SampleHistory.length > 0) {
+    var lastDraw = kl8SampleHistory[0].split(',').map(Number).sort(function(a, b) { return a - b; });
+    var recs = smartRecommendKL8(kl8SampleHistory, lastDraw);
+
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合</div>';
+
+    for (var i = 0; i < recs.length; i++) {
+      html += '<div style="margin-bottom:1rem">';
+      html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">智能方案 ' + (i + 1) + '（选10）</div>';
+      html += '<div class="ball-row">';
+      for (var j = 0; j < recs[i].picks.length; j++) {
+        html += '<div class="ball gold" style="width:36px;height:36px;font-size:0.75rem">' + pad(recs[i].picks[j]) + '</div>';
+      }
+      html += '</div>';
+
+      html += '<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--muted);background:var(--bg3);border:1px solid var(--rule);border-radius:6px;padding:0.5rem">';
+      html += '<div style="font-weight:700;margin-bottom:0.3rem;color:var(--accent)">AI模型分析</div>';
+      var topNums = recs[i].scores.slice(0, 5);
+      for (var k = 0; k < topNums.length; k++) {
+        var s = topNums[k];
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem">';
+        html += '<span>号码 ' + pad(s.num) + '</span>';
+        html += '<span style="color:var(--muted)">转移:' + s.markov.toFixed(2) + ' 关联:' + s.cooc.toFixed(2) + ' 位置:' + s.pos.toFixed(2) + ' 动量:' + s.trend.toFixed(2) + ' 融合:' + s.score.toFixed(4) + '</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+    }
+
+    var el = document.getElementById('kl8-smart-recommend');
+    if (el) el.innerHTML = html;
+  }
+
+  // 排列三
+  if (typeof PL3_HISTORY !== 'undefined' && PL3_HISTORY.length > 0) {
+    var lastDraw = PL3_HISTORY[0].numbers;
+    var recs = smartRecommendPL3(PL3_HISTORY, lastDraw);
+
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合</div>';
+
+    for (var i = 0; i < recs.length; i++) {
+      html += '<div style="margin-bottom:1rem">';
+      html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">智能方案 ' + (i + 1) + '</div>';
+      html += '<div class="ball-row">';
+      for (var j = 0; j < recs[i].picks.length; j++) {
+        html += '<div class="ball red">' + recs[i].picks[j] + '</div>';
+      }
+      html += '</div>';
+
+      html += '<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--muted);background:var(--bg3);border:1px solid var(--rule);border-radius:6px;padding:0.5rem">';
+      html += '<div style="font-weight:700;margin-bottom:0.3rem;color:var(--accent)">AI模型分析</div>';
+      var topNums = recs[i].scores.slice(0, 5);
+      for (var k = 0; k < topNums.length; k++) {
+        var s = topNums[k];
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem">';
+        html += '<span>号码 ' + s.num + '</span>';
+        html += '<span style="color:var(--muted)">转移:' + s.markov.toFixed(2) + ' 关联:' + s.cooc.toFixed(2) + ' 位置:' + s.pos.toFixed(2) + ' 动量:' + s.trend.toFixed(2) + ' 融合:' + s.score.toFixed(4) + '</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+    }
+
+    var el = document.getElementById('pl3-smart-recommend');
+    if (el) el.innerHTML = html;
+  }
+
+  // 排列五
+  if (typeof PL5_HISTORY !== 'undefined' && PL5_HISTORY.length > 0) {
+    var lastDraw = PL5_HISTORY[0].numbers;
+    var recs = smartRecommendPL5(PL5_HISTORY, lastDraw);
+
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合</div>';
+
+    for (var i = 0; i < recs.length; i++) {
+      html += '<div style="margin-bottom:1rem">';
+      html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">智能方案 ' + (i + 1) + '</div>';
+      html += '<div class="ball-row">';
+      for (var j = 0; j < recs[i].picks.length; j++) {
+        html += '<div class="ball red">' + recs[i].picks[j] + '</div>';
+      }
+      html += '</div>';
+
+      html += '<div style="margin-top:0.5rem;font-size:0.75rem;color:var(--muted);background:var(--bg3);border:1px solid var(--rule);border-radius:6px;padding:0.5rem">';
+      html += '<div style="font-weight:700;margin-bottom:0.3rem;color:var(--accent)">AI模型分析</div>';
+      var topNums = recs[i].scores.slice(0, 5);
+      for (var k = 0; k < topNums.length; k++) {
+        var s = topNums[k];
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.15rem">';
+        html += '<span>号码 ' + s.num + '</span>';
+        html += '<span style="color:var(--muted)">转移:' + s.markov.toFixed(2) + ' 关联:' + s.cooc.toFixed(2) + ' 位置:' + s.pos.toFixed(2) + ' 动量:' + s.trend.toFixed(2) + ' 融合:' + s.score.toFixed(4) + '</span>';
+        html += '</div>';
+      }
+      html += '</div>';
+      html += '</div>';
+    }
+
+    var el = document.getElementById('pl5-smart-recommend');
+    if (el) el.innerHTML = html;
+  }
+}
+
+// ==================== 保留原有自动复盘函数（供兼容） ====================
 
 function autoReviewDLT() {
   if (typeof dltSampleHistory === 'undefined' || dltSampleHistory.length < 10) return;
@@ -28,7 +579,6 @@ function autoReviewDLT() {
   var actualFront = actualParts[0].split(',').map(Number);
   var actualBack = actualParts[1].split(',').map(Number);
 
-  // 用排除最新一期后的数据模拟生成推荐
   var simHistory = dltSampleHistory.slice(1);
   var simAllFronts = [];
   var simAllBacks = [];
@@ -40,14 +590,11 @@ function autoReviewDLT() {
 
   var simLast = { front: simAllFronts[0], back: simAllBacks[0] };
 
-  // 用现有评分函数生成模拟推荐
   var simScores = scoreDLTNumbers(simLast, simAllFronts, simAllBacks);
   var simBackScores = scoreDLTBackNumbers(simLast, simAllBacks);
 
-  // 生成3组模拟推荐
   var simRecommendations = generateDLTSimPicks(simScores, simBackScores);
 
-  // 计算每组推荐的命中率
   var reviewResults = [];
   var bestHitRate = 0;
   var bestSetIdx = 0;
@@ -70,16 +617,13 @@ function autoReviewDLT() {
     }
   }
 
-  // 根据复盘结果优化权重
   var optimizedWeights = optimizeDLTWeights(reviewResults, simScores);
 
-  // 用优化后的权重重新生成推荐（包含最新一期数据）
   var fullFronts = [actualFront].concat(simAllFronts);
   var fullBacks = [actualBack].concat(simAllBacks);
   var optScores = scoreDLTNumbersOptimized({ front: actualFront, back: actualBack }, fullFronts, fullBacks, optimizedWeights);
   var optBackScores = scoreDLTBackNumbersOptimized({ front: actualFront, back: actualBack }, fullBacks, optimizedWeights);
 
-  // 渲染复盘结果和优化推荐
   renderAutoReviewDLT(reviewResults, optimizedWeights, optScores, optBackScores, actualFront, actualBack);
 }
 
@@ -291,7 +835,6 @@ function renderAutoReviewDLT(reviewResults, weights, optScores, optBackScores, a
 
   var html = '';
 
-  // 复盘对比标题
   html += '<div style="margin-bottom:1rem">';
   html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">实际开奖号码（最新一期）</div>';
   html += '<div class="ball-row">';
@@ -304,7 +847,6 @@ function renderAutoReviewDLT(reviewResults, weights, optScores, optBackScores, a
   }
   html += '</div></div>';
 
-  // 模拟推荐 vs 实际开奖
   html += '<div style="margin-bottom:1.25rem">';
   html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.75rem">模拟推荐 vs 实际开奖对比</div>';
 
@@ -336,7 +878,6 @@ function renderAutoReviewDLT(reviewResults, weights, optScores, optBackScores, a
   }
   html += '</div>';
 
-  // 权重优化详情
   html += '<div style="margin-bottom:1.25rem">';
   html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.75rem">权重优化详情</div>';
   var baseWeights = { freq: 25, miss: 20, repeat: 15, zone: 15, adj: 5, tail: 3, oddEven: 2 };
@@ -352,7 +893,6 @@ function renderAutoReviewDLT(reviewResults, weights, optScores, optBackScores, a
   }
   html += '</div></div>';
 
-  // 精准推荐
   var optSorted = optScores.slice().sort(function(a, b) { return b.total - a.total; });
   var optBackSorted = optBackScores.slice().sort(function(a, b) { return b.total - a.total; });
 
@@ -514,7 +1054,6 @@ function optimizeSSQWeights(reviewResults, simScores) {
       if (simScores[j].num === n) { scoreData = simScores[j]; break; }
     }
     if (!scoreData) continue;
-    // SSQ scores don't have individual score fields, estimate from total
     var totalScore = scoreData.total;
     if (totalScore >= 60) freqHitCount++;
     if (totalScore >= 50 && totalScore < 70) missHitCount++;
@@ -679,7 +1218,6 @@ function renderAutoReviewSSQ(reviewResults, weights, optScores, optBackScores, a
   }
   html += '</div>';
 
-  // 权重优化详情
   html += '<div style="margin-bottom:1.25rem">';
   html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.75rem">权重优化详情</div>';
   var baseWeights = { freq: 25, miss: 20, repeat: 15, zone: 15, adj: 5, tail: 3, oddEven: 2 };
@@ -695,7 +1233,6 @@ function renderAutoReviewSSQ(reviewResults, weights, optScores, optBackScores, a
   }
   html += '</div></div>';
 
-  // 精准推荐
   var optSorted = optScores.slice().sort(function(a, b) { return b.total - a.total; });
   var optBackSorted = optBackScores.slice().sort(function(a, b) { return b.total - a.total; });
 
@@ -766,7 +1303,7 @@ function autoReviewKL8() {
 
   var simScores = scoreKL8Numbers(simLast, simAllNums);
 
-  var playType = 10; // default
+  var playType = 10;
 
   var simRecommendations = generateKL8SimPicks(simScores, playType);
 
@@ -948,7 +1485,6 @@ function renderAutoReviewKL8(reviewResults, weights, optScores, actualNums, play
   }
   html += '</div>';
 
-  // 权重优化详情
   html += '<div style="margin-bottom:1.25rem">';
   html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.75rem">权重优化详情</div>';
   var baseWeights = { freq: 25, miss: 20, repeat: 15, zone: 15, adj: 5, tail: 3, oddEven: 2 };
@@ -964,7 +1500,6 @@ function renderAutoReviewKL8(reviewResults, weights, optScores, actualNums, play
   }
   html += '</div></div>';
 
-  // 精准推荐
   var optSorted = optScores.slice().sort(function(a, b) { return b.total - a.total; });
 
   html += '<div style="margin-bottom:1rem">';
@@ -1330,7 +1865,6 @@ function renderAutoReviewPL(reviewResults, weights, optScores, actualNums, type,
   }
   html += '</div>';
 
-  // 权重优化详情
   html += '<div style="margin-bottom:1.25rem">';
   html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.75rem">权重优化详情</div>';
   var baseWeights = { freq: 30, miss: 25, repeat: 25, oddEven: 10, bigSmall: 10 };
@@ -1346,7 +1880,6 @@ function renderAutoReviewPL(reviewResults, weights, optScores, actualNums, type,
   }
   html += '</div></div>';
 
-  // 精准推荐
   var optSorted = optScores.slice().sort(function(a, b) { return b.total - a.total; });
 
   html += '<div style="margin-bottom:1rem">';
