@@ -607,6 +607,8 @@ tr:hover td { background: var(--bg3); }
       <button class="tab-btn active" data-tab="dlt">大乐透</button>
       <button class="tab-btn" data-tab="ssq">双色球</button>
       <button class="tab-btn" data-tab="kl8">快乐8</button>
+      <button class="tab-btn" data-tab="pl3">排列三</button>
+      <button class="tab-btn" data-tab="pl5">排列五</button>
       <button class="tab-btn" data-tab="method">分析方法论</button>
     </nav>
   </div>
@@ -968,6 +970,200 @@ tr:hover td { background: var(--bg3); }
   </div>
 </div>
 
+<!-- ==================== 排列三面板 ==================== -->
+<div class="lottery-panel" id="panel-pl3">
+  <div class="card">
+    <div class="card-title"><span class="icon">&#127942;</span> 排列三玩法规则</div>
+    <div class="rule-box">
+      <strong>号码池：</strong>从 0-9 中选取 3 个数字（可重复）&nbsp;|&nbsp; <strong>开奖频率：</strong>每天一期（晚21:15开奖）<br>
+      <strong>玩法类型：</strong>直选（位置对应）、组三（有两个相同）、组六（三个不同）、1D/2D（定位）<br>
+      <strong>和值范围：</strong>0-27 &nbsp;|&nbsp; <strong>跨度范围：</strong>0-9
+    </div>
+  </div>
+
+  <div class="input-section">
+    <h3>输入上期开奖号码</h3>
+    <div class="input-row">
+      <label>开奖号码：</label>
+      <input type="text" id="pl3-numbers" placeholder="如: 5,5,1" style="width:200px">
+    </div>
+    <div class="input-row" style="margin-top:0.5rem">
+      <label>近N期数据：</label>
+      <textarea id="pl3-history" placeholder="粘贴多期数据，每行一期，3个数字逗号分隔&#10;例如:&#10;5,5,1&#10;5,5,7&#10;9,1,1" rows="5"></textarea>
+    </div>
+    <div class="input-row" style="margin-top:0.75rem">
+      <button class="btn btn-primary" onclick="analyzePL3()">开始分析</button>
+      <button class="btn btn-secondary" onclick="loadPL3Sample()">加载示例数据</button>
+      <button class="btn btn-secondary" onclick="clearPL3()">清空</button>
+    </div>
+  </div>
+
+  <div id="pl3-results" style="display:none">
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128200;</span> 基本统计指标</div>
+      <div class="stat-grid" id="pl3-stats"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128260;</span> 上期重号分析</div>
+      <div id="pl3-repeat"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128736;</span> 和值分析</div>
+      <div id="pl3-sum"></div>
+      <figure class="chart-figure">
+        <figcaption>和值走势</figcaption>
+        <div id="chart-pl3-sum" style="width:100%;min-height:300px"></div>
+      </figure>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#129504;</span> 跨度分析</div>
+      <div id="pl3-span"></div>
+      <figure class="chart-figure">
+        <figcaption>跨度走势</figcaption>
+        <div id="chart-pl3-span" style="width:100%;min-height:300px"></div>
+      </figure>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#127777;&#10052;&#65039;</span> 冷热号分析</div>
+      <div id="pl3-hotcold"></div>
+      <figure class="chart-figure">
+        <figcaption>号码出现频率</figcaption>
+        <div id="chart-pl3-freq" style="width:100%;min-height:350px"></div>
+      </figure>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128204;</span> 奇偶比 / 大小比分析</div>
+      <div id="pl3-odd-even"></div>
+      <figure class="chart-figure">
+        <figcaption>奇偶比走势</figcaption>
+        <div id="chart-pl3-oddeven" style="width:100%;min-height:300px"></div>
+      </figure>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128291;</span> 尾数分布分析</div>
+      <div id="pl3-tail"></div>
+      <figure class="chart-figure">
+        <figcaption>尾数出现频率</figcaption>
+        <div id="chart-pl3-tail" style="width:100%;min-height:300px"></div>
+      </figure>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128279;</span> 遗漏分析</div>
+      <div id="pl3-miss"></div>
+      <figure class="chart-figure">
+        <figcaption>各号码遗漏期数</figcaption>
+        <div id="chart-pl3-miss" style="width:100%;min-height:300px"></div>
+      </figure>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#127919;</span> 综合推荐号码</div>
+      <div id="pl3-recommend"></div>
+    </div>
+  </div>
+
+  <div id="pl3-empty" class="empty-state">
+    <div class="icon">&#128203;</div>
+    <p>请输入上期开奖号码或历史数据，点击"开始分析"查看预测结果</p>
+  </div>
+</div>
+
+<!-- ==================== 排列五面板 ==================== -->
+<div class="lottery-panel" id="panel-pl5">
+  <div class="card">
+    <div class="card-title"><span class="icon">&#127942;</span> 排列五玩法规则</div>
+    <div class="rule-box">
+      <strong>号码池：</strong>从 0-9 中选取 5 个数字（可重复）&nbsp;|&nbsp; <strong>开奖频率：</strong>每天一期（晚21:15开奖）<br>
+      <strong>玩法类型：</strong>直选（位置对应）、组选（不考虑顺序）&nbsp;|&nbsp; <strong>前三位与排列三相同</strong><br>
+      <strong>和值范围：</strong>0-45 &nbsp;|&nbsp; <strong>跨度范围：</strong>0-9
+    </div>
+  </div>
+
+  <div class="input-section">
+    <h3>输入上期开奖号码</h3>
+    <div class="input-row">
+      <label>开奖号码：</label>
+      <input type="text" id="pl5-numbers" placeholder="如: 5,5,1,6,4" style="width:300px">
+    </div>
+    <div class="input-row" style="margin-top:0.5rem">
+      <label>近N期数据：</label>
+      <textarea id="pl5-history" placeholder="粘贴多期数据，每行一期，5个数字逗号分隔&#10;例如:&#10;5,5,1,6,4&#10;5,5,7,6,0&#10;9,1,1,3,3" rows="5"></textarea>
+    </div>
+    <div class="input-row" style="margin-top:0.75rem">
+      <button class="btn btn-primary" onclick="analyzePL5()">开始分析</button>
+      <button class="btn btn-secondary" onclick="loadPL5Sample()">加载示例数据</button>
+      <button class="btn btn-secondary" onclick="clearPL5()">清空</button>
+    </div>
+  </div>
+
+  <div id="pl5-results" style="display:none">
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128200;</span> 基本统计指标</div>
+      <div class="stat-grid" id="pl5-stats"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128260;</span> 上期重号分析</div>
+      <div id="pl5-repeat"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128736;</span> 和值分析</div>
+      <div id="pl5-sum"></div>
+      <figure class="chart-figure">
+        <figcaption>和值走势</figcaption>
+        <div id="chart-pl5-sum" style="width:100%;min-height:300px"></div>
+      </figure>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#129504;</span> 跨度分析</div>
+      <div id="pl5-span"></div>
+      <figure class="chart-figure">
+        <figcaption>跨度走势</figcaption>
+        <div id="chart-pl5-span" style="width:100%;min-height:300px"></div>
+      </figure>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#127777;&#10052;&#65039;</span> 冷热号分析</div>
+      <div id="pl5-hotcold"></div>
+      <figure class="chart-figure">
+        <figcaption>号码出现频率</figcaption>
+        <div id="chart-pl5-freq" style="width:100%;min-height:350px"></div>
+      </figure>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128204;</span> 奇偶比 / 大小比分析</div>
+      <div id="pl5-odd-even"></div>
+      <figure class="chart-figure">
+        <figcaption>奇偶比走势</figcaption>
+        <div id="chart-pl5-oddeven" style="width:100%;min-height:300px"></div>
+      </figure>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128291;</span> 尾数分布分析</div>
+      <div id="pl5-tail"></div>
+      <figure class="chart-figure">
+        <figcaption>尾数出现频率</figcaption>
+        <div id="chart-pl5-tail" style="width:100%;min-height:300px"></div>
+      </figure>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128279;</span> 遗漏分析</div>
+      <div id="pl5-miss"></div>
+      <figure class="chart-figure">
+        <figcaption>各号码遗漏期数</figcaption>
+        <div id="chart-pl5-miss" style="width:100%;min-height:300px"></div>
+      </figure>
+    </div>
+    <div class="card">
+      <div class="card-title"><span class="icon">&#127919;</span> 综合推荐号码</div>
+      <div id="pl5-recommend"></div>
+    </div>
+  </div>
+
+  <div id="pl5-empty" class="empty-state">
+    <div class="icon">&#128203;</div>
+    <p>请输入上期开奖号码或历史数据，点击"开始分析"查看预测结果</p>
+  </div>
+</div>
+
 <!-- ==================== 分析方法论面板 ==================== -->
 <div class="lottery-panel" id="panel-method">
   <div class="card">
@@ -1050,8 +1246,11 @@ tr:hover td { background: var(--bg3); }
 
 <!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-<script src="assets/charts.js?v=2"></script>
-<script src="assets/engine.js"></script>
+<script src="assets/charts.js?v=3"></script>
+<script src="assets/pl-charts.js?v=3"></script>
+<script src="assets/engine.js?v=3"></script>
+<script src="assets/pl-data.js?v=3"></script>
+<script src="assets/pl-engine.js?v=3"></script>
 <script>
 // Tab switching
 document.querySelectorAll('.tab-btn').forEach(function(btn) {
@@ -1070,10 +1269,14 @@ window.addEventListener('DOMContentLoaded', function() {
   loadDLTSample();
   loadSSQSample();
   loadKL8Sample();
+  loadPL3Sample();
+  loadPL5Sample();
   setTimeout(function() {
     analyzeDLT();
     analyzeSSQ();
     analyzeKL8();
+    analyzePL3();
+    analyzePL5();
   }, 500);
 });
 </script>
