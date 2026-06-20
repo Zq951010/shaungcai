@@ -22,6 +22,8 @@ function loadPL3Sample() {
     historyLines.push(PL3_HISTORY[i].numbers.join(','));
   }
   document.getElementById('pl3-history').value = historyLines.join('\n');
+  // 填充复盘输入框默认值
+  document.getElementById('pl3-review-numbers').value = last.numbers.join(',');
 }
 
 function clearPL3() {
@@ -549,6 +551,8 @@ function loadPL5Sample() {
     historyLines.push(PL5_HISTORY[i].numbers.join(','));
   }
   document.getElementById('pl5-history').value = historyLines.join('\n');
+  // 填充复盘输入框默认值
+  document.getElementById('pl5-review-numbers').value = last.numbers.join(',');
 }
 
 function clearPL5() {
@@ -1063,6 +1067,130 @@ function renderPL5Recommend(last, history) {
   html += '<div class="disclaimer" style="margin-top:1.5rem"><strong>声明：</strong>以上推荐号码基于历史数据统计分析生成，仅供娱乐参考。彩票开奖为随机事件，不构成任何投注建议。</div>';
 
   document.getElementById('pl5-recommend').innerHTML = html;
+}
+
+// ==================== 排列三/排列五 复盘函数 ====================
+
+function reviewPL3() {
+  var userNums = parseNums0(document.getElementById('pl3-review-numbers').value);
+  if (userNums.length < 3) { alert('请输入3个数字（0-9，逗号分隔）'); return; }
+
+  var lastNums = PL3_HISTORY[0].numbers;
+  var posHits = [0, 0, 0];
+  var numHits = 0;
+  var hitDetails = [];
+
+  for (var i = 0; i < 3; i++) {
+    if (userNums[i] === lastNums[i]) {
+      posHits[i] = 1;
+      numHits++;
+      hitDetails.push('第' + (i + 1) + '位命中 ' + userNums[i]);
+    }
+  }
+
+  var setHits = 0;
+  for (var i = 0; i < userNums.length; i++) {
+    if (lastNums.indexOf(userNums[i]) >= 0) setHits++;
+  }
+
+  var html = '<div style="margin-bottom:0.5rem"><strong>上期开奖：</strong>' + lastNums.join(',') + '</div>';
+  html += '<div style="margin-bottom:0.5rem"><strong>您的选号：</strong>' + userNums.join(',') + '</div>';
+  html += '<div class="stat-grid" style="margin:0.75rem 0">';
+  html += '<div class="stat-item"><div class="stat-value">' + numHits + '/3</div><div class="stat-label">定位命中</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + setHits + '/3</div><div class="stat-label">号码包含</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + (numHits >= 3 ? '直选' : numHits >= 1 ? '定位' : setHits >= 2 ? '组选' : '未中') + '</div><div class="stat-label">奖级</div></div>';
+  html += '</div>';
+
+  html += '<div style="margin-bottom:0.5rem"><strong>位置对比：</strong></div>';
+  html += '<div class="ball-row">';
+  for (var i = 0; i < 3; i++) {
+    var isHit = posHits[i] === 1;
+    html += '<div style="text-align:center;margin-right:0.75rem">';
+    html += '<div style="color:var(--muted);font-size:0.75rem;margin-bottom:0.25rem">第' + (i + 1) + '位</div>';
+    html += '<span class="ball ' + (isHit ? 'red' : 'gray') + '">' + userNums[i] + '</span>';
+    html += '<div style="color:var(--muted);font-size:0.7rem;margin-top:0.25rem">开奖 ' + lastNums[i] + '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  if (hitDetails.length > 0) {
+    html += '<div style="margin-top:0.5rem;color:var(--accent3);font-size:0.85rem">' + hitDetails.join('；') + '</div>';
+  }
+
+  var score = numHits * 30 + (setHits - numHits) * 10;
+  var grade = score >= 80 ? '优秀' : score >= 50 ? '良好' : score >= 20 ? '一般' : '需改进';
+  var color = score >= 80 ? 'var(--accent3)' : score >= 50 ? 'var(--accent4)' : score >= 20 ? 'var(--accent)' : 'var(--accent2)';
+  html += '<div style="margin-top:0.75rem;padding:0.75rem;background:var(--bg3);border-radius:8px">';
+  html += '<div style="font-size:1.1rem;font-weight:700;color:' + color + ';margin-bottom:0.5rem">综合评价：' + grade + '（得分 ' + score + '）</div>';
+  html += '<div style="color:var(--muted);font-size:0.85rem">';
+  if (numHits >= 2) html += '定位命中率高，号码走势把握较好。';
+  else if (numHits >= 1) html += '有定位命中，建议结合冷热号和遗漏分析优化。';
+  else if (setHits >= 2) html += '号码包含命中较多，可考虑组选玩法。';
+  else html += '命中偏低，建议参考冷热号、和值和跨度分析调整选号。';
+  html += '</div></div>';
+
+  document.getElementById('pl3-review-result').innerHTML = html;
+}
+
+function reviewPL5() {
+  var userNums = parseNums0(document.getElementById('pl5-review-numbers').value);
+  if (userNums.length < 5) { alert('请输入5个数字（0-9，逗号分隔）'); return; }
+
+  var lastNums = PL5_HISTORY[0].numbers;
+  var posHits = [0, 0, 0, 0, 0];
+  var numHits = 0;
+  var hitDetails = [];
+
+  for (var i = 0; i < 5; i++) {
+    if (userNums[i] === lastNums[i]) {
+      posHits[i] = 1;
+      numHits++;
+      hitDetails.push('第' + (i + 1) + '位命中 ' + userNums[i]);
+    }
+  }
+
+  var setHits = 0;
+  for (var i = 0; i < userNums.length; i++) {
+    if (lastNums.indexOf(userNums[i]) >= 0) setHits++;
+  }
+
+  var html = '<div style="margin-bottom:0.5rem"><strong>上期开奖：</strong>' + lastNums.join(',') + '</div>';
+  html += '<div style="margin-bottom:0.5rem"><strong>您的选号：</strong>' + userNums.join(',') + '</div>';
+  html += '<div class="stat-grid" style="margin:0.75rem 0">';
+  html += '<div class="stat-item"><div class="stat-value">' + numHits + '/5</div><div class="stat-label">定位命中</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + setHits + '/5</div><div class="stat-label">号码包含</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + (numHits >= 5 ? '一等奖' : numHits >= 4 ? '二等奖' : numHits >= 3 ? '三等奖' : numHits >= 2 ? '四等奖' : '未中') + '</div><div class="stat-label">奖级</div></div>';
+  html += '</div>';
+
+  html += '<div style="margin-bottom:0.5rem"><strong>位置对比：</strong></div>';
+  html += '<div class="ball-row">';
+  for (var i = 0; i < 5; i++) {
+    var isHit = posHits[i] === 1;
+    html += '<div style="text-align:center;margin-right:0.75rem">';
+    html += '<div style="color:var(--muted);font-size:0.75rem;margin-bottom:0.25rem">第' + (i + 1) + '位</div>';
+    html += '<span class="ball ' + (isHit ? 'red' : 'gray') + '">' + userNums[i] + '</span>';
+    html += '<div style="color:var(--muted);font-size:0.7rem;margin-top:0.25rem">开奖 ' + lastNums[i] + '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  if (hitDetails.length > 0) {
+    html += '<div style="margin-top:0.5rem;color:var(--accent3);font-size:0.85rem">' + hitDetails.join('；') + '</div>';
+  }
+
+  var score = numHits * 20 + (setHits - numHits) * 5;
+  var grade = score >= 80 ? '优秀' : score >= 50 ? '良好' : score >= 20 ? '一般' : '需改进';
+  var color = score >= 80 ? 'var(--accent3)' : score >= 50 ? 'var(--accent4)' : score >= 20 ? 'var(--accent)' : 'var(--accent2)';
+  html += '<div style="margin-top:0.75rem;padding:0.75rem;background:var(--bg3);border-radius:8px">';
+  html += '<div style="font-size:1.1rem;font-weight:700;color:' + color + ';margin-bottom:0.5rem">综合评价：' + grade + '（得分 ' + score + '）</div>';
+  html += '<div style="color:var(--muted);font-size:0.85rem">';
+  if (numHits >= 3) html += '定位命中率高，号码走势把握精准，继续保持。';
+  else if (numHits >= 1) html += '有定位命中，建议结合冷热号、和值和跨度分析优化选号。';
+  else if (setHits >= 3) html += '号码包含命中较多，可考虑组选玩法或调整定位策略。';
+  else html += '命中偏低，建议全面参考冷热号、和值、跨度及遗漏分析调整选号策略。';
+  html += '</div></div>';
+
+  document.getElementById('pl5-review-result').innerHTML = html;
 }
 
 // ==================== 排列三/排列五 图表渲染 ====================
