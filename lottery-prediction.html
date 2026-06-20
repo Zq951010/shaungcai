@@ -5,11 +5,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>彩票预测分析平台 — 大乐透 · 双色球 · 快乐8</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-@font-face { font-family: 'Outfit'; src: url('./_shared/fonts/Outfit-Regular.ttf') format('truetype'); font-weight: 400; }
-@font-face { font-family: 'Outfit'; src: url('./_shared/fonts/Outfit-Bold.ttf') format('truetype'); font-weight: 700; }
-@font-face { font-family: 'JetBrains Mono'; src: url('./_shared/fonts/JetBrainsMono-Regular.ttf') format('truetype'); font-weight: 400; }
-@font-face { font-family: 'JetBrains Mono'; src: url('./_shared/fonts/JetBrainsMono-Bold.ttf') format('truetype'); font-weight: 700; }
+:root { --font-ui: 'Inter', sans-serif; --font-mono: 'JetBrains Mono', monospace; }
 
 :root {
   --bg: #0a0e17;
@@ -31,7 +31,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body {
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Inter', sans-serif;
   background: var(--bg);
   color: var(--ink);
   line-height: 1.6;
@@ -82,7 +82,7 @@ body {
   border-radius: 8px;
   background: transparent;
   color: var(--muted);
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.9rem;
   cursor: pointer;
   transition: all 0.25s;
@@ -264,7 +264,7 @@ body {
   padding: 0.5rem 1.25rem;
   border: none;
   border-radius: 6px;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
@@ -1049,7 +1049,7 @@ tr:hover td { background: var(--bg3); }
 </div><!-- end container -->
 
 <!-- Scripts -->
-<script src="./_shared/js/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=2"></script>
 <script src="assets/engine.js"></script>
 <script>
