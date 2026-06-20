@@ -43,6 +43,7 @@ var DLT_ZONES = [[1,12],[13,23],[24,35]];
 var DLT_BACK_ZONES = [[1,4],[5,8],[9,12]];
 
 var dltSampleHistory = [
+  '03,11,12,21,22|06,10',
   '06,16,18,19,28|07,11',
   '10,13,19,21,30|04,05',
   '04,11,12,13,25|04,08',
@@ -81,6 +82,11 @@ function loadDLTSample() {
   document.getElementById('dlt-front').value = parts[0];
   document.getElementById('dlt-back').value = parts[1];
   document.getElementById('dlt-history').value = dltSampleHistory.join('\n');
+  // 填充复盘输入框默认值（推荐号码第一组）
+  var sampleFront = parts[0].split(',').slice(0,5).join(',');
+  var sampleBack = parts[1].split(',').slice(0,2).join(',');
+  document.getElementById('dlt-review-numbers').value = sampleFront;
+  document.getElementById('dlt-review-blue').value = sampleBack;
 }
 
 function clearDLT() {
@@ -720,6 +726,10 @@ function loadSSQSample() {
   document.getElementById('ssq-red').value = parts[0];
   document.getElementById('ssq-blue').value = parts[1];
   document.getElementById('ssq-history').value = ssqSampleHistory.join('\n');
+  // 填充复盘输入框默认值
+  var sampleRed = parts[0].split(',').slice(0,6).join(',');
+  document.getElementById('ssq-review-numbers').value = sampleRed;
+  document.getElementById('ssq-review-blue').value = parts[1];
 }
 
 function clearSSQ() {
@@ -1489,6 +1499,7 @@ function renderSSQTail(allReds) {
 var KL8_ZONES = [[1,20],[21,40],[41,60],[61,80]];
 
 var kl8SampleHistory = [
+  '02,14,15,23,28,30,35,39,43,44,49,50,51,53,57,60,62,69,74,76',
   '02,04,06,09,13,26,32,36,38,41,44,47,56,58,60,69,72,76,78,80',
   '04,05,08,12,22,23,26,27,35,39,47,50,56,58,60,61,66,70,71,77',
   '05,11,12,15,20,23,28,29,37,38,45,49,51,55,63,64,65,69,77,79',
@@ -1525,6 +1536,8 @@ function loadKL8Sample() {
   var last = kl8SampleHistory[0];
   document.getElementById('kl8-numbers').value = last;
   document.getElementById('kl8-history').value = kl8SampleHistory.join('\n');
+  // 填充复盘输入框默认值
+  document.getElementById('kl8-review-numbers').value = last;
 }
 
 function clearKL8() {
@@ -2191,4 +2204,142 @@ function renderKL8AC(history) {
   html += '</div>';
   document.getElementById('kl8-ac').innerHTML = html;
   renderKL8ACChart(acValues);
+}
+
+// ==================== 上期选号复盘函数 ====================
+
+function reviewDLT() {
+  var userFront = parseNums(document.getElementById('dlt-review-numbers').value);
+  var userBack = parseNums(document.getElementById('dlt-review-blue').value);
+  if (userFront.length < 5) { alert('请输入至少5个前区号码'); return; }
+
+  var last = dltSampleHistory[0].split('|');
+  var lastFront = parseNums(last[0]);
+  var lastBack = parseNums(last[1]);
+
+  var hitFront = userFront.filter(function(n){ return lastFront.indexOf(n) >= 0; });
+  var hitBack = userBack.filter(function(n){ return lastBack.indexOf(n) >= 0; });
+
+  var html = '<div style="margin-bottom:0.5rem"><strong>上期开奖：</strong>前区 ' + lastFront.map(function(n){return pad(n);}).join(',') + ' + 后区 ' + lastBack.map(function(n){return pad(n);}).join(',') + '</div>';
+  html += '<div style="margin-bottom:0.5rem"><strong>您的选号：</strong>前区 ' + userFront.map(function(n){return pad(n);}).join(',') + ' + 后区 ' + userBack.map(function(n){return pad(n);}).join(',') + '</div>';
+  html += '<div class="stat-grid" style="margin:0.75rem 0">';
+  html += '<div class="stat-item"><div class="stat-value">' + hitFront.length + '/5</div><div class="stat-label">前区命中</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + hitBack.length + '/2</div><div class="stat-label">后区命中</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + (hitFront.length + hitBack.length) + '/7</div><div class="stat-label">总命中</div></div>';
+  html += '</div>';
+
+  html += '<div style="margin-bottom:0.5rem"><strong>命中号码：</strong></div>';
+  html += '<div class="ball-row">';
+  userFront.forEach(function(n) {
+    var isHit = lastFront.indexOf(n) >= 0;
+    html += '<span class="ball ' + (isHit ? 'red' : 'gray') + '">' + pad(n) + '</span>';
+  });
+  html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
+  userBack.forEach(function(n) {
+    var isHit = lastBack.indexOf(n) >= 0;
+    html += '<span class="ball ' + (isHit ? 'blue' : 'gray') + '">' + pad(n) + '</span>';
+  });
+  html += '</div>';
+
+  var score = hitFront.length * 10 + hitBack.length * 15;
+  var grade = score >= 60 ? '优秀' : score >= 40 ? '良好' : score >= 20 ? '一般' : '需改进';
+  var color = score >= 60 ? 'var(--accent3)' : score >= 40 ? 'var(--accent4)' : score >= 20 ? 'var(--accent)' : 'var(--accent2)';
+  html += '<div style="margin-top:0.75rem;padding:0.75rem;background:var(--bg3);border-radius:8px">';
+  html += '<div style="font-size:1.1rem;font-weight:700;color:' + color + ';margin-bottom:0.5rem">综合评价：' + grade + '（得分 ' + score + '）</div>';
+  html += '<div style="color:var(--muted);font-size:0.85rem">';
+  if (hitFront.length >= 4) html += '前区命中率高，选号思路较好。';
+  else if (hitFront.length >= 2) html += '前区有一定命中，建议多关注冷热号分析。';
+  else html += '前区命中偏低，建议参考冷热号和遗漏分析调整选号策略。';
+  if (hitBack.length >= 1) html += '后区命中不错，继续保持。';
+  else html += '后区未命中，建议关注后区遗漏走势。';
+  html += '</div></div>';
+
+  document.getElementById('dlt-review-result').innerHTML = html;
+}
+
+function reviewSSQ() {
+  var userRed = parseNums(document.getElementById('ssq-review-numbers').value);
+  var userBlue = parseNums(document.getElementById('ssq-review-blue').value);
+  if (userRed.length < 6) { alert('请输入至少6个红球号码'); return; }
+
+  var last = ssqSampleHistory[0].split('|');
+  var lastRed = parseNums(last[0]);
+  var lastBlue = parseNums(last[1]);
+
+  var hitRed = userRed.filter(function(n){ return lastRed.indexOf(n) >= 0; });
+  var hitBlue = userBlue.filter(function(n){ return lastBlue.indexOf(n) >= 0; });
+
+  var html = '<div style="margin-bottom:0.5rem"><strong>上期开奖：</strong>红球 ' + lastRed.map(function(n){return pad(n);}).join(',') + ' + 蓝球 ' + lastBlue.map(function(n){return pad(n);}).join(',') + '</div>';
+  html += '<div style="margin-bottom:0.5rem"><strong>您的选号：</strong>红球 ' + userRed.map(function(n){return pad(n);}).join(',') + ' + 蓝球 ' + userBlue.map(function(n){return pad(n);}).join(',') + '</div>';
+  html += '<div class="stat-grid" style="margin:0.75rem 0">';
+  html += '<div class="stat-item"><div class="stat-value">' + hitRed.length + '/6</div><div class="stat-label">红球命中</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + hitBlue.length + '/1</div><div class="stat-label">蓝球命中</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + (hitRed.length + hitBlue.length) + '/7</div><div class="stat-label">总命中</div></div>';
+  html += '</div>';
+
+  html += '<div style="margin-bottom:0.5rem"><strong>命中号码：</strong></div>';
+  html += '<div class="ball-row">';
+  userRed.forEach(function(n) {
+    var isHit = lastRed.indexOf(n) >= 0;
+    html += '<span class="ball ' + (isHit ? 'red' : 'gray') + '">' + pad(n) + '</span>';
+  });
+  html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
+  userBlue.forEach(function(n) {
+    var isHit = lastBlue.indexOf(n) >= 0;
+    html += '<span class="ball ' + (isHit ? 'blue' : 'gray') + '">' + pad(n) + '</span>';
+  });
+  html += '</div>';
+
+  var score = hitRed.length * 10 + hitBlue.length * 25;
+  var grade = score >= 60 ? '优秀' : score >= 40 ? '良好' : score >= 20 ? '一般' : '需改进';
+  var color = score >= 60 ? 'var(--accent3)' : score >= 40 ? 'var(--accent4)' : score >= 20 ? 'var(--accent)' : 'var(--accent2)';
+  html += '<div style="margin-top:0.75rem;padding:0.75rem;background:var(--bg3);border-radius:8px">';
+  html += '<div style="font-size:1.1rem;font-weight:700;color:' + color + ';margin-bottom:0.5rem">综合评价：' + grade + '（得分 ' + score + '）</div>';
+  html += '<div style="color:var(--muted);font-size:0.85rem">';
+  if (hitRed.length >= 4) html += '红球命中率高，选号思路较好。';
+  else if (hitRed.length >= 2) html += '红球有一定命中，建议多关注冷热号分析。';
+  else html += '红球命中偏低，建议参考冷热号和遗漏分析调整选号策略。';
+  if (hitBlue.length >= 1) html += '蓝球命中不错，继续保持。';
+  else html += '蓝球未命中，建议关注蓝球遗漏走势。';
+  html += '</div></div>';
+
+  document.getElementById('ssq-review-result').innerHTML = html;
+}
+
+function reviewKL8() {
+  var userNums = parseNums(document.getElementById('kl8-review-numbers').value);
+  if (userNums.length < 1) { alert('请输入至少1个号码'); return; }
+
+  var lastNums = parseNums(kl8SampleHistory[0]);
+  var hitNums = userNums.filter(function(n){ return lastNums.indexOf(n) >= 0; });
+
+  var html = '<div style="margin-bottom:0.5rem"><strong>上期开奖（20个）：</strong>' + lastNums.map(function(n){return pad(n);}).join(',') + '</div>';
+  html += '<div style="margin-bottom:0.5rem"><strong>您的选号（' + userNums.length + '个）：</strong>' + userNums.map(function(n){return pad(n);}).join(',') + '</div>';
+  html += '<div class="stat-grid" style="margin:0.75rem 0">';
+  html += '<div class="stat-item"><div class="stat-value">' + hitNums.length + '</div><div class="stat-label">命中个数</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + (userNums.length > 0 ? ((hitNums.length / userNums.length) * 100).toFixed(1) : 0) + '%</div><div class="stat-label">命中率</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + hitNums.length + '/20</div><div class="stat-label">开奖命中</div></div>';
+  html += '</div>';
+
+  html += '<div style="margin-bottom:0.5rem"><strong>命中号码：</strong></div>';
+  html += '<div class="ball-row">';
+  userNums.forEach(function(n) {
+    var isHit = lastNums.indexOf(n) >= 0;
+    html += '<span class="ball ' + (isHit ? 'gold' : 'gray') + '" style="width:36px;height:36px;font-size:0.75rem">' + pad(n) + '</span>';
+  });
+  html += '</div>';
+
+  var hitRate = userNums.length > 0 ? hitNums.length / userNums.length : 0;
+  var score = hitRate * 100;
+  var grade = score >= 50 ? '优秀' : score >= 30 ? '良好' : score >= 15 ? '一般' : '需改进';
+  var color = score >= 50 ? 'var(--accent3)' : score >= 30 ? 'var(--accent4)' : score >= 15 ? 'var(--accent)' : 'var(--accent2)';
+  html += '<div style="margin-top:0.75rem;padding:0.75rem;background:var(--bg3);border-radius:8px">';
+  html += '<div style="font-size:1.1rem;font-weight:700;color:' + color + ';margin-bottom:0.5rem">综合评价：' + grade + '（命中率 ' + score.toFixed(1) + '%）</div>';
+  html += '<div style="color:var(--muted);font-size:0.85rem">';
+  if (hitNums.length >= 5) html += '命中个数较多，选号覆盖面广，思路较好。';
+  else if (hitNums.length >= 2) html += '有一定命中，建议多关注冷热号分布和区间平衡。';
+  else html += '命中偏低，建议参考冷热号分析和四区间分布调整选号策略。';
+  html += '</div></div>';
+
+  document.getElementById('kl8-review-result').innerHTML = html;
 }
