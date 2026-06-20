@@ -263,6 +263,55 @@ function smartRecommendDLT(history, lastDraw) {
     });
   }
 
+  // 为每个号码生成选号理由
+  var allPickedNums = [];
+  for (var i = 0; i < recommendations.length; i++) {
+    for (var j = 0; j < recommendations[i].front.length; j++) {
+      if (allPickedNums.indexOf(recommendations[i].front[j]) < 0) {
+        allPickedNums.push(recommendations[i].front[j]);
+      }
+    }
+  }
+
+  // 为每个前区号码生成理由
+  var reasonMap = {};
+  for (var i = 0; i < allPickedNums.length; i++) {
+    var n = allPickedNums[i];
+    var scoreData = null;
+    for (var j = 0; j < fused.length; j++) {
+      if (fused[j].num === n) { scoreData = fused[j]; break; }
+    }
+    reasonMap[n] = analyzeNumberReason(n, allFronts, lastDraw.front, scoreData || {}, 35, true);
+  }
+
+  // 将理由添加到每个推荐中
+  for (var i = 0; i < recommendations.length; i++) {
+    recommendations[i].reasons = {};
+    for (var j = 0; j < recommendations[i].front.length; j++) {
+      recommendations[i].reasons[recommendations[i].front[j]] = reasonMap[recommendations[i].front[j]];
+    }
+    // 后区理由
+    recommendations[i].backReasons = {};
+    for (var j = 0; j < recommendations[i].back.length; j++) {
+      var bn = recommendations[i].back[j];
+      var bMiss = 0;
+      for (var k = 0; k < allBacks.length; k++) {
+        if (allBacks[k].indexOf(bn) >= 0) break;
+        bMiss++;
+      }
+      var bRecent = 0;
+      for (var k = 0; k < 5 && k < allBacks.length; k++) {
+        if (allBacks[k].indexOf(bn) >= 0) bRecent++;
+      }
+      var bReasons = [];
+      if (lastDraw.back.indexOf(bn) >= 0) bReasons.push('重号');
+      if (bMiss >= 4) bReasons.push('遗漏' + bMiss + '期回补');
+      if (bRecent >= 2) bReasons.push('热号');
+      else if (bRecent === 0) bReasons.push('冷号回补');
+      recommendations[i].backReasons[bn] = bReasons.length > 0 ? bReasons.join('；') : '综合评分较高';
+    }
+  }
+
   return recommendations;
 }
 
@@ -344,6 +393,52 @@ function smartRecommendSSQ(history, lastDraw) {
     });
   }
 
+  // 为每个号码生成选号理由
+  var allPickedReds = [];
+  for (var i = 0; i < recommendations.length; i++) {
+    for (var j = 0; j < recommendations[i].red.length; j++) {
+      if (allPickedReds.indexOf(recommendations[i].red[j]) < 0) {
+        allPickedReds.push(recommendations[i].red[j]);
+      }
+    }
+  }
+
+  // 为每个红球号码生成理由
+  var reasonMap = {};
+  for (var i = 0; i < allPickedReds.length; i++) {
+    var n = allPickedReds[i];
+    var scoreData = null;
+    for (var j = 0; j < fused.length; j++) {
+      if (fused[j].num === n) { scoreData = fused[j]; break; }
+    }
+    reasonMap[n] = analyzeNumberReason(n, allReds, lastDraw.red, scoreData || {}, 33, true);
+  }
+
+  // 将理由添加到每个推荐中
+  for (var i = 0; i < recommendations.length; i++) {
+    recommendations[i].reasons = {};
+    for (var j = 0; j < recommendations[i].red.length; j++) {
+      recommendations[i].reasons[recommendations[i].red[j]] = reasonMap[recommendations[i].red[j]];
+    }
+    // 蓝球理由
+    var bn = recommendations[i].blue;
+    var bMiss = 0;
+    for (var k = 0; k < allBlues.length; k++) {
+      if (allBlues[k] === bn) break;
+      bMiss++;
+    }
+    var bRecent = 0;
+    for (var k = 0; k < 5 && k < allBlues.length; k++) {
+      if (allBlues[k] === bn) bRecent++;
+    }
+    var bReasons = [];
+    if (lastDraw.blue === bn) bReasons.push('重号');
+    if (bMiss >= 4) bReasons.push('遗漏' + bMiss + '期回补');
+    if (bRecent >= 2) bReasons.push('热号');
+    else if (bRecent === 0) bReasons.push('冷号回补');
+    recommendations[i].blueReason = bReasons.length > 0 ? bReasons.join('；') : '综合评分较高';
+  }
+
   return recommendations;
 }
 
@@ -411,6 +506,35 @@ function smartRecommendKL8(history, lastDraw) {
       scores: fused.slice(0, 10),
       avgScore: avgScore
     });
+  }
+
+  // 为每个号码生成选号理由
+  var allPickedNums = [];
+  for (var i = 0; i < recommendations.length; i++) {
+    for (var j = 0; j < recommendations[i].picks.length; j++) {
+      if (allPickedNums.indexOf(recommendations[i].picks[j]) < 0) {
+        allPickedNums.push(recommendations[i].picks[j]);
+      }
+    }
+  }
+
+  // 为每个号码生成理由
+  var reasonMap = {};
+  for (var i = 0; i < allPickedNums.length; i++) {
+    var n = allPickedNums[i];
+    var scoreData = null;
+    for (var j = 0; j < fused.length; j++) {
+      if (fused[j].num === n) { scoreData = fused[j]; break; }
+    }
+    reasonMap[n] = analyzeNumberReason(n, allNums, lastDraw, scoreData || {}, 80, true);
+  }
+
+  // 将理由添加到每个推荐中
+  for (var i = 0; i < recommendations.length; i++) {
+    recommendations[i].reasons = {};
+    for (var j = 0; j < recommendations[i].picks.length; j++) {
+      recommendations[i].reasons[recommendations[i].picks[j]] = reasonMap[recommendations[i].picks[j]];
+    }
   }
 
   return recommendations;
@@ -482,6 +606,35 @@ function smartRecommendPL3(history, lastDraw) {
     });
   }
 
+  // 为每个号码生成选号理由
+  var allPickedNums = [];
+  for (var i = 0; i < recommendations.length; i++) {
+    for (var j = 0; j < recommendations[i].picks.length; j++) {
+      if (allPickedNums.indexOf(recommendations[i].picks[j]) < 0) {
+        allPickedNums.push(recommendations[i].picks[j]);
+      }
+    }
+  }
+
+  // 为每个号码生成理由
+  var reasonMap = {};
+  for (var i = 0; i < allPickedNums.length; i++) {
+    var n = allPickedNums[i];
+    var scoreData = null;
+    for (var j = 0; j < fused.length; j++) {
+      if (fused[j].num === n) { scoreData = fused[j]; break; }
+    }
+    reasonMap[n] = analyzeNumberReason(n, allNums, lastDraw, scoreData || {}, 9, false);
+  }
+
+  // 将理由添加到每个推荐中
+  for (var i = 0; i < recommendations.length; i++) {
+    recommendations[i].reasons = {};
+    for (var j = 0; j < recommendations[i].picks.length; j++) {
+      recommendations[i].reasons[recommendations[i].picks[j]] = reasonMap[recommendations[i].picks[j]];
+    }
+  }
+
   return recommendations;
 }
 
@@ -551,7 +704,135 @@ function smartRecommendPL5(history, lastDraw) {
     });
   }
 
+  // 为每个号码生成选号理由
+  var allPickedNums = [];
+  for (var i = 0; i < recommendations.length; i++) {
+    for (var j = 0; j < recommendations[i].picks.length; j++) {
+      if (allPickedNums.indexOf(recommendations[i].picks[j]) < 0) {
+        allPickedNums.push(recommendations[i].picks[j]);
+      }
+    }
+  }
+
+  // 为每个号码生成理由
+  var reasonMap = {};
+  for (var i = 0; i < allPickedNums.length; i++) {
+    var n = allPickedNums[i];
+    var scoreData = null;
+    for (var j = 0; j < fused.length; j++) {
+      if (fused[j].num === n) { scoreData = fused[j]; break; }
+    }
+    reasonMap[n] = analyzeNumberReason(n, allNums, lastDraw, scoreData || {}, 9, false);
+  }
+
+  // 将理由添加到每个推荐中
+  for (var i = 0; i < recommendations.length; i++) {
+    recommendations[i].reasons = {};
+    for (var j = 0; j < recommendations[i].picks.length; j++) {
+      recommendations[i].reasons[recommendations[i].picks[j]] = reasonMap[recommendations[i].picks[j]];
+    }
+  }
+
   return recommendations;
+}
+
+// ==================== 号码理由分析 ====================
+/**
+ * 分析号码的选号理由
+ * @param {number} num - 号码
+ * @param {array} history - 历史数据数组（每期是一个数字数组）
+ * @param {number} lastDraw - 上期开奖号码数组
+ * @param {object} scoreData - 该号码的评分数据 {markov, cooc, pos, trend, score}
+ * @param {number} poolSize - 号码池大小（大乐透35，双色球33，排列三/五9）
+ * @param {boolean} usePad - 是否补零（大乐透/双色球/快乐8 true，排列三/五 false）
+ * @returns {string} 选号理由文字
+ */
+function analyzeNumberReason(num, history, lastDraw, scoreData, poolSize, usePad) {
+  var reasons = [];
+  var numStr = usePad ? pad(num) : ('' + num);
+
+  // 1. 重号检测：上期是否出现
+  if (lastDraw.indexOf(num) >= 0) {
+    reasons.push('重号（上期开出）');
+  }
+
+  // 2. 斜连检测：与上期号码差值在1-3之间
+  for (var i = 0; i < lastDraw.length; i++) {
+    var diff = Math.abs(num - lastDraw[i]);
+    if (diff >= 1 && diff <= 3) {
+      var lastStr = usePad ? pad(lastDraw[i]) : ('' + lastDraw[i]);
+      reasons.push('斜连（与上期' + lastStr + '差' + diff + '）');
+      break;
+    }
+  }
+
+  // 3. 邻号检测：与上期号码差1
+  for (var i = 0; i < lastDraw.length; i++) {
+    if (Math.abs(num - lastDraw[i]) === 1) {
+      var lastStr2 = usePad ? pad(lastDraw[i]) : ('' + lastDraw[i]);
+      reasons.push('邻号（与上期' + lastStr2 + '相邻）');
+      break;
+    }
+  }
+
+  // 4. 冷热号分析
+  var recentCount = 0;
+  var halfLen = Math.min(10, Math.floor(history.length / 2));
+  if (halfLen < 1) halfLen = 1;
+  for (var i = 0; i < halfLen; i++) {
+    if (history[i].indexOf(num) >= 0) recentCount++;
+  }
+  var recentRate = recentCount / halfLen;
+
+  if (recentRate >= 0.5) {
+    reasons.push('热号（近' + halfLen + '期出现' + recentCount + '次）');
+  } else if (recentRate >= 0.3) {
+    reasons.push('温号（近' + halfLen + '期出现' + recentCount + '次）');
+  } else if (recentCount === 0) {
+    reasons.push('冷号（近' + halfLen + '期未出现，回补预期）');
+  } else {
+    reasons.push('温冷号（近' + halfLen + '期出现' + recentCount + '次）');
+  }
+
+  // 5. 遗漏回补检测
+  var missPeriods = 0;
+  for (var i = 0; i < history.length; i++) {
+    if (history[i].indexOf(num) >= 0) break;
+    missPeriods++;
+  }
+  if (missPeriods >= 5) {
+    reasons.push('遗漏' + missPeriods + '期，回补信号强');
+  } else if (missPeriods >= 3) {
+    reasons.push('遗漏' + missPeriods + '期，有回补趋势');
+  }
+
+  // 6. 转移概率高
+  if (scoreData.markov > 1.0) {
+    reasons.push('转移概率高（上期关联号码后常出）');
+  }
+
+  // 7. 共现关联强
+  if (scoreData.cooc > 5) {
+    reasons.push('与上期号码共现频率高');
+  }
+
+  // 8. 趋势动量
+  if (scoreData.trend > 0.15) {
+    reasons.push('上升动量（近期出现频率增加）');
+  } else if (scoreData.trend < -0.05) {
+    reasons.push('下降趋势（近期频率降低，可能反弹）');
+  }
+
+  // 9. 位置模式
+  if (scoreData.pos > 0.3) {
+    reasons.push('位置吻合度高');
+  }
+
+  if (reasons.length === 0) {
+    reasons.push('综合评分较高');
+  }
+
+  return reasons.slice(0, 3).join('；'); // 最多显示3条理由
 }
 
 // ==================== 渲染智能推荐结果（胆拖模式） ====================
@@ -626,6 +907,25 @@ function renderSmartRecommendations() {
       }
       html += '</div>';
 
+      // 选号理由（仅第一组方案显示完整理由）
+      if (i === 0) {
+        html += '<div style="margin-top:0.4rem;font-size:0.75rem;line-height:1.6;color:var(--muted);background:var(--bg2);border-radius:6px;padding:0.5rem">';
+        html += '<div style="font-weight:700;color:var(--accent4);margin-bottom:0.2rem">选号理由</div>';
+        for (var j = 0; j < recs[i].front.length; j++) {
+          var n = recs[i].front[j];
+          var isDan = recs[i].danma.indexOf(n) >= 0;
+          var reason = recs[i].reasons[n] || '综合评分较高';
+          html += '<div style="margin-bottom:0.15rem"><span class="ball ' + (isDan ? 'gold' : 'red') + '" style="display:inline-block;width:20px;height:20px;font-size:0.65rem;line-height:20px;vertical-align:middle;margin-right:0.3rem">' + pad(n) + '</span>' + reason + '</div>';
+        }
+        for (var j = 0; j < recs[i].back.length; j++) {
+          var n = recs[i].back[j];
+          var isBackDan = n === recs[i].backDan;
+          var reason = recs[i].backReasons[n] || '综合评分较高';
+          html += '<div style="margin-bottom:0.15rem"><span class="ball ' + (isBackDan ? 'gold' : 'blue') + '" style="display:inline-block;width:20px;height:20px;font-size:0.65rem;line-height:20px;vertical-align:middle;margin-right:0.3rem">' + pad(n) + '</span>后区 ' + reason + '</div>';
+        }
+        html += '</div>';
+      }
+
       html += aiAnalysisHTML(recs[i].scores);
       html += '</div>';
     }
@@ -666,6 +966,21 @@ function renderSmartRecommendations() {
       html += '<div class="ball blue">' + pad(recs[i].blue) + '</div>';
       html += '</div>';
 
+      // 选号理由（仅第一组方案显示完整理由）
+      if (i === 0) {
+        html += '<div style="margin-top:0.4rem;font-size:0.75rem;line-height:1.6;color:var(--muted);background:var(--bg2);border-radius:6px;padding:0.5rem">';
+        html += '<div style="font-weight:700;color:var(--accent4);margin-bottom:0.2rem">选号理由</div>';
+        for (var j = 0; j < recs[i].red.length; j++) {
+          var n = recs[i].red[j];
+          var isDan = recs[i].danma.indexOf(n) >= 0;
+          var reason = recs[i].reasons[n] || '综合评分较高';
+          html += '<div style="margin-bottom:0.15rem"><span class="ball ' + (isDan ? 'gold' : 'red') + '" style="display:inline-block;width:20px;height:20px;font-size:0.65rem;line-height:20px;vertical-align:middle;margin-right:0.3rem">' + pad(n) + '</span>' + reason + '</div>';
+        }
+        var blueReason = recs[i].blueReason || '综合评分较高';
+        html += '<div style="margin-bottom:0.15rem"><span class="ball blue" style="display:inline-block;width:20px;height:20px;font-size:0.65rem;line-height:20px;vertical-align:middle;margin-right:0.3rem">' + pad(recs[i].blue) + '</span>蓝球 ' + blueReason + '</div>';
+        html += '</div>';
+      }
+
       html += aiAnalysisHTML(recs[i].scores);
       html += '</div>';
     }
@@ -702,6 +1017,19 @@ function renderSmartRecommendations() {
         html += '<div class="ball ' + (isDan ? 'gold' : 'red') + '" style="width:36px;height:36px;font-size:0.75rem">' + pad(recs[i].picks[j]) + '</div>';
       }
       html += '</div>';
+
+      // 选号理由（仅第一组方案显示完整理由）
+      if (i === 0) {
+        html += '<div style="margin-top:0.4rem;font-size:0.75rem;line-height:1.6;color:var(--muted);background:var(--bg2);border-radius:6px;padding:0.5rem">';
+        html += '<div style="font-weight:700;color:var(--accent4);margin-bottom:0.2rem">选号理由</div>';
+        for (var j = 0; j < recs[i].picks.length; j++) {
+          var n = recs[i].picks[j];
+          var isDan = recs[i].danma.indexOf(n) >= 0;
+          var reason = recs[i].reasons[n] || '综合评分较高';
+          html += '<div style="margin-bottom:0.15rem"><span class="ball ' + (isDan ? 'gold' : 'red') + '" style="display:inline-block;width:20px;height:20px;font-size:0.65rem;line-height:20px;vertical-align:middle;margin-right:0.3rem">' + pad(n) + '</span>' + reason + '</div>';
+        }
+        html += '</div>';
+      }
 
       html += aiAnalysisHTML(recs[i].scores);
       html += '</div>';
@@ -740,6 +1068,19 @@ function renderSmartRecommendations() {
       }
       html += '</div>';
 
+      // 选号理由（仅第一组方案显示完整理由）
+      if (i === 0) {
+        html += '<div style="margin-top:0.4rem;font-size:0.75rem;line-height:1.6;color:var(--muted);background:var(--bg2);border-radius:6px;padding:0.5rem">';
+        html += '<div style="font-weight:700;color:var(--accent4);margin-bottom:0.2rem">选号理由</div>';
+        for (var j = 0; j < recs[i].picks.length; j++) {
+          var n = recs[i].picks[j];
+          var isDan = recs[i].danma.indexOf(n) >= 0;
+          var reason = recs[i].reasons[n] || '综合评分较高';
+          html += '<div style="margin-bottom:0.15rem"><span class="ball ' + (isDan ? 'gold' : 'red') + '" style="display:inline-block;width:20px;height:20px;font-size:0.65rem;line-height:20px;vertical-align:middle;margin-right:0.3rem">' + n + '</span>' + reason + '</div>';
+        }
+        html += '</div>';
+      }
+
       html += aiAnalysisHTML(recs[i].scores);
       html += '</div>';
     }
@@ -776,6 +1117,19 @@ function renderSmartRecommendations() {
         html += '<div class="ball ' + (isDan ? 'gold' : 'red') + '">' + recs[i].picks[j] + '</div>';
       }
       html += '</div>';
+
+      // 选号理由（仅第一组方案显示完整理由）
+      if (i === 0) {
+        html += '<div style="margin-top:0.4rem;font-size:0.75rem;line-height:1.6;color:var(--muted);background:var(--bg2);border-radius:6px;padding:0.5rem">';
+        html += '<div style="font-weight:700;color:var(--accent4);margin-bottom:0.2rem">选号理由</div>';
+        for (var j = 0; j < recs[i].picks.length; j++) {
+          var n = recs[i].picks[j];
+          var isDan = recs[i].danma.indexOf(n) >= 0;
+          var reason = recs[i].reasons[n] || '综合评分较高';
+          html += '<div style="margin-bottom:0.15rem"><span class="ball ' + (isDan ? 'gold' : 'red') + '" style="display:inline-block;width:20px;height:20px;font-size:0.65rem;line-height:20px;vertical-align:middle;margin-right:0.3rem">' + n + '</span>' + reason + '</div>';
+        }
+        html += '</div>';
+      }
 
       html += aiAnalysisHTML(recs[i].scores);
       html += '</div>';
@@ -1110,51 +1464,66 @@ function renderAutoReviewDLT(reviewResults, weights, optScores, optBackScores, a
   }
   html += '</div></div>';
 
-  var optSorted = optScores.slice().sort(function(a, b) { return b.total - a.total; });
-  var optBackSorted = optBackScores.slice().sort(function(a, b) { return b.total - a.total; });
+  // 优化后精准推荐：使用5层AI引擎（与综合推荐算法完全不同）
+  var lastParts2 = dltSampleHistory[0].split('|');
+  var lastDraw2 = { front: lastParts2[0].split(',').map(Number), back: lastParts2[1].split(',').map(Number) };
+  var smartRecs = smartRecommendDLT(dltSampleHistory, lastDraw2);
 
   html += '<div style="margin-bottom:1rem">';
-  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.75rem">优化后精准推荐</div>';
+  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem">优化后精准推荐（AI五层融合引擎）</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合，与综合推荐采用不同算法</div>';
 
-  for (var set = 0; set < 3; set++) {
-    var frontPicks = [];
-    var usedNums = {};
-    frontPicks.push(optSorted[set].num);
-    usedNums[optSorted[set].num] = true;
-    var zoneCounts = [0, 0, 0];
-    var firstZone = frontPicks[0] <= 12 ? 0 : frontPicks[0] <= 23 ? 1 : 2;
-    zoneCounts[firstZone]++;
-    for (var i = 0; i < optSorted.length && frontPicks.length < 5; i++) {
-      var n = optSorted[i].num;
-      if (usedNums[n]) continue;
-      var z = n <= 12 ? 0 : n <= 23 ? 1 : 2;
-      if (zoneCounts[z] < 3) {
-        frontPicks.push(n);
-        usedNums[n] = true;
-        zoneCounts[z]++;
-      }
+  for (var si = 0; si < smartRecs.length; si++) {
+    var sr = smartRecs[si];
+    html += '<div style="margin-bottom:1rem;background:var(--bg3);border:1px solid var(--rule);border-radius:8px;padding:0.75rem">';
+    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">优化方案 ' + (si + 1) + '</div>';
+    html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">前区 胆码: ';
+    for (var j = 0; j < sr.danma.length; j++) {
+      html += '<span style="font-weight:700">' + pad(sr.danma[j]) + '</span>';
+      if (j < sr.danma.length - 1) html += ', ';
     }
-    for (var i = 0; i < optSorted.length && frontPicks.length < 5; i++) {
-      if (!usedNums[optSorted[i].num]) {
-        frontPicks.push(optSorted[i].num);
-        usedNums[optSorted[i].num] = true;
-      }
-    }
-    frontPicks.sort(function(a, b) { return a - b; });
-    var backPicks = [optBackSorted[set].num, optBackSorted[(set + 1) % optBackSorted.length].num].sort(function(a, b) { return a - b; });
-
-    html += '<div style="margin-bottom:1rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">优化方案 ' + (set + 1) + '</div>';
-    html += '<div class="ball-row">';
-    for (var i = 0; i < frontPicks.length; i++) {
-      html += '<div class="ball red">' + pad(frontPicks[i]) + '</div>';
-    }
-    html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
-    for (var i = 0; i < backPicks.length; i++) {
-      html += '<div class="ball blue">' + pad(backPicks[i]) + '</div>';
+    html += ' | 拖码: ';
+    for (var j = 0; j < sr.tuoma.length; j++) {
+      html += pad(sr.tuoma[j]);
+      if (j < sr.tuoma.length - 1) html += ', ';
     }
     html += '</div>';
-    html += '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem">和值: ' + sum(frontPicks) + ' | 跨度: ' + span(frontPicks) + ' | 区间比: ' + zoneCounts.join(':') + '</div>';
+    html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">后区 胆码: ' + pad(sr.backDan) + ' | 拖码: ';
+    for (var j = 0; j < sr.backTuoma.length; j++) {
+      html += pad(sr.backTuoma[j]);
+      if (j < sr.backTuoma.length - 1) html += ', ';
+    }
+    html += '</div>';
+    html += '<div class="ball-row">';
+    for (var j = 0; j < sr.front.length; j++) {
+      var isDan = sr.danma.indexOf(sr.front[j]) >= 0;
+      html += '<div class="ball ' + (isDan ? 'gold' : 'red') + '">' + pad(sr.front[j]) + '</div>';
+    }
+    html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
+    for (var j = 0; j < sr.back.length; j++) {
+      var isBackDan = sr.back[j] === sr.backDan;
+      html += '<div class="ball ' + (isBackDan ? 'gold' : 'blue') + '">' + pad(sr.back[j]) + '</div>';
+    }
+    html += '</div>';
+
+    // 选号理由（仅第一组显示）
+    if (si === 0) {
+      html += '<div style="margin-top:0.4rem;font-size:0.75rem;line-height:1.6;color:var(--muted);background:var(--bg2);border-radius:6px;padding:0.5rem">';
+      html += '<div style="font-weight:700;color:var(--accent4);margin-bottom:0.2rem">选号理由</div>';
+      for (var j = 0; j < sr.front.length; j++) {
+        var n = sr.front[j];
+        var isDanR = sr.danma.indexOf(n) >= 0;
+        var reason = sr.reasons[n] || '综合评分较高';
+        html += '<div style="margin-bottom:0.15rem"><span class="ball ' + (isDanR ? 'gold' : 'red') + '" style="display:inline-block;width:20px;height:20px;font-size:0.65rem;line-height:20px;vertical-align:middle;margin-right:0.3rem">' + pad(n) + '</span>' + reason + '</div>';
+      }
+      for (var j = 0; j < sr.back.length; j++) {
+        var bn = sr.back[j];
+        var isBDR = bn === sr.backDan;
+        var bReason = sr.backReasons[bn] || '综合评分较高';
+        html += '<div style="margin-bottom:0.15rem"><span class="ball ' + (isBDR ? 'gold' : 'blue') + '" style="display:inline-block;width:20px;height:20px;font-size:0.65rem;line-height:20px;vertical-align:middle;margin-right:0.3rem">' + pad(bn) + '</span>后区 ' + bReason + '</div>';
+      }
+      html += '</div>';
+    }
     html += '</div>';
   }
   html += '</div>';
@@ -1450,49 +1819,53 @@ function renderAutoReviewSSQ(reviewResults, weights, optScores, optBackScores, a
   }
   html += '</div></div>';
 
-  var optSorted = optScores.slice().sort(function(a, b) { return b.total - a.total; });
-  var optBackSorted = optBackScores.slice().sort(function(a, b) { return b.total - a.total; });
+  // 优化后精准推荐：使用5层AI引擎（与综合推荐算法完全不同）
+  var lastParts2 = ssqSampleHistory[0].split('|');
+  var lastDraw2 = { red: lastParts2[0].split(',').map(Number), blue: parseInt(lastParts2[1], 10) };
+  var smartRecs = smartRecommendSSQ(ssqSampleHistory, lastDraw2);
 
   html += '<div style="margin-bottom:1rem">';
-  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.75rem">优化后精准推荐</div>';
+  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem">优化后精准推荐（AI五层融合引擎）</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合，与综合推荐采用不同算法</div>';
 
-  for (var set = 0; set < 3; set++) {
-    var redPicks = [];
-    var usedNums = {};
-    redPicks.push(optSorted[set].num);
-    usedNums[optSorted[set].num] = true;
-    var zoneCounts = [0, 0, 0];
-    var firstZone = redPicks[0] <= 11 ? 0 : redPicks[0] <= 22 ? 1 : 2;
-    zoneCounts[firstZone]++;
-    for (var i = 0; i < optSorted.length && redPicks.length < 6; i++) {
-      var n = optSorted[i].num;
-      if (usedNums[n]) continue;
-      var z = n <= 11 ? 0 : n <= 22 ? 1 : 2;
-      if (zoneCounts[z] < 3) {
-        redPicks.push(n);
-        usedNums[n] = true;
-        zoneCounts[z]++;
-      }
+  for (var si = 0; si < smartRecs.length; si++) {
+    var sr = smartRecs[si];
+    html += '<div style="margin-bottom:1rem;background:var(--bg3);border:1px solid var(--rule);border-radius:8px;padding:0.75rem">';
+    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">优化方案 ' + (si + 1) + '</div>';
+    html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">胆码: ';
+    for (var j = 0; j < sr.danma.length; j++) {
+      html += '<span style="font-weight:700">' + pad(sr.danma[j]) + '</span>';
+      if (j < sr.danma.length - 1) html += ', ';
     }
-    for (var i = 0; i < optSorted.length && redPicks.length < 6; i++) {
-      if (!usedNums[optSorted[i].num]) {
-        redPicks.push(optSorted[i].num);
-        usedNums[optSorted[i].num] = true;
-      }
+    html += ' | 拖码: ';
+    for (var j = 0; j < sr.tuoma.length; j++) {
+      html += pad(sr.tuoma[j]);
+      if (j < sr.tuoma.length - 1) html += ', ';
     }
-    redPicks.sort(function(a, b) { return a - b; });
-    var bluePick = optBackSorted[set].num;
-
-    html += '<div style="margin-bottom:1rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">优化方案 ' + (set + 1) + '</div>';
+    html += '</div>';
     html += '<div class="ball-row">';
-    for (var i = 0; i < redPicks.length; i++) {
-      html += '<div class="ball red">' + pad(redPicks[i]) + '</div>';
+    for (var j = 0; j < sr.red.length; j++) {
+      var isDan = sr.danma.indexOf(sr.red[j]) >= 0;
+      html += '<div class="ball ' + (isDan ? 'gold' : 'red') + '">' + pad(sr.red[j]) + '</div>';
     }
     html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
-    html += '<div class="ball blue">' + pad(bluePick) + '</div>';
+    html += '<div class="ball blue">' + pad(sr.blue) + '</div>';
     html += '</div>';
-    html += '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem">和值: ' + sum(redPicks) + ' | 跨度: ' + span(redPicks) + ' | 区间比: ' + zoneCounts.join(':') + '</div>';
+
+    // 选号理由（仅第一组显示）
+    if (si === 0) {
+      html += '<div style="margin-top:0.4rem;font-size:0.75rem;line-height:1.6;color:var(--muted);background:var(--bg2);border-radius:6px;padding:0.5rem">';
+      html += '<div style="font-weight:700;color:var(--accent4);margin-bottom:0.2rem">选号理由</div>';
+      for (var j = 0; j < sr.red.length; j++) {
+        var n = sr.red[j];
+        var isDanR = sr.danma.indexOf(n) >= 0;
+        var reason = sr.reasons[n] || '综合评分较高';
+        html += '<div style="margin-bottom:0.15rem"><span class="ball ' + (isDanR ? 'gold' : 'red') + '" style="display:inline-block;width:20px;height:20px;font-size:0.65rem;line-height:20px;vertical-align:middle;margin-right:0.3rem">' + pad(n) + '</span>' + reason + '</div>';
+      }
+      var blueReason = sr.blueReason || '综合评分较高';
+      html += '<div style="margin-bottom:0.15rem"><span class="ball blue" style="display:inline-block;width:20px;height:20px;font-size:0.65rem;line-height:20px;vertical-align:middle;margin-right:0.3rem">' + pad(sr.blue) + '</span>蓝球 ' + blueReason + '</div>';
+      html += '</div>';
+    }
     html += '</div>';
   }
   html += '</div>';
@@ -1717,38 +2090,48 @@ function renderAutoReviewKL8(reviewResults, weights, optScores, actualNums, play
   }
   html += '</div></div>';
 
-  var optSorted = optScores.slice().sort(function(a, b) { return b.total - a.total; });
+  // 优化后精准推荐：使用5层AI引擎（与综合推荐算法完全不同）
+  var lastDraw2 = kl8SampleHistory[0].split(',').map(Number).sort(function(a, b) { return a - b; });
+  var smartRecs = smartRecommendKL8(kl8SampleHistory, lastDraw2);
 
   html += '<div style="margin-bottom:1rem">';
-  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.75rem">优化后精准推荐</div>';
+  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem">优化后精准推荐（AI五层融合引擎）</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合，与综合推荐采用不同算法</div>';
 
-  for (var set = 0; set < 3; set++) {
-    var picks = [];
-    var usedNums = {};
-    var zoneCounts = [0, 0, 0, 0];
-    var startIdx = set;
-
-    for (var pass = 0; pass < 2 && picks.length < playType; pass++) {
-      for (var i = startIdx; i < optSorted.length && picks.length < playType; i++) {
-        var n = optSorted[i].num;
-        if (usedNums[n]) continue;
-        var z = n <= 20 ? 0 : n <= 40 ? 1 : n <= 60 ? 2 : 3;
-        if (pass === 0 && zoneCounts[z] >= Math.ceil(playType / 3)) continue;
-        picks.push(n);
-        usedNums[n] = true;
-        zoneCounts[z]++;
-      }
+  for (var si = 0; si < smartRecs.length; si++) {
+    var sr = smartRecs[si];
+    html += '<div style="margin-bottom:1rem;background:var(--bg3);border:1px solid var(--rule);border-radius:8px;padding:0.75rem">';
+    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">优化方案 ' + (si + 1) + '（选' + playType + '）</div>';
+    html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">胆码: ';
+    for (var j = 0; j < sr.danma.length; j++) {
+      html += '<span style="font-weight:700">' + pad(sr.danma[j]) + '</span>';
+      if (j < sr.danma.length - 1) html += ', ';
     }
-    picks.sort(function(a, b) { return a - b; });
-
-    html += '<div style="margin-bottom:1rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">优化方案 ' + (set + 1) + '（选' + playType + '）</div>';
-    html += '<div class="ball-row">';
-    for (var i = 0; i < picks.length; i++) {
-      html += '<div class="ball gold" style="width:36px;height:36px;font-size:0.75rem">' + pad(picks[i]) + '</div>';
+    html += ' | 拖码: ';
+    for (var j = 0; j < sr.tuoma.length; j++) {
+      html += pad(sr.tuoma[j]);
+      if (j < sr.tuoma.length - 1) html += ', ';
     }
     html += '</div>';
-    html += '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem">和值: ' + sum(picks) + ' | 跨度: ' + span(picks) + ' | 区间分布: ' + zoneCounts.join(':') + '</div>';
+    html += '<div class="ball-row">';
+    for (var j = 0; j < sr.picks.length; j++) {
+      var isDan = sr.danma.indexOf(sr.picks[j]) >= 0;
+      html += '<div class="ball ' + (isDan ? 'gold' : 'red') + '" style="width:36px;height:36px;font-size:0.75rem">' + pad(sr.picks[j]) + '</div>';
+    }
+    html += '</div>';
+
+    // 选号理由（仅第一组显示）
+    if (si === 0) {
+      html += '<div style="margin-top:0.4rem;font-size:0.75rem;line-height:1.6;color:var(--muted);background:var(--bg2);border-radius:6px;padding:0.5rem">';
+      html += '<div style="font-weight:700;color:var(--accent4);margin-bottom:0.2rem">选号理由</div>';
+      for (var j = 0; j < sr.picks.length; j++) {
+        var n = sr.picks[j];
+        var isDanR = sr.danma.indexOf(n) >= 0;
+        var reason = sr.reasons[n] || '综合评分较高';
+        html += '<div style="margin-bottom:0.15rem"><span class="ball ' + (isDanR ? 'gold' : 'red') + '" style="display:inline-block;width:20px;height:20px;font-size:0.65rem;line-height:20px;vertical-align:middle;margin-right:0.3rem">' + pad(n) + '</span>' + reason + '</div>';
+      }
+      html += '</div>';
+    }
     html += '</div>';
   }
   html += '</div>';
@@ -2097,32 +2480,49 @@ function renderAutoReviewPL(reviewResults, weights, optScores, actualNums, type,
   }
   html += '</div></div>';
 
-  var optSorted = optScores.slice().sort(function(a, b) { return b.total - a.total; });
+  // 优化后精准推荐：使用5层AI引擎（与综合推荐算法完全不同）
+  var plHistory = type === 'PL3' ? PL3_HISTORY : PL5_HISTORY;
+  var lastDraw2 = plHistory[0].numbers;
+  var smartRecs = type === 'PL3' ? smartRecommendPL3(PL3_HISTORY, lastDraw2) : smartRecommendPL5(PL5_HISTORY, lastDraw2);
 
   html += '<div style="margin-bottom:1rem">';
-  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.75rem">优化后精准推荐</div>';
+  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem">优化后精准推荐（AI五层融合引擎）</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合，与综合推荐采用不同算法</div>';
 
-  for (var set = 0; set < 3; set++) {
-    var picks = [];
-    var usedNums = {};
-    picks.push(optSorted[set].num);
-    usedNums[optSorted[set].num] = true;
-    for (var i = 0; i < optSorted.length && picks.length < pickCount; i++) {
-      var n = optSorted[i].num;
-      if (!usedNums[n]) {
-        picks.push(n);
-        usedNums[n] = true;
-      }
+  for (var si = 0; si < smartRecs.length; si++) {
+    var sr = smartRecs[si];
+    html += '<div style="margin-bottom:1rem;background:var(--bg3);border:1px solid var(--rule);border-radius:8px;padding:0.75rem">';
+    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">优化方案 ' + (si + 1) + '</div>';
+    html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">胆码: ';
+    for (var j = 0; j < sr.danma.length; j++) {
+      html += '<span style="font-weight:700">' + sr.danma[j] + '</span>';
+      if (j < sr.danma.length - 1) html += ', ';
     }
-
-    html += '<div style="margin-bottom:1rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">优化方案 ' + (set + 1) + '</div>';
-    html += '<div class="ball-row">';
-    for (var i = 0; i < picks.length; i++) {
-      html += '<div class="ball red">' + picks[i] + '</div>';
+    html += ' | 拖码: ';
+    for (var j = 0; j < sr.tuoma.length; j++) {
+      html += sr.tuoma[j];
+      if (j < sr.tuoma.length - 1) html += ', ';
     }
     html += '</div>';
-    html += '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem">和值: ' + sum(picks) + ' | 跨度: ' + span(picks) + ' | 奇偶: ' + picks.filter(function(x){return x%2===1}).length + ':' + picks.filter(function(x){return x%2===0}).length + ' | 大小: ' + picks.filter(function(x){return x>=5}).length + ':' + picks.filter(function(x){return x<5}).length + '</div>';
+    html += '<div class="ball-row">';
+    for (var j = 0; j < sr.picks.length; j++) {
+      var isDan = sr.danma.indexOf(sr.picks[j]) >= 0;
+      html += '<div class="ball ' + (isDan ? 'gold' : 'red') + '">' + sr.picks[j] + '</div>';
+    }
+    html += '</div>';
+
+    // 选号理由（仅第一组显示）
+    if (si === 0) {
+      html += '<div style="margin-top:0.4rem;font-size:0.75rem;line-height:1.6;color:var(--muted);background:var(--bg2);border-radius:6px;padding:0.5rem">';
+      html += '<div style="font-weight:700;color:var(--accent4);margin-bottom:0.2rem">选号理由</div>';
+      for (var j = 0; j < sr.picks.length; j++) {
+        var n = sr.picks[j];
+        var isDanR = sr.danma.indexOf(n) >= 0;
+        var reason = sr.reasons[n] || '综合评分较高';
+        html += '<div style="margin-bottom:0.15rem"><span class="ball ' + (isDanR ? 'gold' : 'red') + '" style="display:inline-block;width:20px;height:20px;font-size:0.65rem;line-height:20px;vertical-align:middle;margin-right:0.3rem">' + n + '</span>' + reason + '</div>';
+      }
+      html += '</div>';
+    }
     html += '</div>';
   }
   html += '</div>';
