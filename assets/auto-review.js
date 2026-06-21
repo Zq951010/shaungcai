@@ -110,7 +110,15 @@ function trendMomentumAnalysis(history, maxNum) {
   return scores;
 }
 
-// ==================== 算法5：贝叶斯融合决策 ====================
+// ==================== 算法5：贝叶斯融合决策（自适应权重） ====================
+// 权重会根据历史复盘结果自动调整
+var FUSION_WEIGHTS = {
+  markov: 0.30,
+  cooc: 0.30,
+  pos: 0.20,
+  trend: 0.20
+};
+
 function bayesianFusion(markovScores, coocScores, posScores, trendScores, maxNum) {
   var totalM = 0, totalC = 0, totalP = 0, totalT = 0;
   for (var k = 1; k <= maxNum; k++) {
@@ -120,6 +128,7 @@ function bayesianFusion(markovScores, coocScores, posScores, trendScores, maxNum
     totalT += trendScores[k] || 0;
   }
 
+  var w = FUSION_WEIGHTS;
   var results = [];
   for (var n = 1; n <= maxNum; n++) {
     var mScore = markovScores[n] || 0;
@@ -132,7 +141,8 @@ function bayesianFusion(markovScores, coocScores, posScores, trendScores, maxNum
     var np = totalP > 0 ? pScore / totalP : 0;
     var nt = totalT > 0 ? tScore / totalT : 0;
 
-    var fusion = Math.pow(nm + 0.01, 0.3) * Math.pow(nc + 0.01, 0.3) * Math.pow(np + 0.01, 0.2) * Math.pow(nt + 0.01, 0.2);
+    // 自适应融合：根据各算法历史表现动态调整权重
+    var fusion = Math.pow(nm + 0.01, w.markov) * Math.pow(nc + 0.01, w.cooc) * Math.pow(np + 0.01, w.pos) * Math.pow(nt + 0.01, w.trend);
 
     results.push({
       num: n,
@@ -146,6 +156,76 @@ function bayesianFusion(markovScores, coocScores, posScores, trendScores, maxNum
 
   results.sort(function(a, b) { return b.score - a.score; });
   return results;
+}
+
+// ==================== 模型权重优化（基于复盘结果） ====================
+function optimizeFusionWeights(history, actualDraw, lotteryType) {
+  // 解析实际开奖号码
+  var actualNums = [];
+  if (lotteryType === 'dlt') {
+    actualNums = actualDraw.front;
+  } else if (lotteryType === 'ssq') {
+    actualNums = actualDraw.red;
+  } else if (lotteryType === 'kl8') {
+    actualNums = actualDraw;
+  } else {
+    actualNums = actualDraw;
+  }
+
+  var allNums = [];
+  for (var i = 0; i < history.length; i++) {
+    if (lotteryType === 'dlt') {
+      allNums.push(history[i].split('|')[0].split(',').map(Number));
+    } else if (lotteryType === 'ssq') {
+      allNums.push(history[i].split('|')[0].split(',').map(Number));
+    } else if (lotteryType === 'kl8') {
+      allNums.push(history[i].split(',').map(Number));
+    } else {
+      allNums.push(history[i]);
+    }
+  }
+
+  var lastDraw = allNums[0];
+  var maxNum = lotteryType === 'dlt' ? 35 : lotteryType === 'ssq' ? 33 : lotteryType === 'kl8' ? 80 : 9;
+
+  // 计算各算法对实际开奖号码的评分
+  var markov = markovTransitionProb(allNums, lastDraw, maxNum, actualNums.length);
+  var cooc = cooccurrenceAnalysis(allNums, maxNum);
+  var pos = positionPatternLearning(allNums, maxNum, actualNums.length);
+  var trend = trendMomentumAnalysis(allNums, maxNum);
+
+  // 计算各算法对实际开奖号码的命中率
+  var markovHit = 0, coocHit = 0, posHit = 0, trendHit = 0;
+  for (var i = 0; i < actualNums.length; i++) {
+    var n = actualNums[i];
+    if (markov[n] > 0) markovHit++;
+    if (cooc[n] > 0) coocHit++;
+    if (pos[n] > 0) posHit++;
+    if (trend[n] > 0) trendHit++;
+  }
+
+  var total = actualNums.length;
+  var markovRate = markovHit / total;
+  var coocRate = coocHit / total;
+  var posRate = posHit / total;
+  var trendRate = trendHit / total;
+
+  // 根据命中率调整权重（命中率高的算法权重增加）
+  var totalRate = markovRate + coocRate + posRate + trendRate;
+  if (totalRate > 0) {
+    FUSION_WEIGHTS.markov = Math.max(0.15, Math.min(0.45, markovRate / totalRate));
+    FUSION_WEIGHTS.cooc = Math.max(0.15, Math.min(0.45, coocRate / totalRate));
+    FUSION_WEIGHTS.pos = Math.max(0.10, Math.min(0.35, posRate / totalRate));
+    FUSION_WEIGHTS.trend = Math.max(0.10, Math.min(0.35, trendRate / totalRate));
+  }
+
+  return {
+    markovRate: markovRate,
+    coocRate: coocRate,
+    posRate: posRate,
+    trendRate: trendRate,
+    weights: { markov: FUSION_WEIGHTS.markov, cooc: FUSION_WEIGHTS.cooc, pos: FUSION_WEIGHTS.pos, trend: FUSION_WEIGHTS.trend }
+  };
 }
 
 // ==================== 后区/蓝球智能推荐（通用） ====================
