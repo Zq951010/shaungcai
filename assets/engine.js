@@ -43,6 +43,7 @@ var DLT_ZONES = [[1,12],[13,23],[24,35]];
 var DLT_BACK_ZONES = [[1,4],[5,8],[9,12]];
 
 var dltSampleHistory = [
+  '03,11,12,21,22|06,10',
   '06,16,18,19,28|07,11',
   '10,13,19,21,30|04,05',
   '04,11,12,13,25|04,08',
@@ -81,6 +82,11 @@ function loadDLTSample() {
   document.getElementById('dlt-front').value = parts[0];
   document.getElementById('dlt-back').value = parts[1];
   document.getElementById('dlt-history').value = dltSampleHistory.join('\n');
+  // 填充复盘输入框默认值（推荐号码第一组）
+  var sampleFront = parts[0].split(',').slice(0,5).join(',');
+  var sampleBack = parts[1].split(',').slice(0,2).join(',');
+  document.getElementById('dlt-review-numbers').value = sampleFront;
+  document.getElementById('dlt-review-blue').value = sampleBack;
 }
 
 function clearDLT() {
@@ -140,7 +146,7 @@ function analyzeDLT() {
   renderDLTSpan(allFronts);
   renderDLTHotCold(allFronts, allBacks);
   renderDLTDanTuo(last, allFronts, allBacks);
-  renderDLTRecommend(last, allFronts, allBacks);
+  renderDLTRecommend_V3(last.front.concat(last.back), allFronts, allBacks);
 
   // Scroll to results
   document.getElementById('dlt-results').scrollIntoView({ behavior: 'smooth' });
@@ -496,193 +502,332 @@ function renderDLTDanTuo(last, allFronts, allBacks) {
   document.getElementById('dlt-dantuo').innerHTML = html;
 }
 
-function scoreDLTNumbers(last, allFronts, allBacks) {
-  var totalPeriods = allFronts.length;
-  var expected = (5 / 35) * totalPeriods;
-  var scores = [];
+// ========== V3 Helper Functions ==========
+function weightedFreq(num, history, halfLife) {
+  var lambda = Math.log(2) / (halfLife || 10);
+  var score = 0, totalWeight = 0;
+  for (var i = 0; i < history.length; i++) {
+    var w = Math.exp(-lambda * i);
+    if (history[i].indexOf(num) >= 0) score += w;
+    totalWeight += w;
+  }
+  return totalWeight ? score / totalWeight : 0;
+}
+function getMissDistribution(num, history) {
+  var gaps = [], currentGap = 0;
+  for (var i = history.length - 1; i >= 0; i--) {
+    if (history[i].indexOf(num) >= 0) {
+      if (currentGap > 0) gaps.push(currentGap);
+      currentGap = 0;
+    } else currentGap++;
+  }
+  gaps.push(currentGap);
+  var mean = gaps.length ? gaps.reduce(function(a,b){return a+b;},0) / gaps.length : 0;
+  var sorted = gaps.slice().sort(function(a,b){return a-b;});
+  var median = sorted.length ? sorted[Math.floor(sorted.length/2)] : 0;
+  var std = gaps.length > 1 ? Math.sqrt(gaps.reduce(function(s,g){return s+(g-mean)*(g-mean);},0)/gaps.length) : 0;
+  var maxGap = gaps.length ? Math.max.apply(null, gaps) : 0;
+  return {gaps: gaps, mean: mean, median: median, std: std, maxGap: maxGap, currentGap: currentGap};
+}
+function getMissPercentile(num, history) {
+  var dist = getMissDistribution(num, history);
+  if (!dist.gaps.length) return 0.5;
+  var idx = dist.gaps.filter(function(g){return g < dist.currentGap;}).length;
+  return idx / dist.gaps.length;
+}
+function buildCoOccurrence(history) {
+  var co = {};
+  for (var n = 1; n <= 35; n++) co[n] = {};
+  for (var i = 0; i < history.length; i++) {
+    var row = history[i];
+    for (var a = 0; a < row.length; a++) {
+      for (var b = a+1; b < row.length; b++) {
+        var x = row[a], y = row[b];
+        if (!co[x][y]) co[x][y] = 0;
+        if (!co[y][x]) co[y][x] = 0;
+        co[x][y]++; co[y][x]++;
+      }
+    }
+  }
+  return co;
+}
+function markovProb(num, history) {
+  var aa = 0, ab = 0, ba = 0, bb = 0;
+  for (var i = 1; i < history.length; i++) {
+    var prev = history[i-1].indexOf(num) >= 0;
+    var curr = history[i].indexOf(num) >= 0;
+    if (prev && curr) aa++;
+    else if (prev && !curr) ab++;
+    else if (!prev && curr) ba++;
+    else bb++;
+  }
+  var pAtoA = (aa+ab) ? aa/(aa+ab) : 0;
+  var pBtoA = (ba+bb) ? ba/(ba+bb) : 0;
+  var pAtoB = (aa+ab) ? ab/(aa+ab) : 0;
+  return {aa:aa, ab:ab, ba:ba, bb:bb, pAtoA:pAtoA, pBtoA:pBtoA, pAtoB:pAtoB};
+}
+function tailStats(history) {
+  var tails = [0,0,0,0,0,0,0,0,0,0];
+  history.forEach(function(row){ row.forEach(function(n){ tails[n%10]++; }); });
+  var total = tails.reduce(function(a,b){return a+b;},0) || 1;
+  return tails.map(function(t){ return t/total; });
+}
+function gapStats(row) {
+  var sorted = row.slice().sort(function(a,b){return a-b;});
+  var totalGap = 0, maxGap = 0, pairs = [];
+  for (var i = 1; i < sorted.length; i++) {
+    var g = sorted[i]-sorted[i-1];
+    totalGap += g;
+    maxGap = Math.max(maxGap, g);
+    if (g === 1) pairs.push([sorted[i-1], sorted[i]]);
+  }
+  return {totalGap: totalGap, maxGap: maxGap, pairs: pairs, avgGap: totalGap/(sorted.length-1)};
+}
+// ========== V3 Helper Functions End ==========
 
+function scoreDLTNumbers_V3(lastDraw, history) {
+  var fronts = history.map(function(h){ return h.slice(0,5); });
+  var co = buildCoOccurrence(fronts);
+  var last = lastDraw.slice(0,5);
+  var scores = [];
   for (var n = 1; n <= 35; n++) {
-    var score = { num: n, freqScore: 0, missScore: 0, repeatScore: 0, zoneScore: 0, adjScore: 0, total: 0, reasons: [] };
-
-    // 1. Frequency score (25%)
-    var freq = 0;
-    for (var i = 0; i < allFronts.length; i++) {
-      if (allFronts[i].indexOf(n) >= 0) freq++;
-    }
-    score.freqScore = Math.min(25, (freq / expected) * 25);
-    if (freq >= expected * 1.3) { score.reasons.push('高频热号'); }
-    else if (freq >= expected * 1.0) { score.reasons.push('温号稳定'); }
-
-    // 2. Missing score (20%) - find current miss count
-    var miss = 0;
-    for (var i = 0; i < allFronts.length; i++) {
-      if (allFronts[i].indexOf(n) >= 0) break;
-      miss++;
-    }
-    if (miss === allFronts.length) miss = allFronts.length;
-    var avgMiss = Math.round(35 / 5);
-    if (miss >= avgMiss * 0.8 && miss <= avgMiss * 2) {
-      score.missScore = 20 * (miss / avgMiss);
-      if (miss >= avgMiss) score.reasons.push('遗漏回补号');
-    } else if (miss > avgMiss * 2) {
-      score.missScore = 8;
-      score.reasons.push('超长遗漏');
-    } else {
-      score.missScore = 10;
-    }
-
-    // 3. Repeat score (15%)
-    if (last.front.indexOf(n) >= 0) {
-      score.repeatScore = 15;
-      score.reasons.push('上期重号候选');
-    } else {
-      // Check adjacency to last draw
-      for (var i = 0; i < last.front.length; i++) {
-        if (Math.abs(n - last.front[i]) === 1) {
-          score.repeatScore = 8;
-          score.reasons.push('连号关联');
-          break;
-        }
-      }
-    }
-
-    // 4. Zone score (15%)
-    var zoneIdx = n <= 12 ? 0 : n <= 23 ? 1 : 2;
-    var recentZoneCounts = [0, 0, 0];
-    var recentN = Math.min(5, allFronts.length);
-    for (var i = 0; i < recentN; i++) {
-      for (var j = 0; j < allFronts[i].length; j++) {
-        var zn = allFronts[i][j] <= 12 ? 0 : allFronts[i][j] <= 23 ? 1 : 2;
-        recentZoneCounts[zn]++;
-      }
-    }
-    var zoneAvg = recentZoneCounts[zoneIdx] / recentN;
-    if (zoneAvg < 1.5) {
-      score.zoneScore = 15;
-      score.reasons.push('区间回补');
-    } else if (zoneAvg < 1.8) {
-      score.zoneScore = 10;
-    } else {
-      score.zoneScore = 5;
-    }
-
-    // 5-7. Composite scores
-    score.total = score.freqScore + score.missScore + score.repeatScore + score.zoneScore + 5 + 3 + 2;
-
-    scores.push(score);
+    var wf = weightedFreq(n, fronts, 8);
+    var dist = getMissDistribution(n, fronts);
+    var currentGap = dist.currentGap;
+    var mp = getMissPercentile(n, fronts);
+    var mk = markovProb(n, fronts);
+    var mpScore = mp > 0.85 ? 1.0 : (mp > 0.7 ? 0.8 : (mp > 0.5 ? 0.6 : 0.3));
+    var mkScore = mk.pBtoA > mk.pAtoA ? 0.9 : (mk.pBtoA > 0.3 ? 0.7 : 0.4);
+    var tail = n % 10;
+    var tailScore = 1 - Math.abs(tailStats(fronts)[tail] - 0.1) * 5;
+    var isOdd = n % 2 === 1;
+    var oddRatio = last.filter(function(x){return x%2===1;}).length / 5;
+    var oddAltScore = (isOdd && oddRatio <= 0.6) || (!isOdd && oddRatio >= 0.4) ? 0.8 : 0.5;
+    var sizeScore = (n <= 17 && last.filter(function(x){return x<=17;}).length <= 3) || (n > 17 && last.filter(function(x){return x>17;}).length <= 3) ? 0.8 : 0.5;
+    var zoneScore = ((n<=12 && last.filter(function(x){return x<=12;}).length<=2) || (n>12&&n<=23 && last.filter(function(x){return x>12&&x<=23;}).length<=2) || (n>23 && last.filter(function(x){return x>23;}).length<=2)) ? 0.8 : 0.5;
+    var neighborScore = last.some(function(x){ return Math.abs(x-n)<=1 && x!==n; }) ? 0.9 : 0.3;
+    var stability = 1 - Math.abs(wf - 0.15) * 3;
+    scores.push({
+      num: n,
+      wf: wf, currentGap: currentGap, mp: mp, mpScore: mpScore, mkScore: mkScore,
+      tailScore: tailScore, oddAltScore: oddAltScore, sizeScore: sizeScore, zoneScore: zoneScore,
+      neighborScore: neighborScore, stability: stability,
+      baseScore: wf*0.18 + mpScore*0.18 + tailScore*0.10 + oddAltScore*0.04 + sizeScore*0.03 + zoneScore*0.03 + neighborScore*0.05 + stability*0.05 + mkScore*0.12,
+      coScore: 0
+    });
   }
-
-  return scores;
+  var top10 = scores.slice().sort(function(a,b){return b.baseScore-a.baseScore;}).slice(0,10).map(function(s){return s.num;});
+  scores.forEach(function(s){
+    var coSum = 0, coCount = 0;
+    top10.forEach(function(t){
+      if (t !== s.num && co[s.num] && co[s.num][t]) { coSum += co[s.num][t]; coCount++; }
+    });
+    s.coScore = coCount ? Math.min(coSum/coCount/3, 1) : 0;
+    s.totalScore = s.baseScore + s.coScore * 0.15;
+  });
+  return scores.sort(function(a,b){return b.totalScore-a.totalScore;});
 }
 
-function scoreDLTBackNumbers(last, allBacks) {
-  var totalPeriods = allBacks.length;
-  var expected = (2 / 12) * totalPeriods;
+function scoreDLTBlueNumbers_V3(lastDraw, history) {
+  var backs = history.map(function(h){ return h.slice(5); });
+  var lastB = lastDraw.slice(5);
   var scores = [];
-
   for (var n = 1; n <= 12; n++) {
-    var score = { num: n, total: 0, reasons: [] };
-
-    var freq = 0;
-    for (var i = 0; i < allBacks.length; i++) {
-      if (allBacks[i].indexOf(n) >= 0) freq++;
-    }
-
-    var freqScore = Math.min(40, (freq / expected) * 40);
-    if (freq >= expected * 1.3) score.reasons.push('高频热号');
-
-    var miss = 0;
-    for (var i = 0; i < allBacks.length; i++) {
-      if (allBacks[i].indexOf(n) >= 0) break;
-      miss++;
-    }
-    if (miss === allBacks.length) miss = allBacks.length;
-    var missScore = Math.min(30, miss * 3);
-    if (miss >= 4) score.reasons.push('遗漏回补');
-
-    var repeatScore = 0;
-    if (last.back.indexOf(n) >= 0) {
-      repeatScore = 20;
-      score.reasons.push('上期重号');
-    }
-
-    score.total = freqScore + missScore + repeatScore;
-    scores.push(score);
+    var wf = weightedFreq(n, backs, 6);
+    var dist = getMissDistribution(n, backs);
+    var currentGap = dist.currentGap;
+    var mp = getMissPercentile(n, backs);
+    var mpScore = mp > 0.85 ? 1.0 : (mp > 0.7 ? 0.8 : (mp > 0.5 ? 0.6 : 0.3));
+    var mk = markovProb(n, backs);
+    var mkScore = mk.pBtoA > mk.pAtoA ? 0.9 : (mk.pBtoA > 0.3 ? 0.7 : 0.4);
+    var oddScore = (n%2===1 && lastB.filter(function(x){return x%2===1;}).length<=1) || (n%2===0 && lastB.filter(function(x){return x%2===0;}).length<=1) ? 0.85 : 0.5;
+    var sizeScore = (n<=6 && lastB.filter(function(x){return x<=6;}).length<=1) || (n>6 && lastB.filter(function(x){return x>6;}).length<=1) ? 0.85 : 0.5;
+    scores.push({num: n, wf: wf, currentGap: currentGap, mp: mp, mpScore: mpScore, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, totalScore: wf*0.25 + mpScore*0.20 + oddScore*0.08 + sizeScore*0.08 + mkScore*0.10});
   }
-
-  return scores;
+  return scores.sort(function(a,b){return b.totalScore-a.totalScore;});
 }
 
-function renderDLTRecommend(last, allFronts, allBacks) {
-  var scores = scoreDLTNumbers(last, allFronts, allBacks);
-  scores.sort(function(a, b) { return b.total - a.total; });
+function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
+  var last = lastDraw;
+  var history = allFronts.map(function(f,i){ return f.concat(allBacks[i]); });
+  var frontScores = scoreDLTNumbers_V3(last, history);
+  var backScores = scoreDLTBlueNumbers_V3(last, history);
+  var topFronts = frontScores.slice(0,10);
+  var topBacks = backScores.slice(0,5);
 
-  var backScores = scoreDLTBackNumbers(last, allBacks);
-  backScores.sort(function(a, b) { return b.total - a.total; });
-
-  // Generate 3 sets of recommendations
-  var html = '';
-
-  for (var set = 0; set < 3; set++) {
-    var frontPicks = [];
-    var usedNums = {};
-
-    // Pick top scorer
-    frontPicks.push(scores[set].num);
-    usedNums[scores[set].num] = true;
-
-    // Fill remaining 4 from top scores with zone balance
-    var zoneCounts = [0, 0, 0];
-    var firstZone = frontPicks[0] <= 12 ? 0 : frontPicks[0] <= 23 ? 1 : 2;
-    zoneCounts[firstZone]++;
-
-    for (var i = 0; i < scores.length && frontPicks.length < 5; i++) {
-      var n = scores[i].num;
-      if (usedNums[n]) continue;
-      var z = n <= 12 ? 0 : n <= 23 ? 1 : 2;
-      if (zoneCounts[z] < 3) {
-        frontPicks.push(n);
-        usedNums[n] = true;
-        zoneCounts[z]++;
-      }
-    }
-    // Fill remaining if needed
-    for (var i = 0; i < scores.length && frontPicks.length < 5; i++) {
-      if (!usedNums[scores[i].num]) {
-        frontPicks.push(scores[i].num);
-        usedNums[scores[i].num] = true;
-      }
-    }
-    frontPicks.sort(function(a, b) { return a - b; });
-
-    var backPicks = [backScores[set].num, backScores[(set + 1) % backScores.length].num].sort(function(a,b){return a-b;});
-
-    html += '<div style="margin-bottom:1.25rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">推荐方案 ' + (set + 1) + '</div>';
-    html += '<div class="ball-row">';
-    for (var i = 0; i < frontPicks.length; i++) {
-      html += '<div class="ball red">' + pad(frontPicks[i]) + '</div>';
-    }
-    html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
-    for (var i = 0; i < backPicks.length; i++) {
-      html += '<div class="ball blue">' + pad(backPicks[i]) + '</div>';
-    }
-    html += '</div>';
-    html += '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem">和值: ' + sum(frontPicks) + ' | 跨度: ' + span(frontPicks) + ' | 区间比: ' + zoneCounts.join(':') + '</div>';
-    html += '</div>';
+  function qualityScore(front, back) {
+    var s = front.slice().sort(function(a,b){return a-b;});
+    var sum = s.reduce(function(a,b){return a+b;},0);
+    var span = s[4]-s[0];
+    var z1=s.filter(function(x){return x<=12;}).length, z2=s.filter(function(x){return x>12&&x<=23;}).length, z3=s.filter(function(x){return x>23;}).length;
+    var odd=s.filter(function(x){return x%2===1;}).length;
+    var big=s.filter(function(x){return x>17;}).length;
+    var tails = {}; s.forEach(function(n){var t=n%10; tails[t]=(tails[t]||0)+1;});
+    var maxTail = Math.max.apply(null, Object.values(tails));
+    var g = gapStats(s);
+    var q = 40;
+    if (sum>=60 && sum<=130) q+=12; else if (sum>=50 && sum<=140) q+=6;
+    if (span>=10 && span<=28) q+=12; else if (span>=8 && span<=32) q+=6;
+    if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)&&(z3>=1&&z3<=3)) q+=15;
+    else if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)) q+=8;
+    if (odd>=2 && odd<=3) q+=10; else if (odd>=1 && odd<=4) q+=5;
+    if (big>=2 && big<=3) q+=10; else if (big>=1 && big<=4) q+=5;
+    if (maxTail<=2) q+=12; else if (maxTail<=3) q+=6;
+    if (g.pairs.length===1) q+=10; else if (g.pairs.length>=1 && g.pairs.length<=2) q+=5;
+    if (g.maxGap<=12) q+=8; else if (g.maxGap<=15) q+=4;
+    var fScore = s.reduce(function(sum,n){return sum+(frontScores.find(function(x){return x.num===n;})||{}).totalScore||0;},0);
+    var bScore = back.reduce(function(sum,n){return sum+(backScores.find(function(x){return x.num===n;})||{}).totalScore||0;},0);
+    q += Math.min(fScore*5, 20) + Math.min(bScore*8, 12);
+    return Math.min(100, Math.round(q));
   }
 
-  html += '<div class="disclaimer" style="margin-top:1.5rem"><strong>声明：</strong>以上推荐号码基于历史数据统计分析生成，仅供娱乐参考。彩票开奖为随机事件，不构成任何投注建议。</div>';
+  function genStrategy1() {
+    var picks = frontScores.slice(0,14).map(function(s){return s.num;});
+    var best = null, bestQ = -1;
+    for (var a=0;a<picks.length-4;a++)
+    for (var b=a+1;b<picks.length-3;b++)
+    for (var c=b+1;c<picks.length-2;c++)
+    for (var d=c+1;d<picks.length-1;d++)
+    for (var e=d+1;e<picks.length;e++) {
+      var f=[picks[a],picks[b],picks[c],picks[d],picks[e]];
+      var bp = backScores.slice(0,5).map(function(s){return s.num;});
+      for (var i=0;i<bp.length-1;i++)
+      for (var j=i+1;j<bp.length;j++) {
+        var b=[bp[i],bp[j]];
+        var q = qualityScore(f,b);
+        if (q>bestQ) {bestQ=q; best=f.concat(b);}
+      }
+    }
+    return best ? [best] : [];
+  }
+
+  function genStrategy2() {
+    var hot = frontScores.slice(0,8).map(function(s){return s.num;});
+    var cold = frontScores.filter(function(s){return s.mp>0.7;}).slice(0,6).map(function(s){return s.num;});
+    var pool = hot.slice(0,5).concat(cold.slice(0,3));
+    var unique = [];
+    for (var i=0;i<pool.length && unique.length<5;i++) if (unique.indexOf(pool[i])<0) unique.push(pool[i]);
+    while (unique.length<5) {
+      var r = frontScores[Math.floor(Math.random()*frontScores.length)].num;
+      if (unique.indexOf(r)<0) unique.push(r);
+    }
+    var b = [backScores[0].num, backScores[1].num];
+    return [unique.slice(0,5).concat(b)];
+  }
+
+  function genStrategy3() {
+    var hot = frontScores.slice(0,6).map(function(s){return s.num;});
+    var mp = frontScores.filter(function(s){return s.mkScore>0.7 && hot.indexOf(s.num)<0;}).slice(0,5).map(function(s){return s.num;});
+    var pool = hot.concat(mp);
+    var best = null, bestQ = -1;
+    for (var a=0;a<pool.length-4;a++)
+    for (var b=a+1;b<pool.length-3;b++)
+    for (var c=b+1;c<pool.length-2;c++)
+    for (var d=c+1;d<pool.length-1;d++)
+    for (var e=d+1;e<pool.length;e++) {
+      var f=[pool[a],pool[b],pool[c],pool[d],pool[e]];
+      var b2 = [backScores[0].num, backScores[Math.min(2,backScores.length-1)].num];
+      var q = qualityScore(f,b2);
+      if (q>bestQ) {bestQ=q; best=f.concat(b2);}
+    }
+    return best ? [best] : [];
+  }
+
+  function genStrategy4() {
+    var cluster = [frontScores[0].num];
+    var co = buildCoOccurrence(allFronts);
+    while (cluster.length<5) {
+      var bestN=-1, bestS=-1;
+      for (var n=1;n<=35;n++) {
+        if (cluster.indexOf(n)>=0) continue;
+        var s=0;
+        cluster.forEach(function(c){s+= (co[n]&&co[n][c])||0;});
+        if (s>bestS) {bestS=s; bestN=n;}
+      }
+      if (bestN>0) cluster.push(bestN); else break;
+    }
+    while (cluster.length<5) {
+      var r = frontScores.find(function(s){return cluster.indexOf(s.num)<0;});
+      if (r) cluster.push(r.num); else break;
+    }
+    var b = [backScores[0].num, backScores[1].num];
+    return [cluster.slice(0,5).concat(b)];
+  }
+
+  var s1 = genStrategy1();
+  var s2 = genStrategy2();
+  var s3 = genStrategy3();
+  var s4 = genStrategy4();
+
+  var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V3 严谨模型推荐</h3>';
+  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·共现矩阵·马尔可夫转移·尾数分散·区间均衡·连号间距·邻号·稳定性 九维评分体系</p>';
+
+  var strategies = [
+    {name:'严格约束优化', desc:'在Top14热号中遍历所有组合，通过硬性约束（和值/跨度/区间/奇偶/大小/尾数/连号）筛选最高分', combos:s1},
+    {name:'热号+遗漏双轨', desc:'前3球从Top8热号抽取，后2球从遗漏百分位>70%的冷号补充', combos:s2},
+    {name:'马尔可夫转移驱动', desc:'优先选择p(B→A) > p(A→A)的号码（冷转热概率高），辅以遗漏百分位', combos:s3},
+    {name:'共现聚类', desc:'以Top1号码为种子，迭代添加共现概率最高的号码形成聚类', combos:s4}
+  ];
+
+  strategies.forEach(function(st,i){
+    html += '<div class="strategy-box" style="margin:12px 0;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--bg2)">';
+    html += '<h4 style="margin:0 0 6px 0;color:var(--ink)">策略'+(i+1)+'：'+st.name+'</h4>';
+    html += '<p style="margin:0 0 8px 0;color:var(--muted);font-size:12px">'+st.desc+'</p>';
+    st.combos.forEach(function(c,ci){
+      var q = qualityScore(c.slice(0,5), c.slice(5));
+      html += '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;flex-wrap:wrap">';
+      html += '<span style="font-weight:bold;color:var(--accent4)">方案'+(ci+1)+'：</span>';
+      html += '<span style="color:var(--ink)">前区：'+c.slice(0,5).map(function(n){return String(n).padStart(2,'0');}).join(', ')+'</span>';
+      html += '<span style="color:var(--ink)">后区：'+c.slice(5).map(function(n){return String(n).padStart(2,'0');}).join(', ')+'</span>';
+      html += '<span style="margin-left:auto;background:'+(q>=85?'var(--accent3)':(q>=70?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:12px">质量分 '+q+'</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+
+  html += '<h4 style="margin-top:16px;color:var(--ink)">📊 前区 Top10 号码评分详情</h4>';
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--bg3)">';
+  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">号码</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">加权频率</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">当前遗漏</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏%位</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">转移概率</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">共现分</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">总评分</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">理由</th>';
+  html += '</tr></thead><tbody>';
+  topFronts.forEach(function(s){
+    var reason = [];
+    if (s.wf > 0.2) reason.push('高频');
+    if (s.mp > 0.8) reason.push('深冷');
+    if (s.mkScore > 0.8) reason.push('冷转热');
+    if (s.neighborScore > 0.5) reason.push('邻号');
+    if (s.coScore > 0.5) reason.push('共现强');
+    html += '<tr><td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--ink)">'+String(s.num).padStart(2,'0')+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.wf*100).toFixed(1)+'%</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+s.currentGap+'期</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.mp*100).toFixed(0)+'%</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.mkScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.coScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--accent4)">'+(s.totalScore*100).toFixed(1)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(reason.join('·')||'-')+'</td></tr>';
+  });
+  html += '</tbody></table></div>';
+
+  html += '<h4 style="margin-top:16px;color:var(--ink)">🔵 后区 Top5 号码评分</h4>';
+  html += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
+  topBacks.forEach(function(s){
+    html += '<div style="padding:8px 12px;border:1px solid var(--rule);border-radius:6px;background:var(--bg3)">';
+    html += '<span style="font-weight:bold;color:var(--accent2);font-size:16px">'+String(s.num).padStart(2,'0')+'</span>';
+    html += '<span style="color:var(--muted);font-size:11px;margin-left:8px">'+(s.totalScore*100).toFixed(1)+'分 (遗漏'+s.currentGap+'期)</span>';
+    html += '</div>';
+  });
+  html += '</div>';
+  html += '</div>';
 
   document.getElementById('dlt-recommend').innerHTML = html;
 }
+
 
 // ==================== 双色球分析 ====================
 
 var SSQ_ZONES = [[1,11],[12,22],[23,33]];
 
 var ssqSampleHistory = [
-  '12,14,16,17,18,32|08',
+  '03,06,08,14,26,27|08',
   '03,05,16,18,29,32|04',
   '04,19,27,29,30,32|13',
   '05,11,21,23,24,29|16',
@@ -720,6 +865,10 @@ function loadSSQSample() {
   document.getElementById('ssq-red').value = parts[0];
   document.getElementById('ssq-blue').value = parts[1];
   document.getElementById('ssq-history').value = ssqSampleHistory.join('\n');
+  // 填充复盘输入框默认值
+  var sampleRed = parts[0].split(',').slice(0,6).join(',');
+  document.getElementById('ssq-review-numbers').value = sampleRed;
+  document.getElementById('ssq-review-blue').value = parts[1];
 }
 
 function clearSSQ() {
@@ -1051,44 +1200,15 @@ function renderSSQDanTuo(last, allReds, allBlues) {
 }
 
 function scoreSSQNumbers(last, allReds) {
-  var totalPeriods = allReds.length;
-  var expected = (6 / 33) * totalPeriods;
   var scores = [];
-
   for (var n = 1; n <= 33; n++) {
-    var score = { num: n, total: 0, reasons: [] };
+    var wf = weightedFreq(n, allReds, 10);
+    var dist = getMissDistribution(n, allReds);
+    var mp = getMissPercentile(n, allReds);
+    var mk = markovProb(n, allReds);
 
-    var freq = 0;
-    for (var i = 0; i < allReds.length; i++) {
-      if (allReds[i].indexOf(n) >= 0) freq++;
-    }
-    var freqScore = Math.min(25, (freq / expected) * 25);
-    if (freq >= expected * 1.3) score.reasons.push('高频热号');
-    else if (freq >= expected) score.reasons.push('温号稳定');
-
-    var miss = 0;
-    for (var i = 0; i < allReds.length; i++) {
-      if (allReds[i].indexOf(n) >= 0) break;
-      miss++;
-    }
-    if (miss === allReds.length) miss = allReds.length;
-    var avgMiss = Math.round(33 / 6);
-    var missScore = miss >= avgMiss * 0.8 && miss <= avgMiss * 2 ? Math.min(20, (miss / avgMiss) * 20) : 8;
-    if (miss >= avgMiss) score.reasons.push('遗漏回补号');
-
-    var repeatScore = 0;
-    if (last.red.indexOf(n) >= 0) {
-      repeatScore = 15;
-      score.reasons.push('上期重号候选');
-    } else {
-      for (var i = 0; i < last.red.length; i++) {
-        if (Math.abs(n - last.red[i]) === 1) {
-          repeatScore = 8;
-          score.reasons.push('连号关联');
-          break;
-        }
-      }
-    }
+    var mpScore = mp > 0.85 ? 1.0 : (mp > 0.7 ? 0.8 : (mp > 0.5 ? 0.6 : 0.3));
+    var mkScore = mk.pBtoA > mk.pAtoA ? 0.9 : (mk.pBtoA > 0.3 ? 0.7 : 0.4);
 
     var zoneIdx = n <= 11 ? 0 : n <= 22 ? 1 : 2;
     var recentZoneCounts = [0, 0, 0];
@@ -1100,103 +1220,236 @@ function scoreSSQNumbers(last, allReds) {
       }
     }
     var zoneAvg = recentZoneCounts[zoneIdx] / recentN;
-    var zoneScore = zoneAvg < 1.5 ? 15 : zoneAvg < 2 ? 10 : 5;
-    if (zoneAvg < 1.5) score.reasons.push('区间回补');
+    var zoneScore = zoneAvg < 1.5 ? 0.9 : zoneAvg < 2 ? 0.7 : 0.4;
 
-    score.total = freqScore + missScore + repeatScore + zoneScore + 5 + 3 + 2;
-    scores.push(score);
+    var neighborScore = 0;
+    if (last.red.indexOf(n) >= 0) neighborScore = 0.9;
+    else {
+      for (var i = 0; i < last.red.length; i++) {
+        if (Math.abs(n - last.red[i]) === 1) { neighborScore = 0.7; break; }
+      }
+    }
+
+    var isHot = wf > 0.18;
+    var isCold = mp > 0.7;
+    var hcScore = (isHot || isCold) ? 0.8 : 0.5;
+
+    var stability = 1 - Math.abs(wf - 0.18) * 3;
+
+    var totalScore = wf * 0.25 + mpScore * 0.20 + mkScore * 0.15 + zoneScore * 0.15 + neighborScore * 0.10 + hcScore * 0.10 + stability * 0.05;
+
+    var reasons = [];
+    if (wf > 0.2) reasons.push('高频');
+    if (mp > 0.8) reasons.push('深冷');
+    if (mkScore > 0.8) reasons.push('冷转热');
+    if (neighborScore > 0.7) reasons.push('邻号');
+    if (zoneScore > 0.7) reasons.push('区间回补');
+    if (hcScore > 0.7) reasons.push('冷热');
+    if (stability > 0.7) reasons.push('稳定');
+
+    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, neighborScore: neighborScore, hcScore: hcScore, stability: stability, totalScore: totalScore, reasons: reasons });
   }
-  return scores;
+  return scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 }
+
 
 function scoreSSQBlueNumbers(last, allBlues) {
-  var totalPeriods = allBlues.length;
-  var expected = (1 / 16) * totalPeriods;
+  var blueHistory = allBlues.map(function(b){ return [b]; });
   var scores = [];
-
   for (var n = 1; n <= 16; n++) {
-    var score = { num: n, total: 0, reasons: [] };
+    var wf = weightedFreq(n, blueHistory, 8);
+    var dist = getMissDistribution(n, blueHistory);
+    var mp = getMissPercentile(n, blueHistory);
+    var mk = markovProb(n, blueHistory);
 
-    var freq = 0;
-    for (var i = 0; i < allBlues.length; i++) {
-      if (allBlues[i] === n) freq++;
-    }
-    score.total = Math.min(40, (freq / Math.max(1, expected)) * 40);
-    if (freq >= expected * 1.3) score.reasons.push('高频热号');
+    var mpScore = mp > 0.85 ? 1.0 : (mp > 0.7 ? 0.8 : (mp > 0.5 ? 0.6 : 0.3));
+    var mkScore = mk.pBtoA > mk.pAtoA ? 0.9 : (mk.pBtoA > 0.3 ? 0.7 : 0.4);
 
-    var miss = 0;
-    for (var i = 0; i < allBlues.length; i++) {
-      if (allBlues[i] === n) break;
-      miss++;
-    }
-    if (miss === allBlues.length) miss = allBlues.length;
-    score.total += Math.min(30, miss * 3);
-    if (miss >= 8) score.reasons.push('遗漏回补');
+    var lastBlueOdd = last.blue % 2 === 1;
+    var oddScore = (n % 2 === 1 && !lastBlueOdd) || (n % 2 === 0 && lastBlueOdd) ? 0.85 : 0.5;
 
-    if (last.blue === n) {
-      score.total += 20;
-      score.reasons.push('上期重号');
-    }
+    var lastBlueBig = last.blue > 8;
+    var sizeScore = (n > 8 && !lastBlueBig) || (n <= 8 && lastBlueBig) ? 0.85 : 0.5;
 
-    scores.push(score);
+    var totalScore = wf * 0.30 + mpScore * 0.25 + mkScore * 0.15 + oddScore * 0.15 + sizeScore * 0.15;
+
+    var reasons = [];
+    if (wf > 0.2) reasons.push('高频');
+    if (mp > 0.8) reasons.push('深冷');
+    if (mkScore > 0.8) reasons.push('冷转热');
+    if (oddScore > 0.7) reasons.push('奇偶');
+    if (sizeScore > 0.7) reasons.push('大小');
+
+    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, totalScore: totalScore, reasons: reasons });
   }
-  return scores;
+  return scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 }
+
 
 function renderSSQRecommend(last, allReds, allBlues) {
-  var scores = scoreSSQNumbers(last, allReds);
-  scores.sort(function(a, b) { return b.total - a.total; });
-
+  var frontScores = scoreSSQNumbers(last, allReds);
   var backScores = scoreSSQBlueNumbers(last, allBlues);
-  backScores.sort(function(a, b) { return b.total - a.total; });
+  var topFronts = frontScores.slice(0,10);
+  var topBacks = backScores.slice(0,5);
 
-  var html = '';
-  for (var set = 0; set < 3; set++) {
-    var redPicks = [];
-    var usedNums = {};
-    redPicks.push(scores[set].num);
-    usedNums[scores[set].num] = true;
-
-    var zoneCounts = [0, 0, 0];
-    var firstZone = redPicks[0] <= 11 ? 0 : redPicks[0] <= 22 ? 1 : 2;
-    zoneCounts[firstZone]++;
-
-    for (var i = 0; i < scores.length && redPicks.length < 6; i++) {
-      var n = scores[i].num;
-      if (usedNums[n]) continue;
-      var z = n <= 11 ? 0 : n <= 22 ? 1 : 2;
-      if (zoneCounts[z] < 3) {
-        redPicks.push(n);
-        usedNums[n] = true;
-        zoneCounts[z]++;
-      }
-    }
-    for (var i = 0; i < scores.length && redPicks.length < 6; i++) {
-      if (!usedNums[scores[i].num]) {
-        redPicks.push(scores[i].num);
-        usedNums[scores[i].num] = true;
-      }
-    }
-    redPicks.sort(function(a, b) { return a - b; });
-
-    var bluePick = backScores[set].num;
-
-    html += '<div style="margin-bottom:1.25rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">推荐方案 ' + (set + 1) + '</div>';
-    html += '<div class="ball-row">';
-    for (var i = 0; i < redPicks.length; i++) {
-      html += '<div class="ball red">' + pad(redPicks[i]) + '</div>';
-    }
-    html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
-    html += '<div class="ball blue">' + pad(bluePick) + '</div>';
-    html += '</div>';
-    html += '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem">和值: ' + sum(redPicks) + ' | 跨度: ' + span(redPicks) + ' | 区间比: ' + zoneCounts.join(':') + '</div>';
-    html += '</div>';
+  function qualityScoreSSQ(reds, blue) {
+    var s = reds.slice().sort(function(a,b){return a-b;});
+    var sumVal = s.reduce(function(a,b){return a+b;},0);
+    var spanVal = s[5]-s[0];
+    var z1=s.filter(function(x){return x<=11;}).length;
+    var z2=s.filter(function(x){return x>11&&x<=22;}).length;
+    var z3=s.filter(function(x){return x>22;}).length;
+    var odd=s.filter(function(x){return x%2===1;}).length;
+    var big=s.filter(function(x){return x>16;}).length;
+    var tails = {}; s.forEach(function(n){var t=n%10; tails[t]=(tails[t]||0)+1;});
+    var maxTail = Math.max.apply(null, Object.keys(tails).map(function(k){return tails[k];}));
+    var g = gapStats(s);
+    var q = 40;
+    if (sumVal>=60 && sumVal<=130) q+=12; else if (sumVal>=50 && sumVal<=140) q+=6;
+    if (spanVal>=10 && spanVal<=28) q+=12; else if (spanVal>=8 && spanVal<=32) q+=6;
+    if (z1>=1 && z2>=1 && z3>=1) q+=15; else if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)) q+=8;
+    if (odd>=2 && odd<=4) q+=10; else if (odd>=1 && odd<=5) q+=5;
+    if (big>=2 && big<=4) q+=10; else if (big>=1 && big<=5) q+=5;
+    if (maxTail<=2) q+=12; else if (maxTail<=3) q+=6;
+    if (g.pairs.length>=1 && g.pairs.length<=2) q+=8; else if (g.pairs.length<=3) q+=4;
+    if (g.maxGap<=12) q+=8; else if (g.maxGap<=15) q+=4;
+    var fScore = s.reduce(function(sum,n){return sum+(frontScores.find(function(x){return x.num===n;})||{}).totalScore||0;},0);
+    var bScore = (backScores.find(function(x){return x.num===blue;})||{}).totalScore||0;
+    q += Math.min(fScore*8, 20) + Math.min(bScore*15, 10);
+    return Math.min(100, Math.round(q));
   }
 
+  function genStrategy1() {
+    var picks = frontScores.slice(0,14).map(function(s){return s.num;});
+    var best = null, bestQ = -1;
+    for (var a=0;a<picks.length-5;a++)
+    for (var b=a+1;b<picks.length-4;b++)
+    for (var c=b+1;c<picks.length-3;c++)
+    for (var d=c+1;d<picks.length-2;d++)
+    for (var e=d+1;e<picks.length-1;e++)
+    for (var f=e+1;f<picks.length;f++) {
+      var reds=[picks[a],picks[b],picks[c],picks[d],picks[e],picks[f]];
+      var bp = backScores.slice(0,5).map(function(s){return s.num;});
+      for (var i=0;i<bp.length;i++) {
+        var blue = bp[i];
+        var q = qualityScoreSSQ(reds, blue);
+        if (q>bestQ) {bestQ=q; best={reds:reds, blue:blue};}
+      }
+    }
+    return best ? [best] : [];
+  }
+
+  function genStrategy2() {
+    var hot = frontScores.slice(0,8).map(function(s){return s.num;});
+    var cold = frontScores.filter(function(s){return s.mp>0.7;}).slice(0,6).map(function(s){return s.num;});
+    var results = [];
+    for (var i=0;i<3;i++) {
+      var pool = hot.slice(0,4).concat(cold.slice(0,3));
+      var unique = [];
+      for (var j=0;j<pool.length && unique.length<6;j++) if (unique.indexOf(pool[j])<0) unique.push(pool[j]);
+      for (var j=0;j<frontScores.length && unique.length<6;j++) {
+        if (unique.indexOf(frontScores[j].num)<0) unique.push(frontScores[j].num);
+      }
+      unique.sort(function(a,b){return a-b;});
+      var blue = backScores[i % backScores.length].num;
+      results.push({reds:unique, blue:blue});
+    }
+    return results;
+  }
+
+  function genStrategy3() {
+    var hot = frontScores.slice(0,6).map(function(s){return s.num;});
+    var mp = frontScores.filter(function(s){return s.mkScore>0.7 && hot.indexOf(s.num)<0;}).slice(0,6).map(function(s){return s.num;});
+    if (mp.length < 6) {
+      var missSorted = frontScores.slice().sort(function(a,b){return b.mp - a.mp;});
+      for (var i=0;i<missSorted.length && mp.length<6;i++) {
+        if (hot.indexOf(missSorted[i].num)<0 && mp.indexOf(missSorted[i].num)<0) mp.push(missSorted[i].num);
+      }
+    }
+    var pool = hot.concat(mp);
+    var best = null, bestQ = -1;
+    for (var a=0;a<pool.length-5;a++)
+    for (var b=a+1;b<pool.length-4;b++)
+    for (var c=b+1;c<pool.length-3;c++)
+    for (var d=c+1;d<pool.length-2;d++)
+    for (var e=d+1;e<pool.length-1;e++)
+    for (var f=e+1;f<pool.length;f++) {
+      var reds=[pool[a],pool[b],pool[c],pool[d],pool[e],pool[f]];
+      var blue = backScores[0].num;
+      var q = qualityScoreSSQ(reds, blue);
+      if (q>bestQ) {bestQ=q; best={reds:reds, blue:blue};}
+    }
+    return best ? [best] : [];
+  }
+
+  var s1 = genStrategy1();
+  var s2 = genStrategy2();
+  var s3 = genStrategy3();
+
+  var strategies = [
+    {name:'严格约束优化', desc:'在Top14热号中遍历所有组合，通过硬性约束（和值/跨度/区间/奇偶/大小/尾数/连号）筛选最高分', combos:s1},
+    {name:'热号+遗漏双轨', desc:'前4球从Top8热号抽取，后2球从遗漏百分位>70%的冷号补充', combos:s2},
+    {name:'马尔可夫转移驱动', desc:'优先选择p(B→A) > p(A→A)的号码（冷转热概率高），辅以遗漏百分位', combos:s3}
+  ];
+
+  var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V2 严谨模型推荐</h3>';
+  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·马尔可夫转移·区间回补·邻号·冷热交替·稳定性 七维评分体系</p>';
+
+  strategies.forEach(function(st,i){
+    html += '<div class="strategy-box" style="margin:12px 0;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--bg2)">';
+    html += '<h4 style="margin:0 0 6px 0;color:var(--ink)">策略'+(i+1)+'：'+st.name+'</h4>';
+    html += '<p style="margin:0 0 8px 0;color:var(--muted);font-size:12px">'+st.desc+'</p>';
+    st.combos.forEach(function(c,ci){
+      var q = qualityScoreSSQ(c.reds, c.blue);
+      html += '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;flex-wrap:wrap">';
+      html += '<span style="font-weight:bold;color:var(--accent4)">方案'+(ci+1)+'：</span>';
+      html += '<span style="color:var(--ink)">红球：'+c.reds.map(function(n){return String(n).padStart(2,'0');}).join(', ')+'</span>';
+      html += '<span style="color:var(--ink)">蓝球：'+String(c.blue).padStart(2,'0')+'</span>';
+      html += '<span style="margin-left:auto;background:'+(q>=85?'var(--accent3)':(q>=70?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:12px">质量分 '+q+'</span>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+
+  html += '<h4 style="margin-top:16px;color:var(--ink)">📊 红球 Top10 号码评分详情</h4>';
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--bg3)">';
+  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">号码</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">加权频率</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">当前遗漏</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏%位</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">转移概率</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">邻号分</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">总评分</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">理由</th>';
+  html += '</tr></thead><tbody>';
+  topFronts.forEach(function(s){
+    var reason = [];
+    if (s.wf > 0.2) reason.push('高频');
+    if (s.mp > 0.8) reason.push('深冷');
+    if (s.mkScore > 0.8) reason.push('冷转热');
+    if (s.neighborScore > 0.7) reason.push('邻号');
+    if (s.zoneScore > 0.7) reason.push('区间回补');
+    if (s.hcScore > 0.7) reason.push('冷热');
+    if (s.stability > 0.7) reason.push('稳定');
+    html += '<tr><td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--ink)">'+String(s.num).padStart(2,'0')+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.wf*100).toFixed(1)+'%</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+s.currentGap+'期</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.mp*100).toFixed(0)+'%</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.mkScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.neighborScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--accent4)">'+(s.totalScore*100).toFixed(1)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(reason.join('·')||'-')+'</td></tr>';
+  });
+  html += '</tbody></table></div>';
+
+  html += '<h4 style="margin-top:16px;color:var(--ink)">🔵 蓝球 Top5 号码评分</h4>';
+  html += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
+  topBacks.forEach(function(s){
+    html += '<div style="padding:8px 12px;border:1px solid var(--rule);border-radius:6px;background:var(--bg3)">';
+    html += '<span style="font-weight:bold;color:var(--accent2);font-size:16px">'+String(s.num).padStart(2,'0')+'</span>';
+    html += '<span style="color:var(--muted);font-size:11px;margin-left:8px">'+(s.totalScore*100).toFixed(1)+'分 (遗漏'+s.currentGap+'期)</span>';
+    html += '</div>';
+  });
+  html += '</div>';
   html += '<div class="disclaimer" style="margin-top:1.5rem"><strong>声明：</strong>以上推荐号码基于历史数据统计分析生成，仅供娱乐参考。彩票开奖为随机事件，不构成任何投注建议。</div>';
+  html += '</div>';
+
   document.getElementById('ssq-recommend').innerHTML = html;
 }
+
 
 // ==================== 双色球新增分析 ====================
 
@@ -1489,6 +1742,7 @@ function renderSSQTail(allReds) {
 var KL8_ZONES = [[1,20],[21,40],[41,60],[61,80]];
 
 var kl8SampleHistory = [
+  '01,02,08,13,16,18,19,30,33,37,39,40,56,57,63,69,71,73,76,78',
   '02,04,06,09,13,26,32,36,38,41,44,47,56,58,60,69,72,76,78,80',
   '04,05,08,12,22,23,26,27,35,39,47,50,56,58,60,61,66,70,71,77',
   '05,11,12,15,20,23,28,29,37,38,45,49,51,55,63,64,65,69,77,79',
@@ -1525,6 +1779,8 @@ function loadKL8Sample() {
   var last = kl8SampleHistory[0];
   document.getElementById('kl8-numbers').value = last;
   document.getElementById('kl8-history').value = kl8SampleHistory.join('\n');
+  // 填充复盘输入框默认值
+  document.getElementById('kl8-review-numbers').value = last;
 }
 
 function clearKL8() {
@@ -1572,7 +1828,7 @@ function analyzeKL8() {
   renderKL8Consecutive(history);
   renderKL8AC(history);
   renderKL8DanTuo(last, history, playType);
-  renderKL8Recommend(last, history, playType);
+  renderKL8AllPlayTypes_V2(last, history);
 
   document.getElementById('kl8-results').scrollIntoView({ behavior: 'smooth' });
 }
@@ -1809,44 +2065,15 @@ function renderKL8DanTuo(last, history, playType) {
 }
 
 function scoreKL8Numbers(last, history) {
-  var totalPeriods = history.length;
-  var expected = (20 / 80) * totalPeriods;
   var scores = [];
-
   for (var n = 1; n <= 80; n++) {
-    var score = { num: n, total: 0, reasons: [] };
+    var wf = weightedFreq(n, history, 12);
+    var dist = getMissDistribution(n, history);
+    var mp = getMissPercentile(n, history);
+    var mk = markovProb(n, history);
 
-    var freq = 0;
-    for (var i = 0; i < history.length; i++) {
-      if (history[i].indexOf(n) >= 0) freq++;
-    }
-    var freqScore = Math.min(25, (freq / expected) * 25);
-    if (freq >= expected * 1.3) score.reasons.push('高频热号');
-    else if (freq >= expected) score.reasons.push('温号稳定');
-
-    var miss = 0;
-    for (var i = 0; i < history.length; i++) {
-      if (history[i].indexOf(n) >= 0) break;
-      miss++;
-    }
-    if (miss === history.length) miss = history.length;
-    var avgMiss = Math.round(80 / 20);
-    var missScore = miss >= avgMiss * 0.5 && miss <= avgMiss * 2 ? Math.min(20, (miss / avgMiss) * 20) : 8;
-    if (miss >= avgMiss) score.reasons.push('遗漏回补号');
-
-    var repeatScore = 0;
-    if (last.indexOf(n) >= 0) {
-      repeatScore = 15;
-      score.reasons.push('上期重号候选');
-    } else {
-      for (var i = 0; i < last.length; i++) {
-        if (Math.abs(n - last[i]) === 1) {
-          repeatScore = 8;
-          score.reasons.push('连号关联');
-          break;
-        }
-      }
-    }
+    var mpScore = mp > 0.85 ? 1.0 : (mp > 0.7 ? 0.8 : (mp > 0.5 ? 0.6 : 0.3));
+    var mkScore = mk.pBtoA > mk.pAtoA ? 0.9 : (mk.pBtoA > 0.3 ? 0.7 : 0.4);
 
     var zoneIdx = n <= 20 ? 0 : n <= 40 ? 1 : n <= 60 ? 2 : 3;
     var recentZoneCounts = [0, 0, 0, 0];
@@ -1858,55 +2085,221 @@ function scoreKL8Numbers(last, history) {
       }
     }
     var zoneAvg = recentZoneCounts[zoneIdx] / recentN;
-    var zoneScore = zoneAvg < 4 ? 15 : zoneAvg < 5 ? 10 : 5;
-    if (zoneAvg < 4) score.reasons.push('区间回补');
+    var zoneScore = zoneAvg < 4 ? 0.9 : zoneAvg < 5 ? 0.7 : 0.4;
 
-    score.total = freqScore + missScore + repeatScore + zoneScore + 5 + 3 + 2;
-    scores.push(score);
+    var odd = n % 2 === 1;
+    var recentOdds = 0;
+    for (var i = 0; i < recentN; i++) {
+      recentOdds += history[i].filter(function(x){return x%2===1;}).length;
+    }
+    var oddRatio = recentOdds / (recentN * 20);
+    var oddEvenScore = (odd && oddRatio <= 0.55) || (!odd && oddRatio >= 0.45) ? 0.85 : 0.5;
+
+    var big = n > 40;
+    var recentBig = 0;
+    for (var i = 0; i < recentN; i++) {
+      recentBig += history[i].filter(function(x){return x>40;}).length;
+    }
+    var bigRatio = recentBig / (recentN * 20);
+    var bigSmallScore = (big && bigRatio <= 0.55) || (!big && bigRatio >= 0.45) ? 0.85 : 0.5;
+
+    var tail = n % 10;
+    var tails = [0,0,0,0,0,0,0,0,0,0];
+    for (var i = 0; i < history.length; i++) {
+      for (var j = 0; j < history[i].length; j++) {
+        tails[history[i][j] % 10]++;
+      }
+    }
+    var totalTails = tails.reduce(function(a,b){return a+b;},0) || 1;
+    var tailFreq = tails.map(function(t){return t/totalTails;});
+    var tailScore = 1 - Math.abs(tailFreq[tail] - 0.1) * 5;
+
+    var neighborScore = 0;
+    if (last.indexOf(n) >= 0) neighborScore = 0.9;
+    else {
+      for (var i = 0; i < last.length; i++) {
+        if (Math.abs(n - last[i]) === 1) { neighborScore = 0.7; break; }
+      }
+    }
+
+    var stability = 1 - Math.abs(wf - 0.25) * 3;
+
+    var totalScore = wf * 0.20 + mpScore * 0.18 + mkScore * 0.12 + zoneScore * 0.12 + oddEvenScore * 0.10 + bigSmallScore * 0.10 + tailScore * 0.08 + neighborScore * 0.05 + stability * 0.05;
+
+    var reasons = [];
+    if (wf > 0.25) reasons.push('高频');
+    if (mp > 0.8) reasons.push('深冷');
+    if (mkScore > 0.8) reasons.push('冷转热');
+    if (zoneScore > 0.7) reasons.push('区间');
+    if (oddEvenScore > 0.7) reasons.push('奇偶');
+    if (bigSmallScore > 0.7) reasons.push('大小');
+    if (tailScore > 0.7) reasons.push('尾数');
+    if (neighborScore > 0.7) reasons.push('邻号');
+    if (stability > 0.7) reasons.push('稳定');
+
+    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, oddEvenScore: oddEvenScore, bigSmallScore: bigSmallScore, tailScore: tailScore, neighborScore: neighborScore, stability: stability, totalScore: totalScore, reasons: reasons });
   }
-  return scores;
+  return scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 }
 
-function renderKL8Recommend(last, history, playType) {
+
+function renderKL8AllPlayTypes_V2(last, history) {
   var scores = scoreKL8Numbers(last, history);
-  scores.sort(function(a, b) { return b.total - a.total; });
+  var topScores = scores.slice(0,15);
 
-  var html = '';
-  for (var set = 0; set < 3; set++) {
+  function qualityScoreKL8(picks) {
+    var s = picks.slice().sort(function(a,b){return a-b;});
+    var sumVal = s.reduce(function(a,b){return a+b;},0);
+    var spanVal = s[s.length-1]-s[0];
+    var z1=s.filter(function(x){return x<=20;}).length;
+    var z2=s.filter(function(x){return x>20&&x<=40;}).length;
+    var z3=s.filter(function(x){return x>40&&x<=60;}).length;
+    var z4=s.filter(function(x){return x>60;}).length;
+    var odd=s.filter(function(x){return x%2===1;}).length;
+    var big=s.filter(function(x){return x>40;}).length;
+    var tails = {}; s.forEach(function(n){var t=n%10; tails[t]=(tails[t]||0)+1;});
+    var maxTail = Math.max.apply(null, Object.keys(tails).map(function(k){return tails[k];}));
+    var g = gapStats(s);
+    var q = 30;
+    if (sumVal>=Math.max(10, picks.length*5) && sumVal<=picks.length*60) q+=10;
+    if (spanVal>=10 && spanVal<=70) q+=10;
+    if (z1>=1 && z2>=1 && z3>=1 && z4>=1) q+=15;
+    else if (z1+z2>=1 && z3+z4>=1) q+=8;
+    if (odd>=Math.floor(picks.length*0.3) && odd<=Math.ceil(picks.length*0.7)) q+=10;
+    if (big>=Math.floor(picks.length*0.3) && big<=Math.ceil(picks.length*0.7)) q+=10;
+    if (maxTail<=Math.ceil(picks.length*0.3)+1) q+=10;
+    if (g.pairs.length>=1 && g.pairs.length<=Math.ceil(picks.length*0.25)+1) q+=8;
+    var fScore = s.reduce(function(sum,n){return sum+(scores.find(function(x){return x.num===n;})||{}).totalScore||0;},0);
+    q += Math.min(fScore*3, 20);
+    return Math.min(100, Math.round(q));
+  }
+
+  function genStrategy1(playType) {
     var picks = [];
-    var usedNums = {};
-
-    // Ensure zone balance
-    var zoneCounts = [0, 0, 0, 0];
-    var startIdx = set;
-
-    for (var pass = 0; pass < 2 && picks.length < playType; pass++) {
-      for (var i = startIdx; i < scores.length && picks.length < playType; i++) {
-        var n = scores[i].num;
-        if (usedNums[n]) continue;
-        var z = n <= 20 ? 0 : n <= 40 ? 1 : n <= 60 ? 2 : 3;
-        if (pass === 0 && zoneCounts[z] >= Math.ceil(playType / 3)) continue;
+    var used = {};
+    var zoneLimits = [Math.ceil(playType/2), Math.ceil(playType/2), Math.ceil(playType/2), Math.ceil(playType/2)];
+    var zoneCounts = [0,0,0,0];
+    for (var i=0;i<scores.length && picks.length<playType;i++) {
+      var n = scores[i].num;
+      var z = n<=20?0:n<=40?1:n<=60?2:3;
+      if (zoneCounts[z] < zoneLimits[z]) {
         picks.push(n);
-        usedNums[n] = true;
+        used[n] = true;
         zoneCounts[z]++;
       }
     }
-    picks.sort(function(a, b) { return a - b; });
-
-    html += '<div style="margin-bottom:1.25rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">推荐方案 ' + (set + 1) + '（选' + playType + '）</div>';
-    html += '<div class="ball-row">';
-    for (var i = 0; i < picks.length; i++) {
-      html += '<div class="ball gold" style="width:36px;height:36px;font-size:0.75rem">' + pad(picks[i]) + '</div>';
+    for (var i=0;i<scores.length && picks.length<playType;i++) {
+      if (!used[scores[i].num]) {
+        picks.push(scores[i].num);
+        used[scores[i].num] = true;
+      }
     }
-    html += '</div>';
-    html += '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem">和值: ' + sum(picks) + ' | 跨度: ' + span(picks) + ' | 区间分布: ' + zoneCounts.join(':') + '</div>';
+    picks.sort(function(a,b){return a-b;});
+    return picks;
+  }
+
+  function genStrategy2(playType) {
+    var hot = scores.slice(0, Math.max(playType, 10)).map(function(s){return s.num;});
+    var cold = scores.filter(function(s){return s.mp>0.7;}).slice(0, Math.max(playType, 10)).map(function(s){return s.num;});
+    var hotCount = Math.ceil(playType*0.5);
+    var picks = hot.slice(0, hotCount).concat(cold.slice(0, playType-hotCount));
+    var unique = [];
+    for (var i=0;i<picks.length && unique.length<playType;i++) if (unique.indexOf(picks[i])<0) unique.push(picks[i]);
+    for (var i=0;i<scores.length && unique.length<playType;i++) {
+      if (unique.indexOf(scores[i].num)<0) unique.push(scores[i].num);
+    }
+    unique.sort(function(a,b){return a-b;});
+    return unique;
+  }
+
+  function genStrategy3(playType) {
+    var mk = scores.filter(function(s){return s.mkScore>0.7;}).slice(0, Math.max(playType, 12)).map(function(s){return s.num;});
+    if (mk.length < playType) {
+      var missSorted = scores.slice().sort(function(a,b){return b.mp - a.mp;});
+      for (var i=0;i<missSorted.length && mk.length<playType;i++) {
+        if (mk.indexOf(missSorted[i].num)<0) mk.push(missSorted[i].num);
+      }
+    }
+    var picks = mk.slice(0, playType);
+    picks.sort(function(a,b){return a-b;});
+    return picks;
+  }
+
+  var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V2 全玩法推荐模型</h3>';
+  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·马尔可夫转移·区间均衡·奇偶均衡·大小均衡·尾数分散·连号分析·稳定性 九维评分体系</p>';
+
+  var playTypeNames = ['一','二','三','四','五','六','七','八','九','十'];
+
+  for (var pt = 1; pt <= 10; pt++) {
+    var s1 = genStrategy1(pt);
+    var s2 = genStrategy2(pt);
+    var s3 = genStrategy3(pt);
+    var strategies = [
+      {name:'区间均衡+热号', picks:s1, q:qualityScoreKL8(s1)},
+      {name:'热号+遗漏双轨', picks:s2, q:qualityScoreKL8(s2)},
+      {name:'马尔可夫转移驱动', picks:s3, q:qualityScoreKL8(s3)}
+    ];
+
+    html += '<div class="strategy-box" style="margin:12px 0;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--bg2)">';
+    html += '<h4 style="margin:0 0 6px 0;color:var(--ink)">选'+playTypeNames[pt-1]+'（'+pt+'个号码）</h4>';
+
+    for (var si=0;si<strategies.length;si++) {
+      var st = strategies[si];
+      html += '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;flex-wrap:wrap">';
+      html += '<span style="font-weight:bold;color:var(--accent4)">方案'+(si+1)+'：</span>';
+      html += '<span style="color:var(--ink)">'+st.picks.map(function(n){return String(n).padStart(2,'0');}).join(', ')+'</span>';
+      html += '<span style="margin-left:auto;background:'+(st.q>=85?'var(--accent3)':(st.q>=70?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:12px">质量分 '+st.q+'</span>';
+      html += '</div>';
+    }
     html += '</div>';
   }
 
+  html += '<h4 style="margin-top:16px;color:var(--ink)">📊 Top15 号码评分详情</h4>';
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--bg3)">';
+  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">号码</th>';
+  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">加权频率</th>';
+  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">当前遗漏</th>';
+  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏%位</th>';
+  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">转移概率</th>';
+  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">区间分</th>';
+  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">奇偶分</th>';
+  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">大小分</th>';
+  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">尾数分</th>';
+  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">总评分</th>';
+  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">理由</th>';
+  html += '</tr></thead><tbody>';
+
+  topScores.forEach(function(s){
+    var reason = [];
+    if (s.wf > 0.25) reason.push('高频');
+    if (s.mp > 0.8) reason.push('深冷');
+    if (s.mkScore > 0.8) reason.push('冷转热');
+    if (s.zoneScore > 0.7) reason.push('区间');
+    if (s.oddEvenScore > 0.7) reason.push('奇偶');
+    if (s.bigSmallScore > 0.7) reason.push('大小');
+    if (s.tailScore > 0.7) reason.push('尾数');
+    if (s.neighborScore > 0.7) reason.push('邻号');
+    if (s.stability > 0.7) reason.push('稳定');
+    html += '<tr><td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--ink)">'+String(s.num).padStart(2,'0')+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.wf*100).toFixed(1)+'%</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+s.currentGap+'期</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.mp*100).toFixed(0)+'%</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.mkScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.zoneScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.oddEvenScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.bigSmallScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.tailScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--accent4)">'+(s.totalScore*100).toFixed(1)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(reason.join('·')||'-')+'</td></tr>';
+  });
+
+  html += '</tbody></table></div>';
   html += '<div class="disclaimer" style="margin-top:1.5rem"><strong>声明：</strong>以上推荐号码基于历史数据统计分析生成，仅供娱乐参考。彩票开奖为随机事件，不构成任何投注建议。</div>';
+  html += '</div>';
+
   document.getElementById('kl8-recommend').innerHTML = html;
 }
+
 
 // ==================== 快乐8新增分析 ====================
 
@@ -2191,4 +2584,142 @@ function renderKL8AC(history) {
   html += '</div>';
   document.getElementById('kl8-ac').innerHTML = html;
   renderKL8ACChart(acValues);
+}
+
+// ==================== 上期选号复盘函数 ====================
+
+function reviewDLT() {
+  var userFront = parseNums(document.getElementById('dlt-review-numbers').value);
+  var userBack = parseNums(document.getElementById('dlt-review-blue').value);
+  if (userFront.length < 5) { alert('请输入至少5个前区号码'); return; }
+
+  var last = dltSampleHistory[0].split('|');
+  var lastFront = parseNums(last[0]);
+  var lastBack = parseNums(last[1]);
+
+  var hitFront = userFront.filter(function(n){ return lastFront.indexOf(n) >= 0; });
+  var hitBack = userBack.filter(function(n){ return lastBack.indexOf(n) >= 0; });
+
+  var html = '<div style="margin-bottom:0.5rem"><strong>上期开奖：</strong>前区 ' + lastFront.map(function(n){return pad(n);}).join(',') + ' + 后区 ' + lastBack.map(function(n){return pad(n);}).join(',') + '</div>';
+  html += '<div style="margin-bottom:0.5rem"><strong>您的选号：</strong>前区 ' + userFront.map(function(n){return pad(n);}).join(',') + ' + 后区 ' + userBack.map(function(n){return pad(n);}).join(',') + '</div>';
+  html += '<div class="stat-grid" style="margin:0.75rem 0">';
+  html += '<div class="stat-item"><div class="stat-value">' + hitFront.length + '/5</div><div class="stat-label">前区命中</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + hitBack.length + '/2</div><div class="stat-label">后区命中</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + (hitFront.length + hitBack.length) + '/7</div><div class="stat-label">总命中</div></div>';
+  html += '</div>';
+
+  html += '<div style="margin-bottom:0.5rem"><strong>命中号码：</strong></div>';
+  html += '<div class="ball-row">';
+  userFront.forEach(function(n) {
+    var isHit = lastFront.indexOf(n) >= 0;
+    html += '<span class="ball ' + (isHit ? 'red' : 'gray') + '">' + pad(n) + '</span>';
+  });
+  html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
+  userBack.forEach(function(n) {
+    var isHit = lastBack.indexOf(n) >= 0;
+    html += '<span class="ball ' + (isHit ? 'blue' : 'gray') + '">' + pad(n) + '</span>';
+  });
+  html += '</div>';
+
+  var score = hitFront.length * 10 + hitBack.length * 15;
+  var grade = score >= 60 ? '优秀' : score >= 40 ? '良好' : score >= 20 ? '一般' : '需改进';
+  var color = score >= 60 ? 'var(--accent3)' : score >= 40 ? 'var(--accent4)' : score >= 20 ? 'var(--accent)' : 'var(--accent2)';
+  html += '<div style="margin-top:0.75rem;padding:0.75rem;background:var(--bg3);border-radius:8px">';
+  html += '<div style="font-size:1.1rem;font-weight:700;color:' + color + ';margin-bottom:0.5rem">综合评价：' + grade + '（得分 ' + score + '）</div>';
+  html += '<div style="color:var(--muted);font-size:0.85rem">';
+  if (hitFront.length >= 4) html += '前区命中率高，选号思路较好。';
+  else if (hitFront.length >= 2) html += '前区有一定命中，建议多关注冷热号分析。';
+  else html += '前区命中偏低，建议参考冷热号和遗漏分析调整选号策略。';
+  if (hitBack.length >= 1) html += '后区命中不错，继续保持。';
+  else html += '后区未命中，建议关注后区遗漏走势。';
+  html += '</div></div>';
+
+  document.getElementById('dlt-review-result').innerHTML = html;
+}
+
+function reviewSSQ() {
+  var userRed = parseNums(document.getElementById('ssq-review-numbers').value);
+  var userBlue = parseNums(document.getElementById('ssq-review-blue').value);
+  if (userRed.length < 6) { alert('请输入至少6个红球号码'); return; }
+
+  var last = ssqSampleHistory[0].split('|');
+  var lastRed = parseNums(last[0]);
+  var lastBlue = parseNums(last[1]);
+
+  var hitRed = userRed.filter(function(n){ return lastRed.indexOf(n) >= 0; });
+  var hitBlue = userBlue.filter(function(n){ return lastBlue.indexOf(n) >= 0; });
+
+  var html = '<div style="margin-bottom:0.5rem"><strong>上期开奖：</strong>红球 ' + lastRed.map(function(n){return pad(n);}).join(',') + ' + 蓝球 ' + lastBlue.map(function(n){return pad(n);}).join(',') + '</div>';
+  html += '<div style="margin-bottom:0.5rem"><strong>您的选号：</strong>红球 ' + userRed.map(function(n){return pad(n);}).join(',') + ' + 蓝球 ' + userBlue.map(function(n){return pad(n);}).join(',') + '</div>';
+  html += '<div class="stat-grid" style="margin:0.75rem 0">';
+  html += '<div class="stat-item"><div class="stat-value">' + hitRed.length + '/6</div><div class="stat-label">红球命中</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + hitBlue.length + '/1</div><div class="stat-label">蓝球命中</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + (hitRed.length + hitBlue.length) + '/7</div><div class="stat-label">总命中</div></div>';
+  html += '</div>';
+
+  html += '<div style="margin-bottom:0.5rem"><strong>命中号码：</strong></div>';
+  html += '<div class="ball-row">';
+  userRed.forEach(function(n) {
+    var isHit = lastRed.indexOf(n) >= 0;
+    html += '<span class="ball ' + (isHit ? 'red' : 'gray') + '">' + pad(n) + '</span>';
+  });
+  html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
+  userBlue.forEach(function(n) {
+    var isHit = lastBlue.indexOf(n) >= 0;
+    html += '<span class="ball ' + (isHit ? 'blue' : 'gray') + '">' + pad(n) + '</span>';
+  });
+  html += '</div>';
+
+  var score = hitRed.length * 10 + hitBlue.length * 25;
+  var grade = score >= 60 ? '优秀' : score >= 40 ? '良好' : score >= 20 ? '一般' : '需改进';
+  var color = score >= 60 ? 'var(--accent3)' : score >= 40 ? 'var(--accent4)' : score >= 20 ? 'var(--accent)' : 'var(--accent2)';
+  html += '<div style="margin-top:0.75rem;padding:0.75rem;background:var(--bg3);border-radius:8px">';
+  html += '<div style="font-size:1.1rem;font-weight:700;color:' + color + ';margin-bottom:0.5rem">综合评价：' + grade + '（得分 ' + score + '）</div>';
+  html += '<div style="color:var(--muted);font-size:0.85rem">';
+  if (hitRed.length >= 4) html += '红球命中率高，选号思路较好。';
+  else if (hitRed.length >= 2) html += '红球有一定命中，建议多关注冷热号分析。';
+  else html += '红球命中偏低，建议参考冷热号和遗漏分析调整选号策略。';
+  if (hitBlue.length >= 1) html += '蓝球命中不错，继续保持。';
+  else html += '蓝球未命中，建议关注蓝球遗漏走势。';
+  html += '</div></div>';
+
+  document.getElementById('ssq-review-result').innerHTML = html;
+}
+
+function reviewKL8() {
+  var userNums = parseNums(document.getElementById('kl8-review-numbers').value);
+  if (userNums.length < 1) { alert('请输入至少1个号码'); return; }
+
+  var lastNums = parseNums(kl8SampleHistory[0]);
+  var hitNums = userNums.filter(function(n){ return lastNums.indexOf(n) >= 0; });
+
+  var html = '<div style="margin-bottom:0.5rem"><strong>上期开奖（20个）：</strong>' + lastNums.map(function(n){return pad(n);}).join(',') + '</div>';
+  html += '<div style="margin-bottom:0.5rem"><strong>您的选号（' + userNums.length + '个）：</strong>' + userNums.map(function(n){return pad(n);}).join(',') + '</div>';
+  html += '<div class="stat-grid" style="margin:0.75rem 0">';
+  html += '<div class="stat-item"><div class="stat-value">' + hitNums.length + '</div><div class="stat-label">命中个数</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + (userNums.length > 0 ? ((hitNums.length / userNums.length) * 100).toFixed(1) : 0) + '%</div><div class="stat-label">命中率</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + hitNums.length + '/20</div><div class="stat-label">开奖命中</div></div>';
+  html += '</div>';
+
+  html += '<div style="margin-bottom:0.5rem"><strong>命中号码：</strong></div>';
+  html += '<div class="ball-row">';
+  userNums.forEach(function(n) {
+    var isHit = lastNums.indexOf(n) >= 0;
+    html += '<span class="ball ' + (isHit ? 'gold' : 'gray') + '" style="width:36px;height:36px;font-size:0.75rem">' + pad(n) + '</span>';
+  });
+  html += '</div>';
+
+  var hitRate = userNums.length > 0 ? hitNums.length / userNums.length : 0;
+  var score = hitRate * 100;
+  var grade = score >= 50 ? '优秀' : score >= 30 ? '良好' : score >= 15 ? '一般' : '需改进';
+  var color = score >= 50 ? 'var(--accent3)' : score >= 30 ? 'var(--accent4)' : score >= 15 ? 'var(--accent)' : 'var(--accent2)';
+  html += '<div style="margin-top:0.75rem;padding:0.75rem;background:var(--bg3);border-radius:8px">';
+  html += '<div style="font-size:1.1rem;font-weight:700;color:' + color + ';margin-bottom:0.5rem">综合评价：' + grade + '（命中率 ' + score.toFixed(1) + '%）</div>';
+  html += '<div style="color:var(--muted);font-size:0.85rem">';
+  if (hitNums.length >= 5) html += '命中个数较多，选号覆盖面广，思路较好。';
+  else if (hitNums.length >= 2) html += '有一定命中，建议多关注冷热号分布和区间平衡。';
+  else html += '命中偏低，建议参考冷热号分析和四区间分布调整选号策略。';
+  html += '</div></div>';
+
+  document.getElementById('kl8-review-result').innerHTML = html;
 }
