@@ -1,7 +1,7 @@
 /**
  * 票花自主分析引擎
  * 支持大乐透(DLT)、排列三(PL3)、排列五(PL5)
- * 根据票花字母含义，分析输入号码中哪些有潜力
+ * 支持多组票花+号码综合分析
  */
 
 // ==================== 票花字母含义映射表 ====================
@@ -82,6 +82,58 @@ function parseFlowerString(str) {
   return result;
 }
 
+// ==================== 解析多组输入 ====================
+function parseGroups(flowerStr, numStr) {
+  var flowers = flowerStr.split('\n').map(function(s){return s.trim();}).filter(function(s){return s;});
+  var numLines = numStr.split('\n').map(function(s){return s.trim();}).filter(function(s){return s;});
+
+  var groups = [];
+
+  // 检查号码行是否为 "票花|号码" 格式
+  var pipeFormat = false;
+  for (var i = 0; i < numLines.length; i++) {
+    if (numLines[i].indexOf('|') >= 0) {
+      pipeFormat = true;
+      break;
+    }
+  }
+
+  if (pipeFormat) {
+    for (var i = 0; i < numLines.length; i++) {
+      var parts = numLines[i].split('|');
+      if (parts.length >= 2) {
+        var f = parts[0].trim();
+        var nums = parts[1].trim().split(/[,，\s]+/).map(function(s){return parseInt(s.trim(),10);}).filter(function(n){return !isNaN(n) && n >= 0;});
+        if (f && nums.length > 0) groups.push({flower: f, numbers: nums});
+      }
+    }
+    return groups;
+  }
+
+  if (flowers.length === 1 && numLines.length >= 1) {
+    for (var i = 0; i < numLines.length; i++) {
+      var nums = numLines[i].split(/[,，\s]+/).map(function(s){return parseInt(s.trim(),10);}).filter(function(n){return !isNaN(n) && n >= 0;});
+      if (nums.length > 0) groups.push({flower: flowers[0], numbers: nums});
+    }
+    return groups;
+  }
+
+  if (flowers.length === numLines.length) {
+    for (var i = 0; i < flowers.length; i++) {
+      var nums = numLines[i].split(/[,，\s]+/).map(function(s){return parseInt(s.trim(),10);}).filter(function(n){return !isNaN(n) && n >= 0;});
+      if (flowers[i] && nums.length > 0) groups.push({flower: flowers[i], numbers: nums});
+    }
+    return groups;
+  }
+
+  // 默认：用第一个票花对应所有号码行
+  for (var i = 0; i < numLines.length; i++) {
+    var nums = numLines[i].split(/[,，\s]+/).map(function(s){return parseInt(s.trim(),10);}).filter(function(n){return !isNaN(n) && n >= 0;});
+    if (nums.length > 0) groups.push({flower: flowers[0] || '', numbers: nums});
+  }
+  return groups;
+}
+
 // ==================== 号码评分 ====================
 function scoreNumbersByFlower(numbers, flowerInfo, lotteryType) {
   var scores = [];
@@ -101,102 +153,100 @@ function scoreNumbersByFlower(numbers, flowerInfo, lotteryType) {
       var f = flowerInfo[j];
       var match = false;
 
-      // 根据票花含义匹配号码特征
       switch (f.char) {
-        case 'A': case 'a': // 低位正确、有胆
+        case 'A': case 'a':
           if (lotteryType === 'dlt' && num <= 12) match = true;
           else if (lotteryType === 'pl3' && num <= 3) match = true;
           else if (lotteryType === 'pl5' && num <= 2) match = true;
           break;
-        case 'C': case 'c': // 肯定出号、必出、稳胆
+        case 'C': case 'c':
           match = true; isDan = true;
           break;
-        case 'E': case 'e': // 邻号±1
-          // 需要结合上期号码判断，这里先标记为潜力
+        case 'E': case 'e':
           match = true;
           reasons.push('邻号潜力（±1范围）');
           break;
-        case 'F': case 'f': // 首选、第一胆、重点
+        case 'F': case 'f':
           match = true; isDan = true;
           break;
-        case 'J': case 'j': // 正确、数字4
+        case 'J': case 'j':
           if (num === 4 || num % 10 === 4) match = true;
           break;
-        case 'L': case 'l': // 正确、稳号、必出
+        case 'L': case 'l':
           match = true; isDan = true;
           break;
-        case 'N': case 'n': // 接近、邻号、差1
+        case 'N': case 'n':
           match = true;
           reasons.push('邻号潜力（差1）');
           break;
-        case 'Q': case 'q': // 胆码、关键号
+        case 'Q': case 'q':
           match = true; isDan = true;
           break;
-        case 'T': case 't': // 错误、放弃
+        case 'T': case 't':
           isExclude = true;
           break;
-        case 'V': case 'v': // 重要号、核心胆
+        case 'V': case 'v':
           match = true; isDan = true;
           break;
-        case 'W': case 'w': // 重要、重点号
+        case 'W': case 'w':
           match = true;
           break;
-        case 'X': case 'x': // 放弃、排除
+        case 'X': case 'x':
           isExclude = true;
           break;
-        case 'Y': case 'y': // 重号、上期号
+        case 'Y': case 'y':
           match = true;
           reasons.push('重号潜力');
           break;
-        case 'Z': case 'z': // 重点、核心、必防
+        case 'Z': case 'z':
           match = true; isDan = true;
           break;
-        case '*': // 有号、出号
+        case '*':
           match = true;
           break;
-        case 'D': case 'd': // 尾数
+        case 'D': case 'd':
           match = true;
           reasons.push('尾数关注');
           break;
-        case 'H': case 'h': // 中间数
+        case 'H': case 'h':
           if (lotteryType === 'dlt' && num >= 13 && num <= 23) match = true;
           else if ((lotteryType === 'pl3' || lotteryType === 'pl5') && num >= 4 && num <= 6) match = true;
           break;
-        case 'M': case 'm': // 大号
+        case 'M': case 'm':
           if (lotteryType === 'dlt' && num >= 24) match = true;
           else if (lotteryType === 'pl3' && num >= 7) match = true;
           else if (lotteryType === 'pl5' && num >= 7) match = true;
           break;
-        case 'K': case 'k': // 小号
+        case 'K': case 'k':
           if (lotteryType === 'dlt' && num <= 12) match = true;
           else if ((lotteryType === 'pl3' || lotteryType === 'pl5') && num <= 3) match = true;
           break;
-        case 'O': case 'o': // 0号
+        case 'O': case 'o':
           if (num === 0 || num === 10 || num === 20 || num === 30) match = true;
           break;
-        case 'G': case 'g': // 数字7
+        case 'G': case 'g':
           if (num === 7 || num === 17 || num === 27) match = true;
           break;
-        case 'S': case 's': // 数字7
+        case 'S': case 's':
           if (num === 7 || num === 17 || num === 27) match = true;
           break;
-        case 'R': case 'r': // 大号、跨度
+        case 'R': case 'r':
           if (lotteryType === 'dlt' && num >= 25) match = true;
           break;
-        case 'B': case 'b': // 前后位置
+        case 'B': case 'b':
           match = true;
           reasons.push('位置关注');
           break;
-        case 'I': case 'i': // 区间内
+        case 'I': case 'i':
           match = true;
           reasons.push('区间范围内');
           break;
-        case 'P': case 'p': // 后位
+        case 'P': case 'p':
           if (lotteryType === 'pl3' || lotteryType === 'pl5') {
             if (i === numbers.length - 1) match = true;
           }
           break;
-        case 'U': case 'u': // 最后、末尾
+        case 'U': case 'u':
           if (i === numbers.length - 1) match = true;
           break;
       }
@@ -209,7 +259,6 @@ function scoreNumbersByFlower(numbers, flowerInfo, lotteryType) {
       }
     }
 
-    // 综合评分计算
     var finalScore = numScore;
     var level = '一般';
     var levelColor = 'var(--muted)';
@@ -243,64 +292,99 @@ function scoreNumbersByFlower(numbers, flowerInfo, lotteryType) {
       levelColor: levelColor,
       isDan: isDan,
       isExclude: isExclude,
-      reasons: reasons.length > 0 ? reasons : ['票花未明确指向']
+      reasons: reasons.length > 0 ? reasons : ['票花未明确指向'],
+      position: i
     });
   }
 
-  // 按分数排序
   scores.sort(function(a, b) { return b.score - a.score; });
   return scores;
 }
 
-// ==================== 渲染票花分析结果 ====================
-function renderFlowerAnalysis(type) {
-  var flowerInput, numInput, resultId, lotteryType;
-  if (type === 'dlt') {
-    flowerInput = document.getElementById('dlt-flower-input');
-    numInput = document.getElementById('dlt-flower-numbers');
-    resultId = 'dlt-flower-result';
-    lotteryType = 'dlt';
-  } else if (type === 'pl3') {
-    flowerInput = document.getElementById('pl3-flower-input');
-    numInput = document.getElementById('pl3-flower-numbers');
-    resultId = 'pl3-flower-result';
-    lotteryType = 'pl3';
-  } else if (type === 'pl5') {
-    flowerInput = document.getElementById('pl5-flower-input');
-    numInput = document.getElementById('pl5-flower-numbers');
-    resultId = 'pl5-flower-result';
-    lotteryType = 'pl5';
-  }
+// ==================== 多组综合分析 ====================
+function analyzeMultiGroups(groups, lotteryType) {
+  var numStats = {};
+  var posStats = {}; // 仅用于排列三/五的位置统计
 
-  if (!flowerInput || !numInput) return;
+  groups.forEach(function(group, groupIdx) {
+    var flowerInfo = parseFlowerString(group.flower);
+    var scores = scoreNumbersByFlower(group.numbers, flowerInfo, lotteryType);
 
-  var flowerStr = flowerInput.value.trim();
-  var numStr = numInput.value.trim();
+    scores.forEach(function(s) {
+      var key = String(s.num);
+      if (!numStats[key]) {
+        numStats[key] = {
+          num: s.num,
+          totalScore: 0,
+          count: 0,
+          danCount: 0,
+          excludeCount: 0,
+          groupDetails: [],
+          reasons: []
+        };
+      }
+      var stat = numStats[key];
+      stat.totalScore += s.score;
+      stat.count++;
+      if (s.isDan) stat.danCount++;
+      if (s.isExclude) stat.excludeCount++;
+      stat.groupDetails.push({
+        groupIndex: groupIdx + 1,
+        flower: group.flower,
+        score: s.score,
+        isDan: s.isDan,
+        isExclude: s.isExclude,
+        level: s.level,
+        reasons: s.reasons,
+        position: s.position
+      });
+      s.reasons.forEach(function(r) {
+        if (stat.reasons.indexOf(r) < 0) stat.reasons.push(r);
+      });
 
-  if (!flowerStr) {
-    alert('请输入票花代码');
-    return;
-  }
-  if (!numStr) {
-    alert('请输入号码');
-    return;
-  }
-
-  var numbers = numStr.split(/[,，\s]+/).map(function(s) {
-    return parseInt(s.trim(), 10);
-  }).filter(function(n) {
-    return !isNaN(n) && n >= 0;
+      // 排列三/五按位置统计
+      if (lotteryType === 'pl3' || lotteryType === 'pl5') {
+        var posKey = key + '_pos' + s.position;
+        if (!posStats[posKey]) {
+          posStats[posKey] = { num: s.num, position: s.position, count: 0, totalScore: 0 };
+        }
+        posStats[posKey].count++;
+        posStats[posKey].totalScore += s.score;
+      }
+    });
   });
 
-  if (numbers.length === 0) {
-    alert('请输入有效的号码');
-    return;
+  var result = [];
+  for (var key in numStats) {
+    var stat = numStats[key];
+    stat.avgScore = Math.round((stat.totalScore / stat.count) * 10) / 10;
+    var multiplier = 1 + stat.count * 0.15;
+    stat.finalScore = Math.round((stat.avgScore * multiplier + stat.danCount * 2 - stat.excludeCount * 3) * 10) / 10;
+
+    // 排列三/五：附加最常出现的位置
+    if (lotteryType === 'pl3' || lotteryType === 'pl5') {
+      var bestPos = -1, bestPosScore = -Infinity;
+      for (var pk in posStats) {
+        if (posStats[pk].num === stat.num && posStats[pk].totalScore > bestPosScore) {
+          bestPosScore = posStats[pk].totalScore;
+          bestPos = posStats[pk].position;
+        }
+      }
+      stat.bestPosition = bestPos;
+      var posNames = lotteryType === 'pl3' ? ['百位','十位','个位'] : ['万位','千位','百位','十位','个位'];
+      stat.bestPositionName = bestPos >= 0 ? posNames[bestPos] : '';
+    }
+
+    result.push(stat);
   }
 
-  var flowerInfo = parseFlowerString(flowerStr);
-  var scores = scoreNumbersByFlower(numbers, flowerInfo, lotteryType);
+  result.sort(function(a, b) { return b.finalScore - a.finalScore; });
+  return result;
+}
 
-  var container = document.getElementById(resultId);
+// ==================== 渲染单组结果 ====================
+function renderSingleFlowerResult(containerId, flowerInfo, scores, lotteryType, group) {
+  var container = document.getElementById(containerId);
   if (!container) return;
 
   var html = '';
@@ -375,10 +459,168 @@ function renderFlowerAnalysis(type) {
     html += '</div>';
   }
 
-  html += '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.5rem">';
-  html += '票花分析仅供参考，结合走势数据和冷热号分析可提高准确率。';
-  html += '</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.5rem">票花分析仅供参考，结合走势数据和冷热号分析可提高准确率。</div>';
   html += '</div>';
 
   container.innerHTML = html;
+}
+
+// ==================== 渲染多组综合结果 ====================
+function renderMultiFlowerResult(containerId, groups, multiResult, lotteryType) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+
+  var html = '';
+
+  // 输入概览
+  html += '<div style="margin-bottom:1rem;background:var(--bg3);border:1px solid var(--rule);border-radius:8px;padding:0.75rem">';
+  html += '<div style="font-weight:700;color:var(--accent);margin-bottom:0.5rem">输入概览（共' + groups.length + '组）</div>';
+  html += '<div style="display:flex;flex-direction:column;gap:0.4rem">';
+  for (var i = 0; i < groups.length; i++) {
+    html += '<div style="display:flex;align-items:center;gap:0.5rem;font-size:0.82rem">';
+    html += '<span style="background:var(--accent);color:#000;padding:0.1rem 0.4rem;border-radius:4px;font-weight:700;font-size:0.75rem">第' + (i+1) + '组</span>';
+    html += '<span style="color:var(--ink);font-weight:600">' + groups[i].flower + '</span>';
+    html += '<span style="color:var(--muted)">→</span>';
+    html += '<span style="color:var(--ink)">' + groups[i].numbers.map(function(n){return n<10?'0'+n:n;}).join(', ') + '</span>';
+    html += '</div>';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  // 综合排名
+  html += '<div style="margin-bottom:1rem">';
+  html += '<div style="font-weight:700;color:var(--accent);margin-bottom:0.5rem">号码综合潜力排名（权重高的在上）</div>';
+
+  for (var i = 0; i < multiResult.length; i++) {
+    var s = multiResult[i];
+    var isTop = i < 3;
+    var isDan = s.danCount > 0;
+    var isExclude = s.excludeCount > 0;
+    var ballClass = isExclude ? 'gray' : isDan ? 'gold' : isTop ? 'green' : 'red';
+    var badge = '';
+    if (s.count >= 3) badge = '<span style="background:var(--accent);color:#000;padding:0.05rem 0.3rem;border-radius:4px;font-size:0.65rem;margin-left:0.3rem;font-weight:700">多组共识</span>';
+    else if (s.count >= 2) badge = '<span style="background:var(--accent2);color:#fff;padding:0.05rem 0.3rem;border-radius:4px;font-size:0.65rem;margin-left:0.3rem;font-weight:700">重复出现</span>';
+
+    var posLabel = '';
+    if ((lotteryType === 'pl3' || lotteryType === 'pl5') && s.bestPositionName) {
+      posLabel = '<span style="color:var(--accent2);font-size:0.7rem;margin-left:0.3rem">[' + s.bestPositionName + ']</span>';
+    }
+
+    html += '<div style="background:var(--bg3);border:1px solid var(--rule);border-radius:8px;padding:0.6rem 0.75rem;margin-bottom:0.4rem;display:flex;align-items:center;justify-content:space-between">';
+    html += '<div style="display:flex;align-items:center;gap:0.75rem">';
+    html += '<div class="ball ' + ballClass + '" style="width:36px;height:36px;font-size:0.85rem">' + (s.num < 10 ? '0' + s.num : s.num) + '</div>';
+    html += '<div>';
+    html += '<div style="font-weight:700;color:var(--ink);font-size:0.85rem;display:flex;align-items:center">';
+    html += '综合得分 ' + s.finalScore + badge + posLabel;
+    html += '</div>';
+    html += '<div style="font-size:0.72rem;color:var(--muted)">';
+    html += '出现' + s.count + '次 · 均分' + s.avgScore + ' · 胆' + s.danCount + ' · 排' + s.excludeCount;
+    html += '</div>';
+    html += '<div style="font-size:0.7rem;color:var(--muted);margin-top:0.15rem">' + s.reasons.slice(0, 4).join('；') + '</div>';
+    html += '</div>';
+    html += '</div>';
+
+    // 各组详情小标签
+    html += '<div style="text-align:right;min-width:80px">';
+    for (var j = 0; j < s.groupDetails.length && j < 4; j++) {
+      var gd = s.groupDetails[j];
+      var gdColor = gd.isDan ? 'var(--gold)' : gd.isExclude ? 'var(--accent4)' : gd.score > 0 ? 'var(--accent3)' : 'var(--muted)';
+      html += '<div style="font-size:0.7rem;color:' + gdColor + '">第' + gd.groupIndex + '组 ' + (gd.score > 0 ? '+' : '') + gd.score + '</div>';
+    }
+    if (s.groupDetails.length > 4) {
+      html += '<div style="font-size:0.65rem;color:var(--muted)">+' + (s.groupDetails.length - 4) + '组</div>';
+    }
+    html += '</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // 总结
+  var topNums = multiResult.filter(function(s){return s.finalScore >= 10 && s.excludeCount === 0;}).slice(0, 10);
+  var danNums = multiResult.filter(function(s){return s.danCount >= 1 && s.excludeCount === 0;});
+  var excludeNums = multiResult.filter(function(s){return s.excludeCount >= 1;});
+
+  html += '<div style="background:var(--bg2);border:1px solid var(--rule);border-radius:8px;padding:0.75rem">';
+  html += '<div style="font-weight:700;color:var(--accent);margin-bottom:0.5rem">多组综合总结</div>';
+
+  if (danNums.length > 0) {
+    html += '<div style="margin-bottom:0.4rem"><span style="color:var(--gold);font-weight:700">多组胆码：</span>';
+    for (var i = 0; i < danNums.length; i++) {
+      html += '<span class="ball gold" style="display:inline-block;width:24px;height:24px;font-size:0.7rem;line-height:24px;margin-right:0.3rem">' + (danNums[i].num < 10 ? '0' + danNums[i].num : danNums[i].num) + '</span>';
+    }
+    html += '</div>';
+  }
+
+  if (topNums.length > 0) {
+    html += '<div style="margin-bottom:0.4rem"><span style="color:var(--accent3);font-weight:700">重点关注：</span>';
+    for (var i = 0; i < topNums.length; i++) {
+      html += '<span class="ball red" style="display:inline-block;width:24px;height:24px;font-size:0.7rem;line-height:24px;margin-right:0.3rem">' + (topNums[i].num < 10 ? '0' + topNums[i].num : topNums[i].num) + '</span>';
+    }
+    html += '</div>';
+  }
+
+  if (excludeNums.length > 0) {
+    html += '<div style="margin-bottom:0.4rem"><span style="color:var(--accent4);font-weight:700">多组排除：</span>';
+    for (var i = 0; i < excludeNums.length; i++) {
+      html += '<span class="ball gray" style="display:inline-block;width:24px;height:24px;font-size:0.7rem;line-height:24px;margin-right:0.3rem">' + (excludeNums[i].num < 10 ? '0' + excludeNums[i].num : excludeNums[i].num) + '</span>';
+    }
+    html += '</div>';
+  }
+
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.5rem">多组票花综合权重 = 平均得分 × (1 + 出现次数×0.15) + 胆码次数×2 − 排除次数×3。出现次数越多、得分越高的号码排名越靠前。</div>';
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+// ==================== 主入口 ====================
+function renderFlowerAnalysis(type) {
+  var flowerInput, numInput, resultId, lotteryType;
+  if (type === 'dlt') {
+    flowerInput = document.getElementById('dlt-flower-input');
+    numInput = document.getElementById('dlt-flower-numbers');
+    resultId = 'dlt-flower-result';
+    lotteryType = 'dlt';
+  } else if (type === 'pl3') {
+    flowerInput = document.getElementById('pl3-flower-input');
+    numInput = document.getElementById('pl3-flower-numbers');
+    resultId = 'pl3-flower-result';
+    lotteryType = 'pl3';
+  } else if (type === 'pl5') {
+    flowerInput = document.getElementById('pl5-flower-input');
+    numInput = document.getElementById('pl5-flower-numbers');
+    resultId = 'pl5-flower-result';
+    lotteryType = 'pl5';
+  }
+
+  if (!flowerInput || !numInput) return;
+
+  var flowerStr = flowerInput.value;
+  var numStr = numInput.value;
+
+  if (!flowerStr.trim() && !numStr.trim()) {
+    alert('请输入票花代码和号码');
+    return;
+  }
+  if (!numStr.trim()) {
+    alert('请输入号码');
+    return;
+  }
+
+  var groups = parseGroups(flowerStr, numStr);
+  if (groups.length === 0) {
+    alert('请输入有效的票花和号码');
+    return;
+  }
+
+  if (groups.length === 1) {
+    var g = groups[0];
+    var flowerInfo = parseFlowerString(g.flower);
+    var scores = scoreNumbersByFlower(g.numbers, flowerInfo, lotteryType);
+    renderSingleFlowerResult(resultId, flowerInfo, scores, lotteryType, g);
+    return;
+  }
+
+  var multiResult = analyzeMultiGroups(groups, lotteryType);
+  renderMultiFlowerResult(resultId, groups, multiResult, lotteryType);
 }

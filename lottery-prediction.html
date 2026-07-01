@@ -767,15 +767,15 @@ tr:hover td { background: var(--bg3); }
     <!-- 票花自主分析 -->
     <div class="card">
       <div class="card-title"><span class="icon">&#127802;</span> 票花自主分析</div>
-      <div style="margin-bottom:0.5rem;font-size:0.8rem;color:var(--muted)">输入票花代码（如: CFQ*LY），输入你这张票的号码，分析哪些号码有潜力</div>
-      <div class="input-row" style="margin-bottom:0.5rem">
+      <div style="margin-bottom:0.5rem;font-size:0.8rem;color:var(--muted)">支持多组票花+号码综合分析。每行一组，格式：票花代码|号码（如 PZFBBW|02,04,14...）。也可分开填写：票花每行一个，号码每行一组，行数对应。</div>
+      <div class="input-row" style="margin-bottom:0.5rem;align-items:flex-start">
         <label>票花代码：</label>
-        <input type="text" id="dlt-flower-input" placeholder="如: CFQ*LY" style="width:150px;text-transform:uppercase">
+        <textarea id="dlt-flower-input" placeholder="如: PZFBBW&#10;ABC&#10;CFQ*LY" style="width:150px;text-transform:uppercase;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
       </div>
-      <div class="input-row" style="margin-bottom:0.75rem">
+      <div class="input-row" style="margin-bottom:0.75rem;align-items:flex-start">
         <label>号码：</label>
-        <input type="text" id="dlt-flower-numbers" placeholder="前区号码如: 03,11,12,21,22" style="width:280px">
-        <button class="btn btn-secondary" onclick="renderFlowerAnalysis('dlt')" style="margin-left:0.5rem">票花分析</button>
+        <textarea id="dlt-flower-numbers" placeholder="02,04,14,19,23,25,26,28,30,33,3&#10;01,05,12,18,22,29,34,02,08&#10;03,11,15,20,27,35,05,09" style="width:280px;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
+        <button class="btn btn-secondary" onclick="renderFlowerAnalysis('dlt')" style="margin-left:0.5rem;align-self:flex-start">票花分析</button>
       </div>
       <div id="dlt-flower-result"></div>
     </div>
@@ -1200,15 +1200,15 @@ tr:hover td { background: var(--bg3); }
     <!-- 票花自主分析 -->
     <div class="card">
       <div class="card-title"><span class="icon">&#127802;</span> 票花自主分析</div>
-      <div style="margin-bottom:0.5rem;font-size:0.8rem;color:var(--muted)">输入票花代码（如: CFQ*LY），输入你这张票的号码，分析哪些号码有潜力</div>
-      <div class="input-row" style="margin-bottom:0.5rem">
+      <div style="margin-bottom:0.5rem;font-size:0.8rem;color:var(--muted)">支持多组票花+号码综合分析。每行一组，格式：票花代码|号码（如 ABC|5,6,2）。也可分开填写：票花每行一个，号码每行一组（每组3个，按百十个位顺序），行数对应。</div>
+      <div class="input-row" style="margin-bottom:0.5rem;align-items:flex-start">
         <label>票花代码：</label>
-        <input type="text" id="pl3-flower-input" placeholder="如: CFQ*LY" style="width:150px;text-transform:uppercase">
+        <textarea id="pl3-flower-input" placeholder="如: ABC&#10;PZM&#10;KHU" style="width:150px;text-transform:uppercase;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
       </div>
-      <div class="input-row" style="margin-bottom:0.75rem">
+      <div class="input-row" style="margin-bottom:0.75rem;align-items:flex-start">
         <label>号码：</label>
-        <input type="text" id="pl3-flower-numbers" placeholder="如: 5,6,2" style="width:200px">
-        <button class="btn btn-secondary" onclick="renderFlowerAnalysis('pl3')" style="margin-left:0.5rem">票花分析</button>
+        <textarea id="pl3-flower-numbers" placeholder="5,6,2&#10;3,8,9&#10;1,4,7" style="width:200px;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
+        <button class="btn btn-secondary" onclick="renderFlowerAnalysis('pl3')" style="margin-left:0.5rem;align-self:flex-start">票花分析</button>
       </div>
       <div id="pl3-flower-result"></div>
     </div>
@@ -1337,15 +1337,15 @@ tr:hover td { background: var(--bg3); }
     <!-- 票花自主分析 -->
     <div class="card">
       <div class="card-title"><span class="icon">&#127802;</span> 票花自主分析</div>
-      <div style="margin-bottom:0.5rem;font-size:0.8rem;color:var(--muted)">输入票花代码（如: CFQ*LY），输入你这张票的号码，分析哪些号码有潜力</div>
-      <div class="input-row" style="margin-bottom:0.5rem">
+      <div style="margin-bottom:0.5rem;font-size:0.8rem;color:var(--muted)">支持多组票花+号码综合分析。每行一组，格式：票花代码|号码（如 ABC|5,6,2,0,5）。也可分开填写：票花每行一个，号码每行一组（每组5个，按万位到个位顺序），行数对应。</div>
+      <div class="input-row" style="margin-bottom:0.5rem;align-items:flex-start">
         <label>票花代码：</label>
-        <input type="text" id="pl5-flower-input" placeholder="如: CFQ*LY" style="width:150px;text-transform:uppercase">
+        <textarea id="pl5-flower-input" placeholder="如: ABC&#10;PZM&#10;KHU" style="width:150px;text-transform:uppercase;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
       </div>
-      <div class="input-row" style="margin-bottom:0.75rem">
+      <div class="input-row" style="margin-bottom:0.75rem;align-items:flex-start">
         <label>号码：</label>
-        <input type="text" id="pl5-flower-numbers" placeholder="如: 5,6,2,0,5" style="width:200px">
-        <button class="btn btn-secondary" onclick="renderFlowerAnalysis('pl5')" style="margin-left:0.5rem">票花分析</button>
+        <textarea id="pl5-flower-numbers" placeholder="5,6,2,0,5&#10;3,8,9,1,4&#10;1,4,7,2,6" style="width:200px;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
+        <button class="btn btn-secondary" onclick="renderFlowerAnalysis('pl5')" style="margin-left:0.5rem;align-self:flex-start">票花分析</button>
       </div>
       <div id="pl5-flower-result"></div>
     </div>
@@ -1463,7 +1463,7 @@ tr:hover td { background: var(--bg3); }
 <script src="assets/pl-data.js?v=5"></script>
 <script src="assets/pl-engine.js?v=5"></script>
 <script src="assets/auto-review.js?v=5"></script>
-<script src="assets/ticket-flower.js?v=1"></script>
+<script src="assets/ticket-flower.js?v=2"></script>
 <script>
 // Auto-load sample data and analyze on page load (analysis runs in background)
 window.addEventListener('DOMContentLoaded', function() {
