@@ -1103,7 +1103,12 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
 
   function combosEqual(c1, c2) {
     if (!c1 || !c2 || c1.length !== c2.length) return false;
-    for (var i=0;i<c1.length;i++) if (c1[i] !== c2[i]) return false;
+    var f1 = c1.slice(0,5).sort(function(a,b){return a-b;});
+    var f2 = c2.slice(0,5).sort(function(a,b){return a-b;});
+    var b1 = c1.slice(5).sort(function(a,b){return a-b;});
+    var b2 = c2.slice(5).sort(function(a,b){return a-b;});
+    for (var i=0;i<5;i++) if (f1[i] !== f2[i]) return false;
+    for (var i=0;i<b1.length;i++) if (b1[i] !== b2[i]) return false;
     return true;
   }
 
@@ -1111,13 +1116,19 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     var front = baseCombo.slice(0,5);
     var back = baseCombo.slice(5);
     // 尝试替换前区中评分最低的号码
-    var sortedFront = front.slice().sort(function(a,b){return (frontScoreMap[a]?frontScoreMap[a].totalScore:0) - (frontScoreMap[b]?frontScoreMap[b].totalScore:0);});
+    var sortedFront = front.slice().sort(function(a,b){
+      return (frontScoreMap[a]?frontScoreMap[a].totalScore:0) - (frontScoreMap[b]?frontScoreMap[b].totalScore:0);
+    });
     for (var idx=0;idx<sortedFront.length;idx++) {
       for (var j=0;j<frontScores.length;j++) {
         var cand = frontScores[j].num;
         if (front.indexOf(cand) >= 0) continue;
         var newFront = front.slice();
-        var replaceIdx = newFront.indexOf(sortedFront[idx]);
+        var replaceIdx = -1;
+        for (var ri=0;ri<newFront.length;ri++) {
+          if (newFront[ri] === sortedFront[idx]) {replaceIdx=ri; break;}
+        }
+        if (replaceIdx < 0) continue;
         newFront[replaceIdx] = cand;
         newFront.sort(function(a,b){return a-b;});
         var newCombo = newFront.concat(back);
