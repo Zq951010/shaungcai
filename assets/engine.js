@@ -427,16 +427,36 @@ function renderDLTHotCold(allFronts, allBacks) {
 }
 
 function renderDLTDanTuo(last, allFronts, allBacks) {
+  var history = allFronts.map(function(f,i){ return f.concat(allBacks[i]); });
+  var lastDraw = last.front.concat(last.back);
+
+  function makeReasons(s) {
+    var reasons = [];
+    if (s.wf > 0.2) reasons.push('高频');
+    if (s.mp > 0.8) reasons.push('深冷');
+    if (s.mkScore > 0.8) reasons.push('冷转热');
+    if (s.neighborScore > 0.5) reasons.push('邻号');
+    if (s.coScore > 0.5) reasons.push('共现强');
+    return reasons;
+  }
+  function makeBackReasons(s) {
+    var reasons = [];
+    if (s.wf > 0.15) reasons.push('高频');
+    if (s.mp > 0.8) reasons.push('深冷');
+    if (s.mkScore > 0.8) reasons.push('冷转热');
+    return reasons;
+  }
+
   // Score each front number
-  var scores = scoreDLTNumbers(last, allFronts, allBacks);
-  scores.sort(function(a, b) { return b.total - a.total; });
+  var scores = scoreDLTNumbers_V3(lastDraw, history);
+  scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 
   var danCandidates = scores.slice(0, 4);
   var tuoCandidates = scores.slice(4, 14);
 
   // Back area scoring
-  var backScores = scoreDLTBackNumbers(last, allBacks);
-  backScores.sort(function(a, b) { return b.total - a.total; });
+  var backScores = scoreDLTBlueNumbers_V3(lastDraw, history);
+  backScores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 
   var html = '<div class="dantuo-section">';
   html += '<div class="dantuo-grid">';
@@ -447,7 +467,7 @@ function renderDLTDanTuo(last, allFronts, allBacks) {
   html += '<div class="ball-row">';
   for (var i = 0; i < danCandidates.length; i++) {
     var c = danCandidates[i];
-    html += '<div class="ball green tooltip" data-tip="评分:' + c.total.toFixed(1) + '">' + pad(c.num) + '</div>';
+    html += '<div class="ball green tooltip" data-tip="评分:' + (c.totalScore*100).toFixed(1) + '">' + pad(c.num) + '</div>';
   }
   html += '</div>';
   html += '<div style="margin-top:0.75rem">';
@@ -455,8 +475,8 @@ function renderDLTDanTuo(last, allFronts, allBacks) {
     var c = danCandidates[i];
     html += '<div style="margin-bottom:0.5rem;font-size:0.82rem">';
     html += '<span class="hl-green">' + pad(c.num) + '</span> ';
-    html += '<span style="color:var(--muted)">评分 ' + c.total.toFixed(1) + '</span> ';
-    html += c.reasons.map(function(r) { return '<span class="reason-tag">' + r + '</span>'; }).join('');
+    html += '<span style="color:var(--muted)">评分 ' + (c.totalScore*100).toFixed(1) + '</span> ';
+    html += makeReasons(c).map(function(r) { return '<span class="reason-tag">' + r + '</span>'; }).join('');
     html += '</div>';
   }
   html += '</div>';
@@ -464,7 +484,7 @@ function renderDLTDanTuo(last, allFronts, allBacks) {
   html += '<h4 style="margin-top:1rem"><span class="dot" style="background:var(--accent5)"></span> 前区拖码推荐（' + tuoCandidates.length + '个）</h4>';
   html += '<div class="ball-row">';
   for (var i = 0; i < tuoCandidates.length; i++) {
-    html += '<div class="ball purple tooltip" data-tip="评分:' + tuoCandidates[i].total.toFixed(1) + '">' + pad(tuoCandidates[i].num) + '</div>';
+    html += '<div class="ball purple tooltip" data-tip="评分:' + (tuoCandidates[i].totalScore*100).toFixed(1) + '">' + pad(tuoCandidates[i].num) + '</div>';
   }
   html += '</div>';
   html += '</div>';
@@ -475,15 +495,15 @@ function renderDLTDanTuo(last, allFronts, allBacks) {
   html += '<div class="ball-row">';
   var backDan = backScores.slice(0, 2);
   for (var i = 0; i < backDan.length; i++) {
-    html += '<div class="ball green tooltip" data-tip="评分:' + backDan[i].total.toFixed(1) + '">' + pad(backDan[i].num) + '</div>';
+    html += '<div class="ball green tooltip" data-tip="评分:' + (backDan[i].totalScore*100).toFixed(1) + '">' + pad(backDan[i].num) + '</div>';
   }
   html += '</div>';
   html += '<div style="margin-top:0.75rem">';
   for (var i = 0; i < backDan.length; i++) {
     html += '<div style="margin-bottom:0.5rem;font-size:0.82rem">';
     html += '<span class="hl-green">' + pad(backDan[i].num) + '</span> ';
-    html += '<span style="color:var(--muted)">评分 ' + backDan[i].total.toFixed(1) + '</span> ';
-    html += backDan[i].reasons.map(function(r) { return '<span class="reason-tag">' + r + '</span>'; }).join('');
+    html += '<span style="color:var(--muted)">评分 ' + (backDan[i].totalScore*100).toFixed(1) + '</span> ';
+    html += makeBackReasons(backDan[i]).map(function(r) { return '<span class="reason-tag">' + r + '</span>'; }).join('');
     html += '</div>';
   }
   html += '</div>';
@@ -492,7 +512,7 @@ function renderDLTDanTuo(last, allFronts, allBacks) {
   html += '<div class="ball-row">';
   var backTuo = backScores.slice(2, 6);
   for (var i = 0; i < backTuo.length; i++) {
-    html += '<div class="ball purple tooltip" data-tip="评分:' + backTuo[i].total.toFixed(1) + '">' + pad(backTuo[i].num) + '</div>';
+    html += '<div class="ball purple tooltip" data-tip="评分:' + (backTuo[i].totalScore*100).toFixed(1) + '">' + pad(backTuo[i].num) + '</div>';
   }
   html += '</div>';
   html += '</div>';
