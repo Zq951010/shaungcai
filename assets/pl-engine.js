@@ -67,7 +67,7 @@ function analyzePL3() {
   renderPL3OddEven(history);
   renderPL3Tail(history);
   renderPL3Miss(history);
-  renderPL3Recommend(last, history);
+  renderPL3Recommend_V2(last, history);
 
   document.getElementById('pl3-results').scrollIntoView({ behavior: 'smooth' });
 }
@@ -420,119 +420,293 @@ function renderPL3Miss(history) {
 }
 
 function scorePL3Numbers(last, history) {
-  var totalPeriods = history.length;
-  var expected = (3 / 10) * totalPeriods;
-  var scores = [];
+  // V2: position-independent 8-dimensional model for Bai, Shi, Ge
+  var posScores = [];
+  for (var pos = 0; pos < 3; pos++) {
+    posScores[pos] = scorePL3Position(pos, last, history);
+  }
+  return posScores;
+}
 
-  for (var n = 0; n <= 9; n++) {
-    var score = { num: n, freqScore: 0, missScore: 0, repeatScore: 0, total: 0, reasons: [] };
-
-    // 1. Frequency score (30%)
-    var freq = 0;
-    for (var i = 0; i < history.length; i++) {
-      if (history[i].indexOf(n) >= 0) freq++;
+function weightedFreq(num, history, halfLife) {
+  var total = 0;
+  var weightSum = 0;
+  for (var i = 0; i < history.length; i++) {
+    var w = Math.pow(0.5, i / Math.max(1, halfLife));
+    for (var j = 0; j < history[i].length; j++) {
+      if (history[i][j] === num) {
+        total += w;
+        break;
+      }
     }
-    score.freqScore = Math.min(30, (freq / Math.max(1, expected)) * 30);
-    if (freq >= expected * 1.3) score.reasons.push('高频热号');
-    else if (freq >= expected) score.reasons.push('温号稳定');
+    weightSum += w;
+  }
+  return weightSum > 0 ? total / weightSum : 0;
+}
 
-    // 2. Missing score (25%)
-    var miss = 0;
-    for (var i = 0; i < history.length; i++) {
-      if (history[i].indexOf(n) >= 0) break;
-      miss++;
+function getMissDistribution(num, history) {
+  var misses = [];
+  var currentMiss = 0;
+  for (var i = 0; i < history.length; i++) {
+    var found = false;
+    for (var j = 0; j < history[i].length; j++) {
+      if (history[i][j] === num) {
+        found = true;
+        break;
+      }
     }
-    if (miss === history.length) miss = history.length;
-    var avgMiss = Math.round(10 / 3);
-    if (miss >= avgMiss * 0.8 && miss <= avgMiss * 2) {
-      score.missScore = Math.min(25, (miss / avgMiss) * 25);
-      if (miss >= avgMiss) score.reasons.push('遗漏回补号');
-    } else if (miss > avgMiss * 2) {
-      score.missScore = 10;
-      score.reasons.push('超长遗漏');
+    if (found) {
+      if (currentMiss > 0) {
+        misses.push(currentMiss);
+        currentMiss = 0;
+      }
     } else {
-      score.missScore = 12;
+      currentMiss++;
     }
+  }
+  if (currentMiss > 0) misses.push(currentMiss);
+  return misses.length > 0 ? misses : [0];
+}
 
-    // 3. Repeat score (25%)
-    if (last.indexOf(n) >= 0) {
-      score.repeatScore = 25;
-      score.reasons.push('上期重号候选');
-    } else {
-      for (var i = 0; i < last.length; i++) {
-        if (Math.abs(n - last[i]) === 1) {
-          score.repeatScore = 12;
-          score.reasons.push('邻号关联');
-          break;
+function getMissPercentile(num, history) {
+  var currentMiss = 0;
+  for (var i = 0; i < history.length; i++) {
+    var found = false;
+    for (var j = 0; j < history[i].length; j++) {
+      if (history[i][j] === num) {
+        found = true;
+        break;
+      }
+    }
+    if (found) break;
+    currentMiss++;
+  }
+  var dist = getMissDistribution(num, history);
+  var below = 0;
+  for (var i = 0; i < dist.length; i++) {
+    if (dist[i] < currentMiss) below++;
+  }
+  return dist.length > 0 ? below / dist.length : 0.5;
+}
+
+function markovProb(num, history) {
+  if (history.length < 2) return 0.1;
+  var transitions = 0;
+  var matches = 0;
+  for (var i = 1; i < history.length; i++) {
+    var prevNums = history[i];
+    var currNums = history[i - 1];
+    for (var p = 0; p < prevNums.length; p++) {
+      for (var c = 0; c < currNums.length; c++) {
+        if (Math.abs(currNums[c] - prevNums[p]) === 1) {
+          transitions++;
+          if (currNums[c] === num) matches++;
         }
       }
     }
+  }
+  return transitions > 0 ? matches / transitions : 0.1;
+}
 
-    // 4. Odd/even balance (10%)
-    var lastOdd = last.filter(function(x) { return x % 2 === 1; }).length;
-    var isOdd = n % 2 === 1;
-    if (lastOdd >= 2 && !isOdd) {
-      score.total += 10;
-      score.reasons.push('偶数回补');
-    } else if (lastOdd <= 1 && isOdd) {
-      score.total += 10;
-      score.reasons.push('奇数回补');
-    } else {
-      score.total += 5;
+function scorePL3Position(pos, last, history) {
+  var posHistory = [];
+  for (var i = 0; i < history.length; i++) {
+    if (history[i].length > pos) {
+      posHistory.push(history[i][pos]);
     }
+  }
+  var lastPos = last.length > pos ? last[pos] : 0;
+  var scores = [];
+  var totalPeriods = posHistory.length;
+  var expected = totalPeriods / 10;
 
-    // 5. Big/small balance (10%)
-    var lastBig = last.filter(function(x) { return x >= 5; }).length;
+  for (var n = 0; n <= 9; n++) {
+    var score = { num: n, total: 0, reasons: [] };
+
+    // 1. weighted frequency (25%)
+    var wfreq = weightedFreq(n, [posHistory], Math.max(3, Math.floor(totalPeriods / 3)));
+    var freqScore = Math.min(25, (wfreq / Math.max(0.001, expected / totalPeriods)) * 25);
+    if (wfreq >= (expected / totalPeriods) * 1.3) score.reasons.push('高频热号');
+    else if (wfreq >= (expected / totalPeriods) * 0.8) score.reasons.push('温号稳定');
+    else score.reasons.push('低频冷号');
+    score.total += freqScore;
+
+    // 2. miss percentile (20%)
+    var missPerc = getMissPercentile(n, [posHistory]);
+    var missScore = 20 * (1 - missPerc);
+    if (missPerc > 0.7) score.reasons.push('遗漏回补');
+    else if (missPerc < 0.3) score.reasons.push('近期活跃');
+    score.total += missScore;
+
+    // 3. markov transition (15%)
+    var mp = markovProb(n, [posHistory]);
+    var markovScore = Math.min(15, mp * 15 * 10);
+    if (mp > 0.15) score.reasons.push('马尔可夫强关联');
+    score.total += markovScore;
+
+    // 4. neighbor association (15%)
+    var neighborScore = 0;
+    var lastVal = lastPos;
+    if (Math.abs(n - lastVal) === 1) {
+      neighborScore = 15;
+      score.reasons.push('邻号关联');
+    } else if (Math.abs(n - lastVal) === 2) {
+      neighborScore = 7;
+      score.reasons.push('隔号关联');
+    } else {
+      neighborScore = 2;
+    }
+    score.total += neighborScore;
+
+    // 5. stability (10%): variance of intervals
+    var dist = getMissDistribution(n, [posHistory]);
+    var avgMiss = 0;
+    for (var i = 0; i < dist.length; i++) avgMiss += dist[i];
+    avgMiss = avgMiss / dist.length;
+    var varMiss = 0;
+    for (var i = 0; i < dist.length; i++) varMiss += Math.pow(dist[i] - avgMiss, 2);
+    varMiss = varMiss / dist.length;
+    var stabScore = Math.max(0, 10 - varMiss);
+    if (stabScore >= 7) score.reasons.push('稳定性高');
+    score.total += stabScore;
+
+    // 6. hot-cold alternation (10%)
+    var recent = posHistory.slice(0, Math.min(5, posHistory.length));
+    var recentCount = 0;
+    for (var i = 0; i < recent.length; i++) if (recent[i] === n) recentCount++;
+    var older = posHistory.slice(Math.min(5, posHistory.length), Math.min(15, posHistory.length));
+    var olderCount = 0;
+    for (var i = 0; i < older.length; i++) if (older[i] === n) olderCount++;
+    var hcScore = 5;
+    if (recentCount === 0 && olderCount >= 1) {
+      hcScore = 10;
+      score.reasons.push('冷热交替(冷转热)');
+    } else if (recentCount >= 2 && olderCount === 0) {
+      hcScore = 8;
+      score.reasons.push('冷热交替(热持续)');
+    }
+    score.total += hcScore;
+
+    // 7. big-small alternation (5%)
+    var lastBig = lastVal >= 5;
     var isBig = n >= 5;
-    if (lastBig >= 2 && !isBig) {
-      score.total += 10;
-      score.reasons.push('小数回补');
-    } else if (lastBig <= 1 && isBig) {
-      score.total += 10;
-      score.reasons.push('大数回补');
-    } else {
-      score.total += 5;
+    var bsScore = 2.5;
+    if (lastBig !== isBig) {
+      bsScore = 5;
+      score.reasons.push('大小交替');
     }
+    score.total += bsScore;
 
-    score.total = score.freqScore + score.missScore + score.repeatScore + score.total;
     scores.push(score);
   }
 
   return scores;
 }
 
-function renderPL3Recommend(last, history) {
-  var scores = scorePL3Numbers(last, history);
-  scores.sort(function(a, b) { return b.total - a.total; });
+function renderPL3Recommend_V2(last, history) {
+  var posScores = scorePL3Numbers(last, history);
 
-  var html = '';
-
-  for (var set = 0; set < 3; set++) {
+  function pickByStrategy(strategy) {
     var picks = [];
-    var usedNums = {};
-
-    // Pick top scorer
-    picks.push(scores[set].num);
-    usedNums[scores[set].num] = true;
-
-    // Fill remaining 2 from top scores
-    for (var i = 0; i < scores.length && picks.length < 3; i++) {
-      var n = scores[i].num;
-      if (!usedNums[n]) {
-        picks.push(n);
-        usedNums[n] = true;
+    for (var pos = 0; pos < 3; pos++) {
+      var scores = posScores[pos].slice();
+      if (strategy === 'hot') {
+        scores.sort(function(a, b) { return b.total - a.total; });
+      } else if (strategy === 'miss') {
+        scores.sort(function(a, b) {
+          var ma = a.reasons.indexOf('遗漏回补') >= 0 ? 1 : 0;
+          var mb = b.reasons.indexOf('遗漏回补') >= 0 ? 1 : 0;
+          if (mb !== ma) return mb - ma;
+          return b.total - a.total;
+        });
+      } else if (strategy === 'markov') {
+        scores.sort(function(a, b) {
+          var ma = a.reasons.indexOf('马尔可夫强关联') >= 0 ? 1 : 0;
+          var mb = b.reasons.indexOf('马尔可夫强关联') >= 0 ? 1 : 0;
+          if (mb !== ma) return mb - ma;
+          return b.total - a.total;
+        });
+      } else if (strategy === 'neighbor') {
+        scores.sort(function(a, b) {
+          var ma = a.reasons.indexOf('邻号关联') >= 0 ? 1 : 0;
+          var mb = b.reasons.indexOf('邻号关联') >= 0 ? 1 : 0;
+          if (mb !== ma) return mb - ma;
+          return b.total - a.total;
+        });
+      } else {
+        scores.sort(function(a, b) { return b.total - a.total; });
       }
+      picks.push(scores[0].num);
     }
+    return picks;
+  }
+
+  function genAlt(picks) {
+    var alts = [];
+    for (var pos = 0; pos < 3; pos++) {
+      var scores = posScores[pos].slice();
+      scores.sort(function(a, b) { return b.total - a.total; });
+      var idx = 0;
+      for (var i = 0; i < scores.length; i++) {
+        if (scores[i].num === picks[pos]) {
+          idx = i;
+          break;
+        }
+      }
+      var alt = picks.slice();
+      alt[pos] = scores[(idx + 1) % scores.length].num;
+      alts.push(alt);
+    }
+    return alts;
+  }
+
+  var strategies = [
+    { key: 'hot', name: '热号优先' },
+    { key: 'miss', name: '遗漏回补' },
+    { key: 'markov', name: '马尔可夫转移' },
+    { key: 'neighbor', name: '邻号追踪' },
+    { key: 'balanced', name: '混合平衡' }
+  ];
+
+  var html = '<div style="margin-bottom:1rem"><strong>V2 位置独立评分推荐</strong></div>';
+
+  for (var s = 0; s < strategies.length; s++) {
+    var strat = strategies[s];
+    var base = pickByStrategy(strat.key);
+    var alts = genAlt(base);
+    var recs = [base, alts[0], alts[1]];
 
     html += '<div style="margin-bottom:1.25rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">推荐方案 ' + (set + 1) + '</div>';
-    html += '<div class="ball-row">';
-    for (var i = 0; i < picks.length; i++) {
-      html += '<div class="ball red">' + picks[i] + '</div>';
+    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">策略: ' + strat.name + '</div>';
+    for (var r = 0; r < recs.length; r++) {
+      var nums = recs[r];
+      var oddCount = nums.filter(function(x) { return x % 2 === 1; }).length;
+      var bigCount = nums.filter(function(x) { return x >= 5; }).length;
+      html += '<div class="ball-row" style="margin-bottom:0.3rem">';
+      for (var i = 0; i < nums.length; i++) {
+        html += '<div class="ball red">' + nums[i] + '</div>';
+      }
+      html += '</div>';
+      html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem">和值: ' + sum(nums) + ' | 跨度: ' + span(nums) + ' | 奇偶: ' + oddCount + ':' + (3 - oddCount) + ' | 大小: ' + bigCount + ':' + (3 - bigCount) + '</div>';
     }
     html += '</div>';
-    html += '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem">和值: ' + sum(picks) + ' | 跨度: ' + span(picks) + ' | 奇偶: ' + picks.filter(function(x){return x%2===1}).length + ':' + picks.filter(function(x){return x%2===0}).length + ' | 大小: ' + picks.filter(function(x){return x>=5}).length + ':' + picks.filter(function(x){return x<5}).length + '</div>';
-    html += '</div>';
+  }
+
+  // Top 10 score detail table
+  html += '<div style="margin-top:1rem"><strong>各位置评分详情 Top10</strong></div>';
+  var posNames = ['百位', '十位', '个位'];
+  for (var pos = 0; pos < 3; pos++) {
+    html += '<div style="margin-top:0.75rem;font-size:0.82rem;color:var(--muted)">' + posNames[pos] + '</div>';
+    html += '<table style="width:100%;font-size:0.78rem;border-collapse:collapse;margin-top:0.25rem">';
+    html += '<thead><tr style="background:var(--bg3)"><th style="padding:4px;border:1px solid var(--border)">号码</th><th style="padding:4px;border:1px solid var(--border)">评分</th><th style="padding:4px;border:1px solid var(--border)">标签</th></tr></thead><tbody>';
+    var sorted = posScores[pos].slice().sort(function(a, b) { return b.total - a.total; });
+    for (var i = 0; i < Math.min(10, sorted.length); i++) {
+      var sc = sorted[i];
+      html += '<tr><td style="padding:4px;border:1px solid var(--border);text-align:center">' + sc.num + '</td>';
+      html += '<td style="padding:4px;border:1px solid var(--border);text-align:center">' + sc.total.toFixed(1) + '</td>';
+      html += '<td style="padding:4px;border:1px solid var(--border)">' + sc.reasons.join('，') + '</td></tr>';
+    }
+    html += '</tbody></table>';
   }
 
   html += '<div class="disclaimer" style="margin-top:1.5rem"><strong>声明：</strong>以上推荐号码基于历史数据统计分析生成，仅供娱乐参考。彩票开奖为随机事件，不构成任何投注建议。</div>';
@@ -596,7 +770,7 @@ function analyzePL5() {
   renderPL5OddEven(history);
   renderPL5Tail(history);
   renderPL5Miss(history);
-  renderPL5Recommend(last, history);
+  renderPL5Recommend_V2(last, history);
 
   document.getElementById('pl5-results').scrollIntoView({ behavior: 'smooth' });
 }
@@ -949,119 +1123,211 @@ function renderPL5Miss(history) {
 }
 
 function scorePL5Numbers(last, history) {
-  var totalPeriods = history.length;
-  var expected = (5 / 10) * totalPeriods;
+  // V2: position-independent 8-dimensional model for 5 positions
+  var posScores = [];
+  for (var pos = 0; pos < 5; pos++) {
+    posScores[pos] = scorePL5Position(pos, last, history);
+  }
+  return posScores;
+}
+
+function scorePL5Position(pos, last, history) {
+  var posHistory = [];
+  for (var i = 0; i < history.length; i++) {
+    if (history[i].length > pos) {
+      posHistory.push(history[i][pos]);
+    }
+  }
+  var lastPos = last.length > pos ? last[pos] : 0;
   var scores = [];
+  var totalPeriods = posHistory.length;
+  var expected = totalPeriods / 10;
 
   for (var n = 0; n <= 9; n++) {
-    var score = { num: n, freqScore: 0, missScore: 0, repeatScore: 0, total: 0, reasons: [] };
+    var score = { num: n, total: 0, reasons: [] };
 
-    // 1. Frequency score (30%)
-    var freq = 0;
-    for (var i = 0; i < history.length; i++) {
-      if (history[i].indexOf(n) >= 0) freq++;
-    }
-    score.freqScore = Math.min(30, (freq / Math.max(1, expected)) * 30);
-    if (freq >= expected * 1.3) score.reasons.push('高频热号');
-    else if (freq >= expected) score.reasons.push('温号稳定');
+    // 1. weighted frequency (25%)
+    var wfreq = weightedFreq(n, [posHistory], Math.max(3, Math.floor(totalPeriods / 3)));
+    var freqScore = Math.min(25, (wfreq / Math.max(0.001, expected / totalPeriods)) * 25);
+    if (wfreq >= (expected / totalPeriods) * 1.3) score.reasons.push('高频热号');
+    else if (wfreq >= (expected / totalPeriods) * 0.8) score.reasons.push('温号稳定');
+    else score.reasons.push('低频冷号');
+    score.total += freqScore;
 
-    // 2. Missing score (25%)
-    var miss = 0;
-    for (var i = 0; i < history.length; i++) {
-      if (history[i].indexOf(n) >= 0) break;
-      miss++;
-    }
-    if (miss === history.length) miss = history.length;
-    var avgMiss = Math.round(10 / 5);
-    if (miss >= avgMiss * 0.8 && miss <= avgMiss * 2) {
-      score.missScore = Math.min(25, (miss / avgMiss) * 25);
-      if (miss >= avgMiss) score.reasons.push('遗漏回补号');
-    } else if (miss > avgMiss * 2) {
-      score.missScore = 10;
-      score.reasons.push('超长遗漏');
+    // 2. miss percentile (20%)
+    var missPerc = getMissPercentile(n, [posHistory]);
+    var missScore = 20 * (1 - missPerc);
+    if (missPerc > 0.7) score.reasons.push('遗漏回补');
+    else if (missPerc < 0.3) score.reasons.push('近期活跃');
+    score.total += missScore;
+
+    // 3. markov transition (15%)
+    var mp = markovProb(n, [posHistory]);
+    var markovScore = Math.min(15, mp * 15 * 10);
+    if (mp > 0.15) score.reasons.push('马尔可夫强关联');
+    score.total += markovScore;
+
+    // 4. neighbor association (15%)
+    var neighborScore = 0;
+    var lastVal = lastPos;
+    if (Math.abs(n - lastVal) === 1) {
+      neighborScore = 15;
+      score.reasons.push('邻号关联');
+    } else if (Math.abs(n - lastVal) === 2) {
+      neighborScore = 7;
+      score.reasons.push('隔号关联');
     } else {
-      score.missScore = 12;
+      neighborScore = 2;
     }
+    score.total += neighborScore;
 
-    // 3. Repeat score (25%)
-    if (last.indexOf(n) >= 0) {
-      score.repeatScore = 25;
-      score.reasons.push('上期重号候选');
-    } else {
-      for (var i = 0; i < last.length; i++) {
-        if (Math.abs(n - last[i]) === 1) {
-          score.repeatScore = 12;
-          score.reasons.push('邻号关联');
-          break;
-        }
-      }
+    // 5. stability (10%): variance of intervals
+    var dist = getMissDistribution(n, [posHistory]);
+    var avgMiss = 0;
+    for (var i = 0; i < dist.length; i++) avgMiss += dist[i];
+    avgMiss = avgMiss / dist.length;
+    var varMiss = 0;
+    for (var i = 0; i < dist.length; i++) varMiss += Math.pow(dist[i] - avgMiss, 2);
+    varMiss = varMiss / dist.length;
+    var stabScore = Math.max(0, 10 - varMiss);
+    if (stabScore >= 7) score.reasons.push('稳定性高');
+    score.total += stabScore;
+
+    // 6. hot-cold alternation (10%)
+    var recent = posHistory.slice(0, Math.min(5, posHistory.length));
+    var recentCount = 0;
+    for (var i = 0; i < recent.length; i++) if (recent[i] === n) recentCount++;
+    var older = posHistory.slice(Math.min(5, posHistory.length), Math.min(15, posHistory.length));
+    var olderCount = 0;
+    for (var i = 0; i < older.length; i++) if (older[i] === n) olderCount++;
+    var hcScore = 5;
+    if (recentCount === 0 && olderCount >= 1) {
+      hcScore = 10;
+      score.reasons.push('冷热交替(冷转热)');
+    } else if (recentCount >= 2 && olderCount === 0) {
+      hcScore = 8;
+      score.reasons.push('冷热交替(热持续)');
     }
+    score.total += hcScore;
 
-    // 4. Odd/even balance (10%)
-    var lastOdd = last.filter(function(x) { return x % 2 === 1; }).length;
-    var isOdd = n % 2 === 1;
-    if (lastOdd >= 3 && !isOdd) {
-      score.total += 10;
-      score.reasons.push('偶数回补');
-    } else if (lastOdd <= 2 && isOdd) {
-      score.total += 10;
-      score.reasons.push('奇数回补');
-    } else {
-      score.total += 5;
-    }
-
-    // 5. Big/small balance (10%)
-    var lastBig = last.filter(function(x) { return x >= 5; }).length;
+    // 7. big-small alternation (5%)
+    var lastBig = lastVal >= 5;
     var isBig = n >= 5;
-    if (lastBig >= 3 && !isBig) {
-      score.total += 10;
-      score.reasons.push('小数回补');
-    } else if (lastBig <= 2 && isBig) {
-      score.total += 10;
-      score.reasons.push('大数回补');
-    } else {
-      score.total += 5;
+    var bsScore = 2.5;
+    if (lastBig !== isBig) {
+      bsScore = 5;
+      score.reasons.push('大小交替');
     }
+    score.total += bsScore;
 
-    score.total = score.freqScore + score.missScore + score.repeatScore + score.total;
     scores.push(score);
   }
 
   return scores;
 }
 
-function renderPL5Recommend(last, history) {
-  var scores = scorePL5Numbers(last, history);
-  scores.sort(function(a, b) { return b.total - a.total; });
+function renderPL5Recommend_V2(last, history) {
+  var posScores = scorePL5Numbers(last, history);
 
-  var html = '';
-
-  for (var set = 0; set < 3; set++) {
+  function pickByStrategy(strategy) {
     var picks = [];
-    var usedNums = {};
-
-    // Pick top scorer
-    picks.push(scores[set].num);
-    usedNums[scores[set].num] = true;
-
-    // Fill remaining 4 from top scores
-    for (var i = 0; i < scores.length && picks.length < 5; i++) {
-      var n = scores[i].num;
-      if (!usedNums[n]) {
-        picks.push(n);
-        usedNums[n] = true;
+    for (var pos = 0; pos < 5; pos++) {
+      var scores = posScores[pos].slice();
+      if (strategy === 'hot') {
+        scores.sort(function(a, b) { return b.total - a.total; });
+      } else if (strategy === 'miss') {
+        scores.sort(function(a, b) {
+          var ma = a.reasons.indexOf('遗漏回补') >= 0 ? 1 : 0;
+          var mb = b.reasons.indexOf('遗漏回补') >= 0 ? 1 : 0;
+          if (mb !== ma) return mb - ma;
+          return b.total - a.total;
+        });
+      } else if (strategy === 'markov') {
+        scores.sort(function(a, b) {
+          var ma = a.reasons.indexOf('马尔可夫强关联') >= 0 ? 1 : 0;
+          var mb = b.reasons.indexOf('马尔可夫强关联') >= 0 ? 1 : 0;
+          if (mb !== ma) return mb - ma;
+          return b.total - a.total;
+        });
+      } else if (strategy === 'neighbor') {
+        scores.sort(function(a, b) {
+          var ma = a.reasons.indexOf('邻号关联') >= 0 ? 1 : 0;
+          var mb = b.reasons.indexOf('邻号关联') >= 0 ? 1 : 0;
+          if (mb !== ma) return mb - ma;
+          return b.total - a.total;
+        });
+      } else {
+        scores.sort(function(a, b) { return b.total - a.total; });
       }
+      picks.push(scores[0].num);
     }
+    return picks;
+  }
+
+  function genAlt(picks) {
+    var alts = [];
+    for (var pos = 0; pos < 5; pos++) {
+      var scores = posScores[pos].slice();
+      scores.sort(function(a, b) { return b.total - a.total; });
+      var idx = 0;
+      for (var i = 0; i < scores.length; i++) {
+        if (scores[i].num === picks[pos]) {
+          idx = i;
+          break;
+        }
+      }
+      var alt = picks.slice();
+      alt[pos] = scores[(idx + 1) % scores.length].num;
+      alts.push(alt);
+    }
+    return alts;
+  }
+
+  var strategies = [
+    { key: 'hot', name: '热号优先' },
+    { key: 'miss', name: '遗漏回补' },
+    { key: 'markov', name: '马尔可夫转移' },
+    { key: 'neighbor', name: '邻号追踪' },
+    { key: 'balanced', name: '混合平衡' }
+  ];
+
+  var html = '<div style="margin-bottom:1rem"><strong>V2 位置独立评分推荐</strong></div>';
+
+  for (var s = 0; s < strategies.length; s++) {
+    var strat = strategies[s];
+    var base = pickByStrategy(strat.key);
+    var alts = genAlt(base);
+    var recs = [base, alts[0], alts[1]];
 
     html += '<div style="margin-bottom:1.25rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">推荐方案 ' + (set + 1) + '</div>';
-    html += '<div class="ball-row">';
-    for (var i = 0; i < picks.length; i++) {
-      html += '<div class="ball red">' + picks[i] + '</div>';
+    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">策略: ' + strat.name + '</div>';
+    for (var r = 0; r < recs.length; r++) {
+      var nums = recs[r];
+      html += '<div class="ball-row" style="margin-bottom:0.3rem">';
+      for (var i = 0; i < nums.length; i++) {
+        html += '<div class="ball red">' + nums[i] + '</div>';
+      }
+      html += '</div>';
+      html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem">和值: ' + sum(nums) + ' | 跨度: ' + span(nums) + '</div>';
     }
     html += '</div>';
-    html += '<div style="font-size:0.75rem;color:var(--muted);margin-top:0.25rem">和值: ' + sum(picks) + ' | 跨度: ' + span(picks) + ' | 奇偶: ' + picks.filter(function(x){return x%2===1}).length + ':' + picks.filter(function(x){return x%2===0}).length + ' | 大小: ' + picks.filter(function(x){return x>=5}).length + ':' + picks.filter(function(x){return x<5}).length + '</div>';
-    html += '</div>';
+  }
+
+  // Top 10 score detail table
+  html += '<div style="margin-top:1rem"><strong>各位置评分详情 Top10</strong></div>';
+  var posNames = ['万位', '千位', '百位', '十位', '个位'];
+  for (var pos = 0; pos < 5; pos++) {
+    html += '<div style="margin-top:0.75rem;font-size:0.82rem;color:var(--muted)">' + posNames[pos] + '</div>';
+    html += '<table style="width:100%;font-size:0.78rem;border-collapse:collapse;margin-top:0.25rem">';
+    html += '<thead><tr style="background:var(--bg3)"><th style="padding:4px;border:1px solid var(--border)">号码</th><th style="padding:4px;border:1px solid var(--border)">评分</th><th style="padding:4px;border:1px solid var(--border)">标签</th></tr></thead><tbody>';
+    var sorted = posScores[pos].slice().sort(function(a, b) { return b.total - a.total; });
+    for (var i = 0; i < Math.min(10, sorted.length); i++) {
+      var sc = sorted[i];
+      html += '<tr><td style="padding:4px;border:1px solid var(--border);text-align:center">' + sc.num + '</td>';
+      html += '<td style="padding:4px;border:1px solid var(--border);text-align:center">' + sc.total.toFixed(1) + '</td>';
+      html += '<td style="padding:4px;border:1px solid var(--border)">' + sc.reasons.join('，') + '</td></tr>';
+    }
+    html += '</tbody></table>';
   }
 
   html += '<div class="disclaimer" style="margin-top:1.5rem"><strong>声明：</strong>以上推荐号码基于历史数据统计分析生成，仅供娱乐参考。彩票开奖为随机事件，不构成任何投注建议。</div>';

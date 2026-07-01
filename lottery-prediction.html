@@ -12,20 +12,20 @@
 :root { --font-ui: 'Inter', sans-serif; --font-mono: 'JetBrains Mono', monospace; }
 
 :root {
-  --bg: #0a0e17;
-  --bg2: #111827;
-  --bg3: #1a2236;
-  --ink: #e8ecf4;
-  --muted: #7a8ba8;
-  --rule: #2a3550;
+  --bg: #f5f7fa;
+  --bg2: #ffffff;
+  --bg3: #f0f2f5;
+  --ink: #1f2937;
+  --muted: #6b7280;
+  --rule: #e5e7eb;
   --accent: #f59e0b;
   --accent2: #3b82f6;
   --accent3: #10b981;
   --accent4: #ef4444;
   --accent5: #8b5cf6;
-  --gold: #fbbf24;
-  --silver: #94a3b8;
-  --bronze: #d97706;
+  --gold: #f59e0b;
+  --silver: #6b7280;
+  --bronze: #b45309;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -33,6 +33,7 @@ html { scroll-behavior: smooth; }
 body {
   font-family: 'Inter', sans-serif;
   background: var(--bg);
+  transition: background 0.3s, color 0.3s;
   color: var(--ink);
   line-height: 1.6;
   font-size: 15px;
@@ -41,7 +42,8 @@ body {
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-track { background: var(--bg);
+  transition: background 0.3s, color 0.3s; }
 ::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 3px; }
 
 /* Header */
@@ -242,6 +244,7 @@ body {
 }
 .input-row input, .input-row select, .input-row textarea {
   background: var(--bg);
+  transition: background 0.3s, color 0.3s;
   border: 1px solid var(--rule);
   border-radius: 6px;
   padding: 0.5rem 0.75rem;
@@ -415,6 +418,7 @@ tr:hover td { background: var(--bg3); }
 .reason-tag {
   display: inline-block;
   background: var(--bg);
+  transition: background 0.3s, color 0.3s;
   border: 1px solid var(--rule);
   border-radius: 4px;
   padding: 0.15rem 0.4rem;
@@ -521,6 +525,7 @@ tr:hover td { background: var(--bg3); }
   left: 50%;
   transform: translateX(-50%);
   background: var(--bg);
+  transition: background 0.3s, color 0.3s;
   color: var(--ink);
   padding: 0.3rem 0.6rem;
   border-radius: 4px;
@@ -541,6 +546,7 @@ tr:hover td { background: var(--bg3); }
   flex: 1;
   height: 6px;
   background: var(--bg);
+  transition: background 0.3s, color 0.3s;
   border-radius: 3px;
   overflow: hidden;
 }
@@ -575,6 +581,7 @@ tr:hover td { background: var(--bg3); }
   cursor: pointer;
   transition: all 0.15s;
   background: var(--bg);
+  transition: background 0.3s, color 0.3s;
   border: 1px solid var(--rule);
   color: var(--muted);
 }
@@ -1413,9 +1420,9 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=4"></script>
-<script src="assets/pl-data.js?v=4"></script>
-<script src="assets/pl-engine.js?v=3"></script>
+<script src="assets/engine.js?v=5"></script>
+<script src="assets/pl-data.js?v=5"></script>
+<script src="assets/pl-engine.js?v=4"></script>
 <script src="assets/auto-review.js?v=5"></script>
 <script src="assets/ticket-flower.js?v=1"></script>
 <script>
@@ -1456,6 +1463,49 @@ window.addEventListener('DOMContentLoaded', function() {
     renderSmartRecommendations();
   }, 1500);
 });
+</script>
+
+
+<script>
+// Home navigation + light theme enhancements
+(function(){
+  // Game card clicks
+  document.querySelectorAll('.game-card').forEach(function(card){
+    card.addEventListener('click', function(){
+      var game = this.dataset.game;
+      document.querySelectorAll('.panel').forEach(function(p){ p.style.display = 'none'; });
+      document.getElementById('panel-' + game).style.display = 'block';
+      window.scrollTo(0,0);
+    });
+  });
+  // Back to home
+  document.querySelectorAll('.back-to-home').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.panel').forEach(function(p){ p.style.display = 'none'; });
+      document.getElementById('panel-home').style.display = 'block';
+      window.scrollTo(0,0);
+    });
+  });
+  // Tab nav buttons also route through panels
+  document.querySelectorAll('.tab-btn').forEach(function(btn){
+    var origClick = btn.onclick;
+    btn.addEventListener('click', function(){
+      var target = this.dataset.target || this.getAttribute('onclick');
+      if (target && target.indexOf('showPanel') >= 0) {
+        var m = target.match(/showPanel\('([^']+)'\)/);
+        if (m) {
+          document.querySelectorAll('.panel').forEach(function(p){ p.style.display = 'none'; });
+          document.getElementById('panel-' + m[1]).style.display = 'block';
+          window.scrollTo(0,0);
+        }
+      }
+    });
+  });
+  // Default show home
+  document.querySelectorAll('.panel').forEach(function(p){ p.style.display = 'none'; });
+  var home = document.getElementById('panel-home');
+  if (home) home.style.display = 'block';
+})();
 </script>
 
 </body>
