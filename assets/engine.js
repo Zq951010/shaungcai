@@ -1010,6 +1010,7 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
 
   function genStrategy1() {
     var picks = frontScores.slice(0,12).map(function(s){return s.num;});
+    var bp = backScores.slice(0,4).map(function(s){return s.num;});
     var best = null, bestQ = -1;
     for (var a=0;a<picks.length-4;a++)
     for (var b=a+1;b<picks.length-3;b++)
@@ -1017,7 +1018,6 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     for (var d=c+1;d<picks.length-1;d++)
     for (var e=d+1;e<picks.length;e++) {
       var f=[picks[a],picks[b],picks[c],picks[d],picks[e]];
-      var bp = backScores.slice(0,4).map(function(s){return s.num;});
       for (var i=0;i<bp.length-1;i++)
       for (var j=i+1;j<bp.length;j++) {
         var b=[bp[i],bp[j]];
@@ -1029,23 +1029,36 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   }
 
   function genStrategy2() {
+    // 强制引入至少1个冷号，与策略1形成差异
     var hot = frontScores.slice(0,8).map(function(s){return s.num;});
-    var cold = frontScores.filter(function(s){return s.mp>0.7;}).slice(0,6).map(function(s){return s.num;});
-    var pool = hot.slice(0,5).concat(cold.slice(0,3));
+    var cold = frontScores.filter(function(s){return s.mp>0.6;}).map(function(s){return s.num;});
     var unique = [];
-    for (var i=0;i<pool.length && unique.length<5;i++) if (unique.indexOf(pool[i])<0) unique.push(pool[i]);
-    while (unique.length<5) {
-      var r = frontScores[Math.floor(Math.random()*frontScores.length)].num;
-      if (unique.indexOf(r)<0) unique.push(r);
+    // 先取4个热号
+    for (var i=0;i<hot.length && unique.length<4;i++) {
+      if (unique.indexOf(hot[i])<0) unique.push(hot[i]);
     }
-    var b = [backScores[0].num, backScores[1].num];
-    return [unique.slice(0,5).concat(b)];
+    // 强制加入1个冷号
+    for (var i=0;i<cold.length && unique.length<5;i++) {
+      if (unique.indexOf(cold[i])<0) unique.push(cold[i]);
+    }
+    // 补足到5个
+    for (var i=0;i<frontScores.length && unique.length<5;i++) {
+      if (unique.indexOf(frontScores[i].num)<0) unique.push(frontScores[i].num);
+    }
+    unique.sort(function(a,b){return a-b;});
+    var b = [backScores[0].num, backScores[Math.min(2,backScores.length-1)].num];
+    return [unique.concat(b)];
   }
 
   function genStrategy3() {
-    var hot = frontScores.slice(0,6).map(function(s){return s.num;});
-    var mp = frontScores.filter(function(s){return s.mkScore>0.7 && hot.indexOf(s.num)<0;}).slice(0,5).map(function(s){return s.num;});
-    var pool = hot.concat(mp);
+    // 马尔可夫转移驱动：优先选mkScore高的号码
+    var mkPool = frontScores.filter(function(s){return s.mkScore>0.5;}).slice(0,10).map(function(s){return s.num;});
+    if (mkPool.length < 5) {
+      for (var i=0;i<frontScores.length && mkPool.length<5;i++) {
+        if (mkPool.indexOf(frontScores[i].num)<0) mkPool.push(frontScores[i].num);
+      }
+    }
+    var pool = mkPool.slice(0,12);
     var best = null, bestQ = -1;
     for (var a=0;a<pool.length-4;a++)
     for (var b=a+1;b<pool.length-3;b++)
@@ -1053,7 +1066,7 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     for (var d=c+1;d<pool.length-1;d++)
     for (var e=d+1;e<pool.length;e++) {
       var f=[pool[a],pool[b],pool[c],pool[d],pool[e]];
-      var b2 = [backScores[0].num, backScores[Math.min(2,backScores.length-1)].num];
+      var b2 = [backScores[1].num, backScores[Math.min(2,backScores.length-1)].num];
       var q = qualityScore(f,b2);
       if (q>bestQ) {bestQ=q; best=f.concat(b2);}
     }
@@ -1074,17 +1087,75 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
       if (bestN>0) cluster.push(bestN); else break;
     }
     while (cluster.length<5) {
-      var r = frontScores.find(function(s){return cluster.indexOf(s.num)<0;});
-      if (r) cluster.push(r.num); else break;
+      var found = false;
+      for (var i=0;i<frontScores.length;i++) {
+        if (cluster.indexOf(frontScores[i].num)<0) {
+          cluster.push(frontScores[i].num);
+          found = true;
+          break;
+        }
+      }
+      if (!found) break;
     }
-    var b = [backScores[0].num, backScores[1].num];
+    var b = [backScores[0].num, backScores[Math.min(3,backScores.length-1)].num];
     return [cluster.slice(0,5).concat(b)];
+  }
+
+  function combosEqual(c1, c2) {
+    if (!c1 || !c2 || c1.length !== c2.length) return false;
+    for (var i=0;i<c1.length;i++) if (c1[i] !== c2[i]) return false;
+    return true;
+  }
+
+  function makeDistinct(baseCombo, existing) {
+    var front = baseCombo.slice(0,5);
+    var back = baseCombo.slice(5);
+    // 尝试替换前区中评分最低的号码
+    var sortedFront = front.slice().sort(function(a,b){return (frontScoreMap[a]?frontScoreMap[a].totalScore:0) - (frontScoreMap[b]?frontScoreMap[b].totalScore:0);});
+    for (var idx=0;idx<sortedFront.length;idx++) {
+      for (var j=0;j<frontScores.length;j++) {
+        var cand = frontScores[j].num;
+        if (front.indexOf(cand) >= 0) continue;
+        var newFront = front.slice();
+        var replaceIdx = newFront.indexOf(sortedFront[idx]);
+        newFront[replaceIdx] = cand;
+        newFront.sort(function(a,b){return a-b;});
+        var newCombo = newFront.concat(back);
+        var dup = false;
+        for (var k=0;k<existing.length;k++) if (combosEqual(newCombo, existing[k])) {dup=true; break;}
+        if (!dup) return newCombo;
+      }
+    }
+    // 尝试调整后区
+    for (var j=2;j<backScores.length;j++) {
+      var newBack = [backScores[0].num, backScores[j].num];
+      var newCombo = front.concat(newBack);
+      var dup = false;
+      for (var k=0;k<existing.length;k++) if (combosEqual(newCombo, existing[k])) {dup=true; break;}
+      if (!dup) return newCombo;
+    }
+    return baseCombo;
   }
 
   var s1 = genStrategy1();
   var s2 = genStrategy2();
   var s3 = genStrategy3();
   var s4 = genStrategy4();
+
+  // 去重：确保四个策略的推荐不完全相同
+  var allCombos = [];
+  [s1, s2, s3, s4].forEach(function(strat) {
+    for (var i=0;i<strat.length;i++) {
+      var dup = false;
+      for (var j=0;j<allCombos.length;j++) {
+        if (combosEqual(strat[i], allCombos[j])) {dup=true; break;}
+      }
+      if (dup) {
+        strat[i] = makeDistinct(strat[i], allCombos);
+      }
+      allCombos.push(strat[i]);
+    }
+  });
 
   var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V3 严谨模型推荐</h3>';
   html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·共现矩阵·马尔可夫转移·尾数分散·区间均衡·连号间距·邻号·稳定性 九维评分体系</p>';
