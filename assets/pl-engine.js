@@ -445,27 +445,20 @@ function weightedFreq(num, history, halfLife) {
 }
 
 function getMissDistribution(num, history) {
-  var misses = [];
-  var currentMiss = 0;
-  for (var i = 0; i < history.length; i++) {
-    var found = false;
-    for (var j = 0; j < history[i].length; j++) {
-      if (history[i][j] === num) {
-        found = true;
-        break;
-      }
-    }
-    if (found) {
-      if (currentMiss > 0) {
-        misses.push(currentMiss);
-        currentMiss = 0;
-      }
-    } else {
-      currentMiss++;
-    }
+  var gaps = [], currentGap = 0;
+  for (var i = history.length - 1; i >= 0; i--) {
+    if (history[i].indexOf(num) >= 0) {
+      if (currentGap > 0) gaps.push(currentGap);
+      currentGap = 0;
+    } else currentGap++;
   }
-  if (currentMiss > 0) misses.push(currentMiss);
-  return misses.length > 0 ? misses : [0];
+  gaps.push(currentGap);
+  var mean = gaps.length ? gaps.reduce(function(a,b){return a+b;},0) / gaps.length : 0;
+  var sorted = gaps.slice().sort(function(a,b){return a-b;});
+  var median = sorted.length ? sorted[Math.floor(sorted.length/2)] : 0;
+  var std = gaps.length > 1 ? Math.sqrt(gaps.reduce(function(s,g){return s+(g-mean)*(g-mean);},0)/gaps.length) : 0;
+  var maxGap = gaps.length ? Math.max.apply(null, gaps) : 0;
+  return {gaps: gaps, mean: mean, median: median, std: std, maxGap: maxGap, currentGap: currentGap};
 }
 
 function getMissPercentile(num, history) {
@@ -483,10 +476,10 @@ function getMissPercentile(num, history) {
   }
   var dist = getMissDistribution(num, history);
   var below = 0;
-  for (var i = 0; i < dist.length; i++) {
-    if (dist[i] < currentMiss) below++;
+  for (var i = 0; i < dist.gaps.length; i++) {
+    if (dist.gaps[i] < currentMiss) below++;
   }
-  return dist.length > 0 ? below / dist.length : 0.5;
+  return dist.gaps.length > 0 ? below / dist.gaps.length : 0.5;
 }
 
 function markovProb(num, history) {
@@ -561,11 +554,11 @@ function scorePL3Position(pos, last, history) {
     // 5. stability (10%): variance of intervals
     var dist = getMissDistribution(n, [posHistory]);
     var avgMiss = 0;
-    for (var i = 0; i < dist.length; i++) avgMiss += dist[i];
-    avgMiss = avgMiss / dist.length;
+    for (var i = 0; i < dist.gaps.length; i++) avgMiss += dist.gaps[i];
+    avgMiss = avgMiss / dist.gaps.length;
     var varMiss = 0;
-    for (var i = 0; i < dist.length; i++) varMiss += Math.pow(dist[i] - avgMiss, 2);
-    varMiss = varMiss / dist.length;
+    for (var i = 0; i < dist.gaps.length; i++) varMiss += Math.pow(dist.gaps[i] - avgMiss, 2);
+    varMiss = varMiss / dist.gaps.length;
     var stabScore = Math.max(0, 10 - varMiss);
     if (stabScore >= 7) score.reasons.push('稳定性高');
     score.total += stabScore;
@@ -1184,11 +1177,11 @@ function scorePL5Position(pos, last, history) {
     // 5. stability (10%): variance of intervals
     var dist = getMissDistribution(n, [posHistory]);
     var avgMiss = 0;
-    for (var i = 0; i < dist.length; i++) avgMiss += dist[i];
-    avgMiss = avgMiss / dist.length;
+    for (var i = 0; i < dist.gaps.length; i++) avgMiss += dist.gaps[i];
+    avgMiss = avgMiss / dist.gaps.length;
     var varMiss = 0;
-    for (var i = 0; i < dist.length; i++) varMiss += Math.pow(dist[i] - avgMiss, 2);
-    varMiss = varMiss / dist.length;
+    for (var i = 0; i < dist.gaps.length; i++) varMiss += Math.pow(dist.gaps[i] - avgMiss, 2);
+    varMiss = varMiss / dist.gaps.length;
     var stabScore = Math.max(0, 10 - varMiss);
     if (stabScore >= 7) score.reasons.push('稳定性高');
     score.total += stabScore;
