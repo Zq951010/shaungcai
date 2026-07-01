@@ -655,6 +655,12 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   var topFronts = frontScores.slice(0,10);
   var topBacks = backScores.slice(0,5);
 
+  // Build fast lookup maps
+  var frontScoreMap = {};
+  frontScores.forEach(function(s){ frontScoreMap[s.num] = s; });
+  var backScoreMap = {};
+  backScores.forEach(function(s){ backScoreMap[s.num] = s; });
+
   function qualityScore(front, back) {
     var s = front.slice().sort(function(a,b){return a-b;});
     var sum = s.reduce(function(a,b){return a+b;},0);
@@ -675,14 +681,14 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     if (maxTail<=2) q+=12; else if (maxTail<=3) q+=6;
     if (g.pairs.length===1) q+=10; else if (g.pairs.length>=1 && g.pairs.length<=2) q+=5;
     if (g.maxGap<=12) q+=8; else if (g.maxGap<=15) q+=4;
-    var fScore = s.reduce(function(sum,n){return sum+(frontScores.find(function(x){return x.num===n;})||{}).totalScore||0;},0);
-    var bScore = back.reduce(function(sum,n){return sum+(backScores.find(function(x){return x.num===n;})||{}).totalScore||0;},0);
+    var fScore = s.reduce(function(sum,n){var sc=frontScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
+    var bScore = back.reduce(function(sum,n){var sc=backScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
     q += Math.min(fScore*5, 20) + Math.min(bScore*8, 12);
     return Math.min(100, Math.round(q));
   }
 
   function genStrategy1() {
-    var picks = frontScores.slice(0,14).map(function(s){return s.num;});
+    var picks = frontScores.slice(0,12).map(function(s){return s.num;});
     var best = null, bestQ = -1;
     for (var a=0;a<picks.length-4;a++)
     for (var b=a+1;b<picks.length-3;b++)
@@ -690,7 +696,7 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     for (var d=c+1;d<picks.length-1;d++)
     for (var e=d+1;e<picks.length;e++) {
       var f=[picks[a],picks[b],picks[c],picks[d],picks[e]];
-      var bp = backScores.slice(0,5).map(function(s){return s.num;});
+      var bp = backScores.slice(0,4).map(function(s){return s.num;});
       for (var i=0;i<bp.length-1;i++)
       for (var j=i+1;j<bp.length;j++) {
         var b=[bp[i],bp[j]];
