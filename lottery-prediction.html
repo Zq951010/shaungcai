@@ -657,7 +657,7 @@ tr:hover td { background: var(--bg3); }
 </div>
 
 <!-- ==================== 大乐透面板 ==================== -->
-<div class="lottery-panel active" id="panel-dlt">
+<div class="lottery-panel" id="panel-dlt">
   <div style="margin-bottom:1rem"><button class="back-to-home" style="padding:0.4rem 1rem;border:1px solid var(--rule);border-radius:6px;background:var(--bg3);color:var(--ink);cursor:pointer;font-size:0.85rem">← 返回首页</button></div>
 
   <!-- 规则说明 -->
@@ -1500,24 +1500,26 @@ window.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.game-card').forEach(function(card){
     card.addEventListener('click', function(){
       var game = this.dataset.game;
-      document.querySelectorAll('.panel').forEach(function(p){ p.style.display = 'none'; });
-      document.getElementById('panel-' + game).style.display = 'block';
+      document.querySelectorAll('.lottery-panel').forEach(function(p){ p.style.display = 'none'; p.classList.remove('active'); });
+      var target = document.getElementById('panel-' + game);
+      if (target) { target.style.display = 'block'; target.classList.add('active'); }
       window.scrollTo(0,0);
     });
   });
   // Back to home
   document.querySelectorAll('.back-to-home').forEach(function(btn){
     btn.addEventListener('click', function(){
-      document.querySelectorAll('.panel').forEach(function(p){ p.style.display = 'none'; });
-      document.getElementById('panel-home').style.display = 'block';
+      document.querySelectorAll('.lottery-panel').forEach(function(p){ p.style.display = 'none'; p.classList.remove('active'); });
+      var home = document.getElementById('panel-home');
+      if (home) { home.style.display = 'block'; home.classList.add('active'); }
       window.scrollTo(0,0);
     });
   });
   // No top tab buttons - navigation is via home cards only
-  // Default show home
-  document.querySelectorAll('.panel').forEach(function(p){ p.style.display = 'none'; });
+  // Default show home only
+  document.querySelectorAll('.lottery-panel').forEach(function(p){ p.style.display = 'none'; p.classList.remove('active'); });
   var home = document.getElementById('panel-home');
-  if (home) home.style.display = 'block';
+  if (home) { home.style.display = 'block'; home.classList.add('active'); }
 })();
 </script>
 
