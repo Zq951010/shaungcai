@@ -43,6 +43,7 @@ var DLT_ZONES = [[1,12],[13,23],[24,35]];
 var DLT_BACK_ZONES = [[1,4],[5,8],[9,12]];
 
 var dltSampleHistory = [
+  '04,10,22,23,33|02,12',
   '03,11,12,21,22|06,10',
   '06,16,18,19,28|07,11',
   '10,13,19,21,30|04,05',
@@ -904,6 +905,37 @@ function gapStats(row) {
   }
   return {totalGap: totalGap, maxGap: maxGap, pairs: pairs, avgGap: totalGap/(sorted.length-1)};
 }
+
+// 计算每个号码作为连号一部分的历史频率（连号评分）
+function pairHistoryScore(num, history) {
+  var pairCount = 0, total = 0;
+  for (var i = 0; i < history.length; i++) {
+    var row = history[i];
+    if (row.indexOf(num) >= 0) {
+      total++;
+      // 检查该号码是否与同组其他号码形成连号
+      for (var j = 0; j < row.length; j++) {
+        if (Math.abs(row[j] - num) === 1) { pairCount++; break; }
+      }
+    }
+  }
+  return total ? pairCount / total : 0;
+}
+
+// 计算后区同尾组合的历史频率
+function backTailPairScore(num, history) {
+  var tailCount = 0, total = 0;
+  for (var i = 0; i < history.length; i++) {
+    var row = history[i];
+    if (row.length >= 2) {
+      total++;
+      var tail = num % 10;
+      var sameTail = row.filter(function(n){ return n % 10 === tail; });
+      if (sameTail.length >= 2) tailCount++;
+    }
+  }
+  return total ? tailCount / total : 0;
+}
 // ========== V3 Helper Functions End ==========
 
 function scoreDLTNumbers_V3(lastDraw, history) {
@@ -926,14 +958,17 @@ function scoreDLTNumbers_V3(lastDraw, history) {
     var oddAltScore = (isOdd && oddRatio <= 0.6) || (!isOdd && oddRatio >= 0.4) ? 0.8 : 0.5;
     var sizeScore = (n <= 17 && last.filter(function(x){return x<=17;}).length <= 3) || (n > 17 && last.filter(function(x){return x>17;}).length <= 3) ? 0.8 : 0.5;
     var zoneScore = ((n<=12 && last.filter(function(x){return x<=12;}).length<=2) || (n>12&&n<=23 && last.filter(function(x){return x>12&&x<=23;}).length<=2) || (n>23 && last.filter(function(x){return x>23;}).length<=2)) ? 0.8 : 0.5;
-    var neighborScore = last.some(function(x){ return Math.abs(x-n)<=1 && x!==n; }) ? 0.9 : 0.3;
+    // neighborScore 优化：结合上期邻号判断 + 该号码作为连号一部分的历史频率
+    var hasNeighbor = last.some(function(x){ return Math.abs(x-n)<=1 && x!==n; });
+    var pairScore = pairHistoryScore(n, fronts);
+    var neighborScore = hasNeighbor ? (0.6 + pairScore * 0.4) : (0.2 + pairScore * 0.2);
     var stability = 1 - Math.abs(wf - 0.15) * 3;
     scores.push({
       num: n,
       wf: wf, currentGap: currentGap, mp: mp, mpScore: mpScore, mkScore: mkScore,
       tailScore: tailScore, oddAltScore: oddAltScore, sizeScore: sizeScore, zoneScore: zoneScore,
-      neighborScore: neighborScore, stability: stability,
-      baseScore: wf*0.18 + mpScore*0.18 + tailScore*0.10 + oddAltScore*0.04 + sizeScore*0.03 + zoneScore*0.03 + neighborScore*0.05 + stability*0.05 + mkScore*0.12,
+      neighborScore: neighborScore, pairScore: pairScore, stability: stability,
+      baseScore: wf*0.17 + mpScore*0.17 + tailScore*0.09 + oddAltScore*0.04 + sizeScore*0.03 + zoneScore*0.03 + neighborScore*0.04 + pairScore*0.06 + stability*0.05 + mkScore*0.12,
       coScore: 0
     });
   }
@@ -963,7 +998,9 @@ function scoreDLTBlueNumbers_V3(lastDraw, history) {
     var mkScore = mk.pBtoA > mk.pAtoA ? 0.9 : (mk.pBtoA > 0.3 ? 0.7 : 0.4);
     var oddScore = (n%2===1 && lastB.filter(function(x){return x%2===1;}).length<=1) || (n%2===0 && lastB.filter(function(x){return x%2===0;}).length<=1) ? 0.85 : 0.5;
     var sizeScore = (n<=6 && lastB.filter(function(x){return x<=6;}).length<=1) || (n>6 && lastB.filter(function(x){return x>6;}).length<=1) ? 0.85 : 0.5;
-    scores.push({num: n, wf: wf, currentGap: currentGap, mp: mp, mpScore: mpScore, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, totalScore: wf*0.25 + mpScore*0.20 + oddScore*0.08 + sizeScore*0.08 + mkScore*0.10});
+    // 同尾组合评分：该尾数在历史上作为后区同尾出现的频率
+    var tailScore = backTailPairScore(n, backs);
+    scores.push({num: n, wf: wf, currentGap: currentGap, mp: mp, mpScore: mpScore, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, tailScore: tailScore, totalScore: wf*0.23 + mpScore*0.18 + oddScore*0.07 + sizeScore*0.07 + tailScore*0.08 + mkScore*0.10});
   }
   return scores.sort(function(a,b){return b.totalScore-a.totalScore;});
 }
@@ -1000,8 +1037,13 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     if (odd>=2 && odd<=3) q+=10; else if (odd>=1 && odd<=4) q+=5;
     if (big>=2 && big<=3) q+=10; else if (big>=1 && big<=4) q+=5;
     if (maxTail<=2) q+=12; else if (maxTail<=3) q+=6;
-    if (g.pairs.length===1) q+=10; else if (g.pairs.length>=1 && g.pairs.length<=2) q+=5;
+    if (g.pairs.length===1) q+=12; else if (g.pairs.length===2) q+=6;
     if (g.maxGap<=12) q+=8; else if (g.maxGap<=15) q+=4;
+    // 前区同尾加分：最多一对同尾是较优形态
+    var sameTailPairs = 0;
+    var tailSeen = {};
+    s.forEach(function(n){ var t=n%10; if(tailSeen[t]) sameTailPairs++; else tailSeen[t]=true; });
+    if (sameTailPairs===1) q+=5;
     var fScore = s.reduce(function(sum,n){var sc=frontScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
     var bScore = back.reduce(function(sum,n){var sc=backScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
     q += Math.min(fScore*5, 20) + Math.min(bScore*8, 12);
