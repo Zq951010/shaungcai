@@ -623,8 +623,49 @@ tr:hover td { background: var(--bg3); }
 
 <div class="container">
 
+<!-- ==================== 首页面板 ==================== -->
+<div id="panel-home" class="lottery-panel" style="display:none">
+  <div style="text-align:center;padding:2rem 0">
+    <h2 style="font-size:1.5rem;margin-bottom:0.5rem;color:var(--ink)">选择彩票玩法</h2>
+    <p style="color:var(--muted)">点击下方卡片进入对应玩法的预测分析</p>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;max-width:1000px;margin:0 auto">
+    <div class="game-card" data-game="dlt" style="background:var(--bg2);border:1px solid var(--rule);border-radius:12px;padding:1.5rem;cursor:pointer;transition:all 0.25s;text-align:center">
+      <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#fbbf24);display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;font-weight:700;color:#fff;font-size:1.1rem">DLT</div>
+      <h3 style="margin:0 0 0.25rem;color:var(--ink)">大乐透</h3>
+      <p style="margin:0;color:var(--muted);font-size:0.85rem">前区35选5 + 后区12选2</p>
+    </div>
+    <div class="game-card" data-game="ssq" style="background:var(--bg2);border:1px solid var(--rule);border-radius:12px;padding:1.5rem;cursor:pointer;transition:all 0.25s;text-align:center">
+      <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#ef4444,#f87171);display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;font-weight:700;color:#fff;font-size:1.1rem">SSQ</div>
+      <h3 style="margin:0 0 0.25rem;color:var(--ink)">双色球</h3>
+      <p style="margin:0;color:var(--muted);font-size:0.85rem">红区33选6 + 蓝区16选1</p>
+    </div>
+    <div class="game-card" data-game="kl8" style="background:var(--bg2);border:1px solid var(--rule);border-radius:12px;padding:1.5rem;cursor:pointer;transition:all 0.25s;text-align:center">
+      <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#60a5fa);display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;font-weight:700;color:#fff;font-size:1.1rem">KL8</div>
+      <h3 style="margin:0 0 0.25rem;color:var(--ink)">快乐8</h3>
+      <p style="margin:0;color:var(--muted);font-size:0.85rem">80选10 多玩法分析</p>
+    </div>
+    <div class="game-card" data-game="pl3" style="background:var(--bg2);border:1px solid var(--rule);border-radius:12px;padding:1.5rem;cursor:pointer;transition:all 0.25s;text-align:center">
+      <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#10b981,#34d399);display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;font-weight:700;color:#fff;font-size:1.1rem">PL3</div>
+      <h3 style="margin:0 0 0.25rem;color:var(--ink)">排列三</h3>
+      <p style="margin:0;color:var(--muted);font-size:0.85rem">0-9三位数字组合</p>
+    </div>
+    <div class="game-card" data-game="pl5" style="background:var(--bg2);border:1px solid var(--rule);border-radius:12px;padding:1.5rem;cursor:pointer;transition:all 0.25s;text-align:center">
+      <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#8b5cf6,#a78bfa);display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;font-weight:700;color:#fff;font-size:1.1rem">PL5</div>
+      <h3 style="margin:0 0 0.25rem;color:var(--ink)">排列五</h3>
+      <p style="margin:0;color:var(--muted);font-size:0.85rem">0-9五位数字组合</p>
+    </div>
+    <div class="game-card" data-game="method" style="background:var(--bg2);border:1px solid var(--rule);border-radius:12px;padding:1.5rem;cursor:pointer;transition:all 0.25s;text-align:center">
+      <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#6b7280,#9ca3af);display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;font-weight:700;color:#fff;font-size:1.1rem">DOC</div>
+      <h3 style="margin:0 0 0.25rem;color:var(--ink)">分析方法论</h3>
+      <p style="margin:0;color:var(--muted);font-size:0.85rem">算法模型说明文档</p>
+    </div>
+  </div>
+</div>
+
 <!-- ==================== 大乐透面板 ==================== -->
 <div class="lottery-panel active" id="panel-dlt">
+  <div style="margin-bottom:1rem"><button class="back-to-home" style="padding:0.4rem 1rem;border:1px solid var(--rule);border-radius:6px;background:var(--bg3);color:var(--ink);cursor:pointer;font-size:0.85rem">← 返回首页</button></div>
 
   <!-- 规则说明 -->
   <div class="card">
@@ -771,9 +812,10 @@ tr:hover td { background: var(--bg3); }
     <p>请输入上期开奖号码或历史数据，点击"开始分析"查看预测结果</p>
   </div>
 </div>
-
 <!-- ==================== 双色球面板 ==================== -->
 <div class="lottery-panel" id="panel-ssq">
+  <div style="margin-bottom:1rem"><button class="back-to-home" style="padding:0.4rem 1rem;border:1px solid var(--rule);border-radius:6px;background:var(--bg3);color:var(--ink);cursor:pointer;font-size:0.85rem">← 返回首页</button></div>
+
   <div class="card">
     <div class="card-title"><span class="icon">&#127942;</span> 双色球玩法规则</div>
     <div class="rule-box">
@@ -919,6 +961,7 @@ tr:hover td { background: var(--bg3); }
 
 <!-- ==================== 快乐8面板 ==================== -->
 <div class="lottery-panel" id="panel-kl8">
+  <div style="margin-bottom:1rem"><button class="back-to-home" style="padding:0.4rem 1rem;border:1px solid var(--rule);border-radius:6px;background:var(--bg3);color:var(--ink);cursor:pointer;font-size:0.85rem">← 返回首页</button></div>
   <div class="card">
     <div class="card-title"><span class="icon">&#127942;</span> 快乐8玩法规则</div>
     <div class="rule-box">
@@ -1066,6 +1109,7 @@ tr:hover td { background: var(--bg3); }
 
 <!-- ==================== 排列三面板 ==================== -->
 <div class="lottery-panel" id="panel-pl3">
+  <div style="margin-bottom:1rem"><button class="back-to-home" style="padding:0.4rem 1rem;border:1px solid var(--rule);border-radius:6px;background:var(--bg3);color:var(--ink);cursor:pointer;font-size:0.85rem">← 返回首页</button></div>
   <div class="card">
     <div class="card-title"><span class="icon">&#127942;</span> 排列三玩法规则</div>
     <div class="rule-box">
@@ -1202,6 +1246,7 @@ tr:hover td { background: var(--bg3); }
 
 <!-- ==================== 排列五面板 ==================== -->
 <div class="lottery-panel" id="panel-pl5">
+  <div style="margin-bottom:1rem"><button class="back-to-home" style="padding:0.4rem 1rem;border:1px solid var(--rule);border-radius:6px;background:var(--bg3);color:var(--ink);cursor:pointer;font-size:0.85rem">← 返回首页</button></div>
   <div class="card">
     <div class="card-title"><span class="icon">&#127942;</span> 排列五玩法规则</div>
     <div class="rule-box">
@@ -1338,6 +1383,7 @@ tr:hover td { background: var(--bg3); }
 
 <!-- ==================== 分析方法论面板 ==================== -->
 <div class="lottery-panel" id="panel-method">
+  <div style="margin-bottom:1rem"><button class="back-to-home" style="padding:0.4rem 1rem;border:1px solid var(--rule);border-radius:6px;background:var(--bg3);color:var(--ink);cursor:pointer;font-size:0.85rem">← 返回首页</button></div>
   <div class="card">
     <div class="card-title"><span class="icon">&#128218;</span> 预测分析方法论</div>
 
