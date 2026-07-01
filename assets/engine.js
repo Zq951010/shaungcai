@@ -426,6 +426,307 @@ function renderDLTHotCold(allFronts, allBacks) {
   renderDLTFreqChart(freqMap, expected);
 }
 
+// ========== Canvas Charts ==========
+function createChartCanvas(containerId, height) {
+  var container = document.getElementById(containerId);
+  if (!container) return null;
+  container.innerHTML = '';
+  var W = container.clientWidth || 700;
+  var H = height;
+  var canvas = document.createElement('canvas');
+  var dpr = window.devicePixelRatio || 1;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  container.appendChild(canvas);
+  var ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  return { canvas: canvas, ctx: ctx, width: W, height: H };
+}
+
+function renderDLTZoneChart(zoneCounts, zoneNames) {
+  var H = 300;
+  var chart = createChartCanvas('chart-dlt-zone', H);
+  if (!chart) return;
+  var ctx = chart.ctx, W = chart.width;
+  var padL = 50, padR = 20, padT = 30, padB = 40;
+  var w = W - padL - padR, h = H - padT - padB;
+  var n = zoneCounts.length;
+  var barW = w / n * 0.6;
+  var colors = ['#ef4444', '#f59e0b', '#3b82f6'];
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = '#e5e7eb';
+  ctx.lineWidth = 1;
+  for (var i = 0; i <= 5; i++) {
+    var y = padT + h - (i / 5) * h;
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + w, y);
+    ctx.stroke();
+  }
+
+  for (var i = 0; i < n; i++) {
+    var x = padL + (i + 0.5) * (w / n);
+    var idx = n - 1 - i;
+    var startY = padT + h;
+    for (var z = 0; z < 3; z++) {
+      var bh = (zoneCounts[idx][z] / 5) * h;
+      ctx.fillStyle = colors[z];
+      ctx.fillRect(x - barW / 2, startY - bh, barW, bh);
+      startY -= bh;
+    }
+  }
+
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  for (var i = 0; i < n; i++) {
+    var x = padL + (i + 0.5) * (w / n);
+    ctx.fillText((n - i) + '期前', x, H - 10);
+  }
+
+  ctx.textAlign = 'right';
+  for (var i = 0; i <= 5; i++) {
+    var y = padT + h - (i / 5) * h;
+    ctx.fillText(i, padL - 8, y + 4);
+  }
+
+  ctx.textAlign = 'left';
+  for (var z = 0; z < 3; z++) {
+    ctx.fillStyle = colors[z];
+    ctx.fillRect(padL + z * 100, 8, 12, 12);
+    ctx.fillStyle = '#1f2937';
+    ctx.fillText(zoneNames[z], padL + z * 100 + 18, 18);
+  }
+}
+
+function renderDLTSumChart(sums) {
+  var H = 260;
+  var chart = createChartCanvas('chart-dlt-sum', H);
+  if (!chart) return;
+  var ctx = chart.ctx, W = chart.width;
+  var padL = 50, padR = 20, padT = 30, padB = 40;
+  var w = W - padL - padR, h = H - padT - padB;
+  var n = sums.length;
+  var minS = Math.min.apply(null, sums);
+  var maxS = Math.max.apply(null, sums);
+  var range = maxS - minS || 1;
+  var yMin = Math.max(0, minS - range * 0.2);
+  var yMax = maxS + range * 0.2;
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = '#e5e7eb';
+  ctx.lineWidth = 1;
+  var steps = 5;
+  for (var i = 0; i <= steps; i++) {
+    var y = padT + h - (i / steps) * h;
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + w, y);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = '#f59e0b';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (var i = 0; i < n; i++) {
+    var x = padL + (i / (n - 1 || 1)) * w;
+    var y = padT + h - ((sums[n - 1 - i] - yMin) / (yMax - yMin)) * h;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = '#f59e0b';
+  for (var i = 0; i < n; i++) {
+    var x = padL + (i / (n - 1 || 1)) * w;
+    var y = padT + h - ((sums[n - 1 - i] - yMin) / (yMax - yMin)) * h;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  var xStep = Math.max(1, Math.floor(n / 6));
+  for (var i = 0; i < n; i += xStep) {
+    var x = padL + (i / (n - 1 || 1)) * w;
+    ctx.fillText((n - i) + '期前', x, H - 10);
+  }
+
+  ctx.textAlign = 'right';
+  for (var i = 0; i <= steps; i++) {
+    var y = padT + h - (i / steps) * h;
+    var val = Math.round(yMin + (i / steps) * (yMax - yMin));
+    ctx.fillText(val, padL - 8, y + 4);
+  }
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#1f2937';
+  ctx.fillText('前区和值走势', padL, 20);
+}
+
+function renderDLTSpanChart(spans) {
+  var H = 260;
+  var chart = createChartCanvas('chart-dlt-span', H);
+  if (!chart) return;
+  var ctx = chart.ctx, W = chart.width;
+  var padL = 50, padR = 20, padT = 30, padB = 40;
+  var w = W - padL - padR, h = H - padT - padB;
+  var n = spans.length;
+  var minS = Math.min.apply(null, spans);
+  var maxS = Math.max.apply(null, spans);
+  var range = maxS - minS || 1;
+  var yMin = Math.max(0, minS - range * 0.2);
+  var yMax = maxS + range * 0.2;
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = '#e5e7eb';
+  ctx.lineWidth = 1;
+  var steps = 5;
+  for (var i = 0; i <= steps; i++) {
+    var y = padT + h - (i / steps) * h;
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + w, y);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = '#10b981';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (var i = 0; i < n; i++) {
+    var x = padL + (i / (n - 1 || 1)) * w;
+    var y = padT + h - ((spans[n - 1 - i] - yMin) / (yMax - yMin)) * h;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.fillStyle = '#10b981';
+  for (var i = 0; i < n; i++) {
+    var x = padL + (i / (n - 1 || 1)) * w;
+    var y = padT + h - ((spans[n - 1 - i] - yMin) / (yMax - yMin)) * h;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'center';
+  var xStep = Math.max(1, Math.floor(n / 6));
+  for (var i = 0; i < n; i += xStep) {
+    var x = padL + (i / (n - 1 || 1)) * w;
+    ctx.fillText((n - i) + '期前', x, H - 10);
+  }
+
+  ctx.textAlign = 'right';
+  for (var i = 0; i <= steps; i++) {
+    var y = padT + h - (i / steps) * h;
+    var val = Math.round(yMin + (i / steps) * (yMax - yMin));
+    ctx.fillText(val, padL - 8, y + 4);
+  }
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#1f2937';
+  ctx.fillText('前区跨度走势', padL, 20);
+}
+
+function renderDLTFreqChart(freqMap, expected) {
+  var H = 300;
+  var chart = createChartCanvas('chart-dlt-freq', H);
+  if (!chart) return;
+  var ctx = chart.ctx, W = chart.width;
+  var padL = 40, padR = 20, padT = 30, padB = 50;
+  var w = W - padL - padR, h = H - padT - padB;
+  var n = 35;
+  var maxF = 0;
+  for (var i = 1; i <= 35; i++) if (freqMap[i] > maxF) maxF = freqMap[i];
+  var yMax = Math.max(maxF, expected * 1.5) + 1;
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = '#e5e7eb';
+  ctx.lineWidth = 1;
+  var steps = 5;
+  for (var i = 0; i <= steps; i++) {
+    var y = padT + h - (i / steps) * h;
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + w, y);
+    ctx.stroke();
+  }
+
+  var expY = padT + h - (expected / yMax) * h;
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 1;
+  if (ctx.setLineDash) {
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(padL, expY);
+    ctx.lineTo(padL + w, expY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  var barW = w / n * 0.7;
+  for (var i = 1; i <= n; i++) {
+    var x = padL + (i - 0.5) * (w / n);
+    var bh = (freqMap[i] / yMax) * h;
+    ctx.fillStyle = freqMap[i] >= expected * 1.3 ? '#ef4444' : (freqMap[i] <= expected * 0.7 ? '#3b82f6' : '#9ca3af');
+    ctx.fillRect(x - barW / 2, padT + h - bh, barW, bh);
+  }
+
+  ctx.fillStyle = '#6b7280';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  for (var i = 1; i <= n; i += 2) {
+    var x = padL + (i - 0.5) * (w / n);
+    ctx.fillText(String(i).padStart(2, '0'), x, H - 15);
+  }
+
+  ctx.textAlign = 'right';
+  for (var i = 0; i <= steps; i++) {
+    var y = padT + h - (i / steps) * h;
+    var val = Math.round((i / steps) * yMax);
+    ctx.fillText(val, padL - 6, y + 3);
+  }
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ef4444';
+  ctx.fillRect(padL, 8, 12, 12);
+  ctx.fillStyle = '#1f2937';
+  ctx.fillText('热号(>' + (expected * 1.3).toFixed(1) + ')', padL + 18, 18);
+  ctx.fillStyle = '#9ca3af';
+  ctx.fillRect(padL + 100, 8, 12, 12);
+  ctx.fillStyle = '#1f2937';
+  ctx.fillText('温号', padL + 118, 18);
+  ctx.fillStyle = '#3b82f6';
+  ctx.fillRect(padL + 170, 8, 12, 12);
+  ctx.fillStyle = '#1f2937';
+  ctx.fillText('冷号(<' + (expected * 0.7).toFixed(1) + ')', padL + 188, 18);
+  if (ctx.setLineDash) {
+    ctx.strokeStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.moveTo(padL + 270, 14);
+    ctx.lineTo(padL + 290, 14);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#1f2937';
+  ctx.fillText('期望值(' + expected.toFixed(1) + ')', padL + 298, 18);
+}
+
 function renderDLTDanTuo(last, allFronts, allBacks) {
   var history = allFronts.map(function(f,i){ return f.concat(allBacks[i]); });
   var lastDraw = last.front.concat(last.back);
