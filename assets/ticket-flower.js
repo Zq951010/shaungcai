@@ -135,12 +135,11 @@ function parseGroups(flowerStr, numStr) {
 }
 
 // ==================== 号码评分 ====================
+// 核心原则：按位置一对一匹配。票花第i个字符只评价号码第i个号码。
+// 大乐透：票花1-4位对应前区号码位置关系，5-6位对应后区。
+// 排列三/五：票花按位对应各位数字。
 function scoreNumbersByFlower(numbers, flowerInfo, lotteryType) {
   var scores = [];
-  var totalFlowerScore = 0;
-  for (var i = 0; i < flowerInfo.length; i++) {
-    totalFlowerScore += Math.abs(flowerInfo[i].score);
-  }
 
   for (var i = 0; i < numbers.length; i++) {
     var num = numbers[i];
@@ -149,10 +148,11 @@ function scoreNumbersByFlower(numbers, flowerInfo, lotteryType) {
     var isDan = false;
     var isExclude = false;
 
-    for (var j = 0; j < flowerInfo.length; j++) {
-      var f = flowerInfo[j];
-      var match = false;
+    // 按位置获取对应的票花字符（一对一匹配）
+    var f = flowerInfo[i];
+    var match = false;
 
+    if (f) {
       switch (f.char) {
         case 'A': case 'a':
           if (lotteryType === 'dlt' && num <= 12) match = true;
@@ -242,12 +242,10 @@ function scoreNumbersByFlower(numbers, flowerInfo, lotteryType) {
           reasons.push('区间范围内');
           break;
         case 'P': case 'p':
-          if (lotteryType === 'pl3' || lotteryType === 'pl5') {
-            if (i === numbers.length - 1) match = true;
-          }
+          if (lotteryType === 'pl3' || lotteryType === 'pl5') match = true;
           break;
         case 'U': case 'u':
-          if (i === numbers.length - 1) match = true;
+          match = true;
           break;
       }
 
