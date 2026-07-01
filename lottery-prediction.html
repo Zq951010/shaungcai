@@ -610,14 +610,7 @@ tr:hover td { background: var(--bg3); }
 <header class="header">
   <div class="header-inner">
     <div class="logo">Lottery Analyzer <span>预测分析平台</span></div>
-    <nav class="tab-nav">
-      <button class="tab-btn active" data-tab="dlt">大乐透</button>
-      <button class="tab-btn" data-tab="ssq">双色球</button>
-      <button class="tab-btn" data-tab="kl8">快乐8</button>
-      <button class="tab-btn" data-tab="pl3">排列三</button>
-      <button class="tab-btn" data-tab="pl5">排列五</button>
-      <button class="tab-btn" data-tab="method">分析方法论</button>
-    </nav>
+    <!-- 顶部标签入口已取消，改为首页卡片点击进入 -->
   </div>
 </header>
 
@@ -1472,19 +1465,7 @@ tr:hover td { background: var(--bg3); }
 <script src="assets/auto-review.js?v=5"></script>
 <script src="assets/ticket-flower.js?v=1"></script>
 <script>
-// Tab switching
-document.querySelectorAll('.tab-btn').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
-    document.querySelectorAll('.lottery-panel').forEach(function(p) { p.classList.remove('active'); });
-    btn.classList.add('active');
-    document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-    // Trigger chart resize
-    setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 100);
-  });
-});
-
-// Auto-load sample data and analyze on page load
+// Auto-load sample data and analyze on page load (analysis runs in background)
 window.addEventListener('DOMContentLoaded', function() {
   loadDLTSample();
   loadSSQSample();
@@ -1532,21 +1513,7 @@ window.addEventListener('DOMContentLoaded', function() {
       window.scrollTo(0,0);
     });
   });
-  // Tab nav buttons also route through panels
-  document.querySelectorAll('.tab-btn').forEach(function(btn){
-    var origClick = btn.onclick;
-    btn.addEventListener('click', function(){
-      var target = this.dataset.target || this.getAttribute('onclick');
-      if (target && target.indexOf('showPanel') >= 0) {
-        var m = target.match(/showPanel\('([^']+)'\)/);
-        if (m) {
-          document.querySelectorAll('.panel').forEach(function(p){ p.style.display = 'none'; });
-          document.getElementById('panel-' + m[1]).style.display = 'block';
-          window.scrollTo(0,0);
-        }
-      }
-    });
-  });
+  // No top tab buttons - navigation is via home cards only
   // Default show home
   document.querySelectorAll('.panel').forEach(function(p){ p.style.display = 'none'; });
   var home = document.getElementById('panel-home');
