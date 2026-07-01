@@ -264,13 +264,18 @@ function scoreNumbersByFlower(numbers, flowerInfo, lotteryType) {
     var levelColor = 'var(--muted)';
 
     if (isExclude) {
+      finalScore -= 10;
+    }
+    if (isDan) {
+      finalScore += 5;
+    }
+
+    if (isExclude && finalScore < 0) {
       level = '建议排除';
       levelColor = 'var(--accent4)';
-      finalScore -= 10;
-    } else if (isDan) {
+    } else if (isDan && finalScore > 0) {
       level = '高潜力（胆码）';
       levelColor = 'var(--gold)';
-      finalScore += 5;
     } else if (finalScore >= 15) {
       level = '高潜力';
       levelColor = 'var(--accent3)';
@@ -280,7 +285,7 @@ function scoreNumbersByFlower(numbers, flowerInfo, lotteryType) {
     } else if (finalScore > 0) {
       level = '略有潜力';
       levelColor = 'var(--accent2)';
-    } else if (finalScore <= 0) {
+    } else {
       level = '潜力较低';
       levelColor = 'var(--muted)';
     }
@@ -494,8 +499,8 @@ function renderMultiFlowerResult(containerId, groups, multiResult, lotteryType) 
   for (var i = 0; i < multiResult.length; i++) {
     var s = multiResult[i];
     var isTop = i < 3;
-    var isDan = s.danCount > 0;
-    var isExclude = s.excludeCount > 0;
+    var isDan = s.danCount > 0 && s.finalScore > 0;
+    var isExclude = s.excludeCount >= s.count / 2 || (s.excludeCount > 0 && s.finalScore < 0);
     var ballClass = isExclude ? 'gray' : isDan ? 'gold' : isTop ? 'green' : 'red';
     var badge = '';
     if (s.count >= 3) badge = '<span style="background:var(--accent);color:#000;padding:0.05rem 0.3rem;border-radius:4px;font-size:0.65rem;margin-left:0.3rem;font-weight:700">多组共识</span>';
@@ -536,9 +541,9 @@ function renderMultiFlowerResult(containerId, groups, multiResult, lotteryType) 
   html += '</div>';
 
   // 总结
-  var topNums = multiResult.filter(function(s){return s.finalScore >= 10 && s.excludeCount === 0;}).slice(0, 10);
-  var danNums = multiResult.filter(function(s){return s.danCount >= 1 && s.excludeCount === 0;});
-  var excludeNums = multiResult.filter(function(s){return s.excludeCount >= 1;});
+  var topNums = multiResult.filter(function(s){return s.finalScore >= 10 && s.danCount === 0 && !s.excludeCount >= s.count / 2;}).slice(0, 10);
+  var danNums = multiResult.filter(function(s){return s.danCount >= 1 && s.finalScore > 0;});
+  var excludeNums = multiResult.filter(function(s){return s.excludeCount >= s.count / 2 || (s.excludeCount > 0 && s.finalScore < 0);});
 
   html += '<div style="background:var(--bg2);border:1px solid var(--rule);border-radius:8px;padding:0.75rem">';
   html += '<div style="font-weight:700;color:var(--accent);margin-bottom:0.5rem">多组综合总结</div>';
