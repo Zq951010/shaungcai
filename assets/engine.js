@@ -1028,6 +1028,14 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   var backScoreMap = {};
   backScores.forEach(function(s){ backScoreMap[s.num] = s; });
 
+  // 上期前区/后区号码，用于回归分析
+  var lastFront = last.slice(0, 5);
+  var lastBack = last.slice(5);
+  var lastOddRatio = lastFront.filter(function(x){return x%2===1;}).length / 5;
+  var lastBigRatio = lastFront.filter(function(x){return x>17;}).length / 5;
+  var lastHasPair = gapStats(lastFront.slice().sort(function(a,b){return a-b;})).pairs.length >= 1;
+  var lastBackSameTail = lastBack.length >= 2 && (lastBack[0] % 10) === (lastBack[1] % 10);
+
   function qualityScore(front, back) {
     var s = front.slice().sort(function(a,b){return a-b;});
     var sum = s.reduce(function(a,b){return a+b;},0);
@@ -1053,6 +1061,22 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     var tailSeen = {};
     s.forEach(function(n){ var t=n%10; if(tailSeen[t]) sameTailPairs++; else tailSeen[t]=true; });
     if (sameTailPairs===1) q+=5;
+
+    // ========== 基于上期特征的动态回归调整 ==========
+    // 1. 奇偶回归：上期极端则下期强烈反向回归
+    if ((lastOddRatio >= 0.8 && odd <= 2) || (lastOddRatio <= 0.2 && odd >= 3)) q += 4;
+    else if ((lastOddRatio >= 0.6 && odd <= 2) || (lastOddRatio <= 0.4 && odd >= 3)) q += 2;
+    // 2. 大小回归：上期极端则下期反向回归
+    if ((lastBigRatio >= 0.8 && big <= 2) || (lastBigRatio <= 0.2 && big >= 3)) q += 4;
+    else if ((lastBigRatio >= 0.6 && big <= 2) || (lastBigRatio <= 0.4 && big >= 3)) q += 2;
+    // 3. 连号延续：上期有连号则下期有连号适当加分（连号有一定惯性）
+    if (lastHasPair && g.pairs.length >= 1) q += 3;
+    // 4. 后区同尾避免：上期后区同尾则下期优先不同尾
+    if (lastBackSameTail) {
+      var backTailSame = (back[0] % 10) === (back[1] % 10);
+      if (!backTailSame) q += 5;
+    }
+
     var fScore = s.reduce(function(sum,n){var sc=frontScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
     var bScore = back.reduce(function(sum,n){var sc=backScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
     q += Math.min(fScore*5, 20) + Math.min(bScore*8, 12);
@@ -1220,7 +1244,7 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   });
 
   var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V3 严谨模型推荐</h3>';
-  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·共现矩阵·马尔可夫转移·尾数分散·区间均衡·连号间距·邻号·稳定性 九维评分体系</p>';
+  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·共现矩阵·马尔可夫转移·尾数分散·区间均衡·连号历史·邻号·奇偶回归·大小均衡·稳定性 十一维评分体系（含上期特征动态回归）</p>';
 
   var strategies = [
     {name:'严格约束优化', desc:'在Top14热号中遍历所有组合，通过硬性约束（和值/跨度/区间/奇偶/大小/尾数/连号）筛选最高分', combos:s1},
@@ -2691,7 +2715,7 @@ function renderKL8AllPlayTypes_V2(last, history) {
   }
 
   var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V2 全玩法推荐模型</h3>';
-  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·马尔可夫转移·区间均衡·奇偶均衡·大小均衡·尾数分散·连号分析·稳定性 九维评分体系</p>';
+  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·马尔可夫转移·区间均衡·奇偶均衡·大小均衡·尾数分散·连号历史·稳定性 十维评分体系（含上期特征动态回归）</p>';
 
   var playTypeNames = ['一','二','三','四','五','六','七','八','九','十'];
 

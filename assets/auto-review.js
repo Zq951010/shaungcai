@@ -299,6 +299,13 @@ function smartRecommendDLT(history, lastDraw) {
     }
   }
 
+  // 分析上期前区特征
+  var lastFrontSorted = lastDraw.front.slice().sort(function(a,b){return a-b;});
+  var lastHasPair = false;
+  for (var i = 0; i < lastFrontSorted.length - 1; i++) {
+    if (lastFrontSorted[i+1] - lastFrontSorted[i] === 1) { lastHasPair = true; break; }
+  }
+
   // 后区胆拖
   var backFused = [];
   for (var n = 1; n <= 12; n++) {
@@ -313,8 +320,32 @@ function smartRecommendDLT(history, lastDraw) {
   backFused.sort(function(a, b) { return b.score - a.score; });
   var backDan = backFused[0].num;
   var backTuoma = [];
+  // 同尾避免：如果上期后区同尾，下期优先不同尾组合
+  var lastBackSameTail = lastDraw.back.length >= 2 && (lastDraw.back[0] % 10) === (lastDraw.back[1] % 10);
   for (var i = 1; i < backFused.length && backTuoma.length < 3; i++) {
+    if (lastBackSameTail && (backFused[i].num % 10) === (backDan % 10)) continue;
     backTuoma.push(backFused[i].num);
+  }
+  // 如果同尾避免导致拖码不足，补充回来
+  for (var i = 1; i < backFused.length && backTuoma.length < 3; i++) {
+    if (backTuoma.indexOf(backFused[i].num) < 0) backTuoma.push(backFused[i].num);
+  }
+
+  // 如果上期有连号，对拖码池按"连号潜力"重新排序（优先可与胆码形成连号的拖码）
+  if (lastHasPair) {
+    tuomaPool.sort(function(a, b) {
+      var aPair = 0, bPair = 0;
+      for (var i = 0; i < danma.length; i++) {
+        if (Math.abs(a - danma[i]) === 1) aPair++;
+        if (Math.abs(b - danma[i]) === 1) bPair++;
+      }
+      // 同时考虑拖码之间是否能形成连号
+      for (var i = 0; i < tuomaPool.length; i++) {
+        if (Math.abs(a - tuomaPool[i]) === 1) aPair++;
+        if (Math.abs(b - tuomaPool[i]) === 1) bPair++;
+      }
+      return bPair - aPair;
+    });
   }
 
   // 生成3组方案
