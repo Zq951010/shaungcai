@@ -766,6 +766,14 @@ function renderPL3Recommend_V2(last, history) {
           if (mb !== ma) return mb - ma;
           return b.total - a.total;
         });
+      } else if (strategy === 'formula') {
+        scores.sort(function(a, b) {
+          // 优先选择未被公式命中的号码
+          var aKilled = a.reasons.some(function(r){ return r.indexOf('公式杀号') >= 0; }) ? 1 : 0;
+          var bKilled = b.reasons.some(function(r){ return r.indexOf('公式杀号') >= 0; }) ? 1 : 0;
+          if (aKilled !== bKilled) return aKilled - bKilled;
+          return b.total - a.total;
+        });
       } else {
         scores.sort(function(a, b) { return b.total - a.total; });
       }
@@ -801,7 +809,8 @@ function renderPL3Recommend_V2(last, history) {
     { key: 'balanced', name: '混合平衡' }
   ];
 
-  var html = '<div style="margin-bottom:1rem"><strong>V2 位置独立评分推荐</strong></div>';
+  var html = '<div style="margin-bottom:1rem"><strong>V2 十维评分推荐（含4套专用选号公式）</strong></div>';
+  html += '<div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.5rem">公式来源：尾数相杀法(82%) · 对位差杀(93%) · 跨位和值杀(92%) · 三期跨度杀 · 奇偶反向</div>';
 
   for (var s = 0; s < strategies.length; s++) {
     var strat = strategies[s];
@@ -1428,6 +1437,14 @@ function renderPL5Recommend_V2(last, history) {
           if (mb !== ma) return mb - ma;
           return b.total - a.total;
         });
+      } else if (strategy === 'formula') {
+        scores.sort(function(a, b) {
+          // 优先选择未被公式命中的号码
+          var aKilled = a.reasons.some(function(r){ return r.indexOf('公式杀号') >= 0; }) ? 1 : 0;
+          var bKilled = b.reasons.some(function(r){ return r.indexOf('公式杀号') >= 0; }) ? 1 : 0;
+          if (aKilled !== bKilled) return aKilled - bKilled;
+          return b.total - a.total;
+        });
       } else {
         scores.sort(function(a, b) { return b.total - a.total; });
       }
@@ -1460,10 +1477,12 @@ function renderPL5Recommend_V2(last, history) {
     { key: 'miss', name: '遗漏回补' },
     { key: 'markov', name: '马尔可夫转移' },
     { key: 'neighbor', name: '邻号追踪' },
+    { key: 'formula', name: '公式杀号排除' },
     { key: 'balanced', name: '混合平衡' }
   ];
 
-  var html = '<div style="margin-bottom:1rem"><strong>V2 位置独立评分推荐</strong></div>';
+  var html = '<div style="margin-bottom:1rem"><strong>V2 十维评分推荐（含4套专用选号公式）</strong></div>';
+  html += '<div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.5rem">公式来源：尾数相杀法(82%) · 对位差杀(93%) · 跨位和值杀(92%) · 三期跨度杀 · 奇偶反向</div>';
 
   for (var s = 0; s < strategies.length; s++) {
     var strat = strategies[s];
