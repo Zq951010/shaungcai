@@ -955,7 +955,16 @@ function scoreDLTNumbers_V3(lastDraw, history) {
     var tailScore = 1 - Math.abs(tailStats(fronts)[tail] - 0.1) * 5;
     var isOdd = n % 2 === 1;
     var oddRatio = last.filter(function(x){return x%2===1;}).length / 5;
-    var oddAltScore = (isOdd && oddRatio <= 0.6) || (!isOdd && oddRatio >= 0.4) ? 0.8 : 0.5;
+    var oddAltScore;
+    if (oddRatio >= 0.8) {
+      // 上期奇数极多，下期倾向偶数（回归）
+      oddAltScore = isOdd ? 0.3 : 0.95;
+    } else if (oddRatio <= 0.2) {
+      // 上期奇数极少，下期倾向奇数（回归）
+      oddAltScore = isOdd ? 0.95 : 0.3;
+    } else {
+      oddAltScore = (isOdd && oddRatio <= 0.6) || (!isOdd && oddRatio >= 0.4) ? 0.8 : 0.5;
+    }
     var sizeScore = (n <= 17 && last.filter(function(x){return x<=17;}).length <= 3) || (n > 17 && last.filter(function(x){return x>17;}).length <= 3) ? 0.8 : 0.5;
     var zoneScore = ((n<=12 && last.filter(function(x){return x<=12;}).length<=2) || (n>12&&n<=23 && last.filter(function(x){return x>12&&x<=23;}).length<=2) || (n>23 && last.filter(function(x){return x>23;}).length<=2)) ? 0.8 : 0.5;
     // neighborScore 优化：结合上期邻号判断 + 该号码作为连号一部分的历史频率
@@ -2193,6 +2202,7 @@ function renderSSQTail(allReds) {
 var KL8_ZONES = [[1,20],[21,40],[41,60],[61,80]];
 
 var kl8SampleHistory = [
+  '04,05,11,16,17,19,20,26,37,44,46,47,51,55,61,63,66,68,70,75',
   '01,02,08,13,16,18,19,30,33,37,39,40,56,57,63,69,71,73,76,78',
   '02,04,06,09,13,26,32,36,38,41,44,47,56,58,60,69,72,76,78,80',
   '04,05,08,12,22,23,26,27,35,39,47,50,56,58,60,61,66,70,71,77',
@@ -2573,9 +2583,12 @@ function scoreKL8Numbers(last, history) {
       }
     }
 
+    // KL8连号历史频率评分
+    var consecutiveScore = pairHistoryScore(n, history);
+
     var stability = 1 - Math.abs(wf - 0.25) * 3;
 
-    var totalScore = wf * 0.20 + mpScore * 0.18 + mkScore * 0.12 + zoneScore * 0.12 + oddEvenScore * 0.10 + bigSmallScore * 0.10 + tailScore * 0.08 + neighborScore * 0.05 + stability * 0.05;
+    var totalScore = wf * 0.19 + mpScore * 0.17 + mkScore * 0.12 + zoneScore * 0.11 + oddEvenScore * 0.10 + bigSmallScore * 0.10 + tailScore * 0.08 + neighborScore * 0.04 + stability * 0.05 + consecutiveScore * 0.04;
 
     var reasons = [];
     if (wf > 0.25) reasons.push('高频');
@@ -2586,6 +2599,7 @@ function scoreKL8Numbers(last, history) {
     if (bigSmallScore > 0.7) reasons.push('大小');
     if (tailScore > 0.7) reasons.push('尾数');
     if (neighborScore > 0.7) reasons.push('邻号');
+    if (consecutiveScore > 0.5) reasons.push('连号');
     if (stability > 0.7) reasons.push('稳定');
 
     scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, oddEvenScore: oddEvenScore, bigSmallScore: bigSmallScore, tailScore: tailScore, neighborScore: neighborScore, stability: stability, totalScore: totalScore, reasons: reasons });

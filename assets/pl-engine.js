@@ -501,6 +501,27 @@ function markovProb(num, history) {
   return transitions > 0 ? matches / transitions : 0.1;
 }
 
+function pl3PatternBoost(n, pos, last) {
+  var sortedLast = last.slice().sort(function(a,b){return a-b;});
+  var isGroup3 = sortedLast[0] === sortedLast[1] || sortedLast[1] === sortedLast[2];
+  var isStraight = sortedLast[2] - sortedLast[1] === 1 && sortedLast[1] - sortedLast[0] === 1;
+  if (isGroup3 && n === last[pos]) return 3;
+  if (isStraight && Math.abs(n - last[pos]) <= 1) return 2;
+  return 0;
+}
+
+function pl5PatternBoost(n, pos, last) {
+  var freq = {};
+  for (var i = 0; i < last.length; i++) {
+    freq[last[i]] = (freq[last[i]] || 0) + 1;
+  }
+  // 重号/对子形态延续：上期该位置数字在其他位置也出现过
+  if (n === last[pos] && freq[n] >= 2) return 3;
+  // 邻号延续
+  if (Math.abs(n - last[pos]) <= 1) return 1;
+  return 0;
+}
+
 function scorePL3Position(pos, last, history) {
   var posHistory = [];
   for (var i = 0; i < history.length; i++) {
@@ -516,32 +537,32 @@ function scorePL3Position(pos, last, history) {
   for (var n = 0; n <= 9; n++) {
     var score = { num: n, total: 0, reasons: [] };
 
-    // 1. weighted frequency (25%)
+    // 1. weighted frequency (24%)
     var wfreq = weightedFreq(n, [posHistory], Math.max(3, Math.floor(totalPeriods / 3)));
-    var freqScore = Math.min(25, (wfreq / Math.max(0.001, expected / totalPeriods)) * 25);
+    var freqScore = Math.min(24, (wfreq / Math.max(0.001, expected / totalPeriods)) * 24);
     if (wfreq >= (expected / totalPeriods) * 1.3) score.reasons.push('高频热号');
     else if (wfreq >= (expected / totalPeriods) * 0.8) score.reasons.push('温号稳定');
     else score.reasons.push('低频冷号');
     score.total += freqScore;
 
-    // 2. miss percentile (20%)
+    // 2. miss percentile (19%)
     var missPerc = getMissPercentile(n, [posHistory]);
-    var missScore = 20 * (1 - missPerc);
+    var missScore = 19 * (1 - missPerc);
     if (missPerc > 0.7) score.reasons.push('遗漏回补');
     else if (missPerc < 0.3) score.reasons.push('近期活跃');
     score.total += missScore;
 
-    // 3. markov transition (15%)
+    // 3. markov transition (14%)
     var mp = markovProb(n, [posHistory]);
-    var markovScore = Math.min(15, mp * 15 * 10);
+    var markovScore = Math.min(14, mp * 14 * 10);
     if (mp > 0.15) score.reasons.push('马尔可夫强关联');
     score.total += markovScore;
 
-    // 4. neighbor association (15%)
+    // 4. neighbor association (14%)
     var neighborScore = 0;
     var lastVal = lastPos;
     if (Math.abs(n - lastVal) === 1) {
-      neighborScore = 15;
+      neighborScore = 14;
       score.reasons.push('邻号关联');
     } else if (Math.abs(n - lastVal) === 2) {
       neighborScore = 7;
@@ -589,6 +610,11 @@ function scorePL3Position(pos, last, history) {
       score.reasons.push('大小交替');
     }
     score.total += bsScore;
+
+    // 8. pattern boost (4%): 形态延续评分
+    var patternScore = pl3PatternBoost(n, pos, last);
+    if (patternScore > 0) score.reasons.push('形态延续');
+    score.total += patternScore;
 
     scores.push(score);
   }
@@ -1139,32 +1165,32 @@ function scorePL5Position(pos, last, history) {
   for (var n = 0; n <= 9; n++) {
     var score = { num: n, total: 0, reasons: [] };
 
-    // 1. weighted frequency (25%)
+    // 1. weighted frequency (24%)
     var wfreq = weightedFreq(n, [posHistory], Math.max(3, Math.floor(totalPeriods / 3)));
-    var freqScore = Math.min(25, (wfreq / Math.max(0.001, expected / totalPeriods)) * 25);
+    var freqScore = Math.min(24, (wfreq / Math.max(0.001, expected / totalPeriods)) * 24);
     if (wfreq >= (expected / totalPeriods) * 1.3) score.reasons.push('高频热号');
     else if (wfreq >= (expected / totalPeriods) * 0.8) score.reasons.push('温号稳定');
     else score.reasons.push('低频冷号');
     score.total += freqScore;
 
-    // 2. miss percentile (20%)
+    // 2. miss percentile (19%)
     var missPerc = getMissPercentile(n, [posHistory]);
-    var missScore = 20 * (1 - missPerc);
+    var missScore = 19 * (1 - missPerc);
     if (missPerc > 0.7) score.reasons.push('遗漏回补');
     else if (missPerc < 0.3) score.reasons.push('近期活跃');
     score.total += missScore;
 
-    // 3. markov transition (15%)
+    // 3. markov transition (14%)
     var mp = markovProb(n, [posHistory]);
-    var markovScore = Math.min(15, mp * 15 * 10);
+    var markovScore = Math.min(14, mp * 14 * 10);
     if (mp > 0.15) score.reasons.push('马尔可夫强关联');
     score.total += markovScore;
 
-    // 4. neighbor association (15%)
+    // 4. neighbor association (14%)
     var neighborScore = 0;
     var lastVal = lastPos;
     if (Math.abs(n - lastVal) === 1) {
-      neighborScore = 15;
+      neighborScore = 14;
       score.reasons.push('邻号关联');
     } else if (Math.abs(n - lastVal) === 2) {
       neighborScore = 7;
@@ -1212,6 +1238,11 @@ function scorePL5Position(pos, last, history) {
       score.reasons.push('大小交替');
     }
     score.total += bsScore;
+
+    // 8. pattern boost (4%): 形态延续评分
+    var patternScore = pl5PatternBoost(n, pos, last);
+    if (patternScore > 0) score.reasons.push('形态延续');
+    score.total += patternScore;
 
     scores.push(score);
   }
