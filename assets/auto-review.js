@@ -475,6 +475,29 @@ function smartRecommendSSQ(history, lastDraw) {
     }
   }
 
+  // 分析上期前区特征
+  var lastRedSorted = lastDraw.red.slice().sort(function(a,b){return a-b;});
+  var lastHasPair = false;
+  for (var i = 0; i < lastRedSorted.length - 1; i++) {
+    if (lastRedSorted[i+1] - lastRedSorted[i] === 1) { lastHasPair = true; break; }
+  }
+
+  // 如果上期有连号，对拖码池按"连号潜力"重新排序（优先可与胆码形成连号的拖码）
+  if (lastHasPair) {
+    tuomaPool.sort(function(a, b) {
+      var aPair = 0, bPair = 0;
+      for (var i = 0; i < danma.length; i++) {
+        if (Math.abs(a - danma[i]) === 1) aPair++;
+        if (Math.abs(b - danma[i]) === 1) bPair++;
+      }
+      for (var i = 0; i < tuomaPool.length; i++) {
+        if (Math.abs(a - tuomaPool[i]) === 1) aPair++;
+        if (Math.abs(b - tuomaPool[i]) === 1) bPair++;
+      }
+      return bPair - aPair;
+    });
+  }
+
   // 蓝球：取融合分最高的1个
   var blueMarkov = markovTransitionProb(allBlues.map(function(b) { return [b]; }), [lastDraw.blue], 16, 1);
   var blueCooc = cooccurrenceAnalysis(allBlues.map(function(b) { return [b]; }), 16);

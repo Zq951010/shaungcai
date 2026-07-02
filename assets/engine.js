@@ -1685,6 +1685,7 @@ function renderSSQDanTuo(last, allReds, allBlues) {
 
 function scoreSSQNumbers(last, allReds) {
   var scores = [];
+  var co = buildCoOccurrence(allReds);
   for (var n = 1; n <= 33; n++) {
     var wf = weightedFreq(n, allReds, 10);
     var dist = getMissDistribution(n, allReds);
@@ -1706,6 +1707,30 @@ function scoreSSQNumbers(last, allReds) {
     var zoneAvg = recentZoneCounts[zoneIdx] / recentN;
     var zoneScore = zoneAvg < 1.5 ? 0.9 : zoneAvg < 2 ? 0.7 : 0.4;
 
+    var tail = n % 10;
+    var tails = [0,0,0,0,0,0,0,0,0,0];
+    for (var i = 0; i < allReds.length; i++) {
+      for (var j = 0; j < allReds[i].length; j++) {
+        tails[allReds[i][j] % 10]++;
+      }
+    }
+    var totalTails = tails.reduce(function(a,b){return a+b;},0) || 1;
+    var tailFreq = tails.map(function(t){return t/totalTails;});
+    var tailScore = 1 - Math.abs(tailFreq[tail] - 0.1) * 5;
+
+    var isOdd = n % 2 === 1;
+    var oddRatio = last.red.filter(function(x){return x%2===1;}).length / 6;
+    var oddAltScore;
+    if (oddRatio >= 0.83) {
+      oddAltScore = isOdd ? 0.3 : 0.95;
+    } else if (oddRatio <= 0.17) {
+      oddAltScore = isOdd ? 0.95 : 0.3;
+    } else {
+      oddAltScore = (isOdd && oddRatio <= 0.6) || (!isOdd && oddRatio >= 0.4) ? 0.8 : 0.5;
+    }
+
+    var sizeScore = (n <= 16 && last.red.filter(function(x){return x<=16;}).length <= 3) || (n > 16 && last.red.filter(function(x){return x>16;}).length <= 3) ? 0.8 : 0.5;
+
     var neighborScore = 0;
     if (last.red.indexOf(n) >= 0) neighborScore = 0.9;
     else {
@@ -1714,25 +1739,38 @@ function scoreSSQNumbers(last, allReds) {
       }
     }
 
+    var pairScore = pairHistoryScore(n, allReds);
+
     var isHot = wf > 0.18;
     var isCold = mp > 0.7;
     var hcScore = (isHot || isCold) ? 0.8 : 0.5;
 
     var stability = 1 - Math.abs(wf - 0.18) * 3;
 
-    var totalScore = wf * 0.25 + mpScore * 0.20 + mkScore * 0.15 + zoneScore * 0.15 + neighborScore * 0.10 + hcScore * 0.10 + stability * 0.05;
+    var baseScore = wf*0.18 + mpScore*0.15 + mkScore*0.12 + zoneScore*0.10 + tailScore*0.08 + oddAltScore*0.05 + sizeScore*0.05 + neighborScore*0.08 + pairScore*0.06 + hcScore*0.08 + stability*0.05;
 
     var reasons = [];
     if (wf > 0.2) reasons.push('高频');
     if (mp > 0.8) reasons.push('深冷');
     if (mkScore > 0.8) reasons.push('冷转热');
+    if (tailScore > 0.7) reasons.push('尾数');
     if (neighborScore > 0.7) reasons.push('邻号');
     if (zoneScore > 0.7) reasons.push('区间回补');
     if (hcScore > 0.7) reasons.push('冷热');
     if (stability > 0.7) reasons.push('稳定');
+    if (pairScore > 0.5) reasons.push('连号');
 
-    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, neighborScore: neighborScore, hcScore: hcScore, stability: stability, totalScore: totalScore, reasons: reasons });
+    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, tailScore: tailScore, oddAltScore: oddAltScore, sizeScore: sizeScore, neighborScore: neighborScore, pairScore: pairScore, hcScore: hcScore, stability: stability, baseScore: baseScore, coScore: 0, totalScore: baseScore, reasons: reasons });
   }
+  var top10 = scores.slice().sort(function(a,b){return b.baseScore-a.baseScore;}).slice(0,10).map(function(s){return s.num;});
+  scores.forEach(function(s){
+    var coSum = 0, coCount = 0;
+    top10.forEach(function(t){
+      if (t !== s.num && co[s.num] && co[s.num][t]) { coSum += co[s.num][t]; coCount++; }
+    });
+    s.coScore = coCount ? Math.min(coSum/coCount/3, 1) : 0;
+    s.totalScore = s.baseScore + s.coScore * 0.15;
+  });
   return scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 }
 
@@ -1755,7 +1793,17 @@ function scoreSSQBlueNumbers(last, allBlues) {
     var lastBlueBig = last.blue > 8;
     var sizeScore = (n > 8 && !lastBlueBig) || (n <= 8 && lastBlueBig) ? 0.85 : 0.5;
 
-    var totalScore = wf * 0.30 + mpScore * 0.25 + mkScore * 0.15 + oddScore * 0.15 + sizeScore * 0.15;
+    // 蓝球尾数分散评分
+    var tail = n % 10;
+    var tails = [0,0,0,0,0,0,0,0,0,0];
+    for (var i = 0; i < allBlues.length; i++) {
+      tails[allBlues[i] % 10]++;
+    }
+    var totalTails = tails.reduce(function(a,b){return a+b;},0) || 1;
+    var tailFreq = tails.map(function(t){return t/totalTails;});
+    var tailScore = 1 - Math.abs(tailFreq[tail] - 0.1) * 5;
+
+    var totalScore = wf * 0.28 + mpScore * 0.22 + mkScore * 0.13 + oddScore * 0.13 + sizeScore * 0.13 + tailScore * 0.11;
 
     var reasons = [];
     if (wf > 0.2) reasons.push('高频');
@@ -1763,8 +1811,9 @@ function scoreSSQBlueNumbers(last, allBlues) {
     if (mkScore > 0.8) reasons.push('冷转热');
     if (oddScore > 0.7) reasons.push('奇偶');
     if (sizeScore > 0.7) reasons.push('大小');
+    if (tailScore > 0.7) reasons.push('尾数');
 
-    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, totalScore: totalScore, reasons: reasons });
+    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, tailScore: tailScore, totalScore: totalScore, reasons: reasons });
   }
   return scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 }
@@ -1775,6 +1824,12 @@ function renderSSQRecommend(last, allReds, allBlues) {
   var backScores = scoreSSQBlueNumbers(last, allBlues);
   var topFronts = frontScores.slice(0,10);
   var topBacks = backScores.slice(0,5);
+
+  // 上期红球特征分析（用于动态回归）
+  var lastRed = last.red;
+  var lastOddRatio = lastRed.filter(function(x){return x%2===1;}).length / 6;
+  var lastBigRatio = lastRed.filter(function(x){return x>16;}).length / 6;
+  var lastHasPair = gapStats(lastRed.slice().sort(function(a,b){return a-b;})).pairs.length >= 1;
 
   function qualityScoreSSQ(reds, blue) {
     var s = reds.slice().sort(function(a,b){return a-b;});
@@ -1797,6 +1852,17 @@ function renderSSQRecommend(last, allReds, allBlues) {
     if (maxTail<=2) q+=12; else if (maxTail<=3) q+=6;
     if (g.pairs.length>=1 && g.pairs.length<=2) q+=8; else if (g.pairs.length<=3) q+=4;
     if (g.maxGap<=12) q+=8; else if (g.maxGap<=15) q+=4;
+
+    // ========== 基于上期特征的动态回归调整 ==========
+    // 1. 奇偶回归：上期极端则下期强烈反向回归
+    if ((lastOddRatio >= 0.83 && odd <= 3) || (lastOddRatio <= 0.17 && odd >= 3)) q += 4;
+    else if ((lastOddRatio >= 0.67 && odd <= 3) || (lastOddRatio <= 0.33 && odd >= 3)) q += 2;
+    // 2. 大小回归：上期极端则下期反向回归
+    if ((lastBigRatio >= 0.83 && big <= 3) || (lastBigRatio <= 0.17 && big >= 3)) q += 4;
+    else if ((lastBigRatio >= 0.67 && big <= 3) || (lastBigRatio <= 0.33 && big >= 3)) q += 2;
+    // 3. 连号延续：上期有连号则下期有连号适当加分
+    if (lastHasPair && g.pairs.length >= 1) q += 3;
+
     var fScore = s.reduce(function(sum,n){return sum+(frontScores.find(function(x){return x.num===n;})||{}).totalScore||0;},0);
     var bScore = (backScores.find(function(x){return x.num===blue;})||{}).totalScore||0;
     q += Math.min(fScore*8, 20) + Math.min(bScore*15, 10);
@@ -1877,7 +1943,7 @@ function renderSSQRecommend(last, allReds, allBlues) {
   ];
 
   var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V2 严谨模型推荐</h3>';
-  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·马尔可夫转移·区间回补·邻号·冷热交替·稳定性 七维评分体系</p>';
+  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·马尔可夫转移·区间回补·尾数分散·奇偶回归·大小均衡·邻号·连号历史·冷热交替·共现矩阵·稳定性 十二维评分体系（含上期特征动态回归）</p>';
 
   strategies.forEach(function(st,i){
     html += '<div class="strategy-box" style="margin:12px 0;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--bg2)">';
