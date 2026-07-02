@@ -31,9 +31,10 @@ function min(arr) { return Math.min.apply(null, arr); }
 function span(arr) { return arr.length ? max(arr) - min(arr) : 0; }
 
 // ==================== 算法1：马尔可夫转移概率 ====================
-function markovTransitionProb(history, lastDraw, maxNum, pickCount) {
+function markovTransitionProb(history, lastDraw, maxNum, pickCount, startNum) {
+  startNum = (startNum !== undefined) ? startNum : 1;
   var scores = {};
-  for (var n = 1; n <= maxNum; n++) {
+  for (var n = startNum; n <= maxNum; n++) {
     var score = 0;
     for (var j = 0; j < lastDraw.length; j++) {
       var prevNum = lastDraw[j];
@@ -53,11 +54,12 @@ function markovTransitionProb(history, lastDraw, maxNum, pickCount) {
 }
 
 // ==================== 算法2：号码共现关联分析 ====================
-function cooccurrenceAnalysis(history, maxNum) {
+function cooccurrenceAnalysis(history, maxNum, startNum) {
+  startNum = (startNum !== undefined) ? startNum : 1;
   var scores = {};
-  for (var n = 1; n <= maxNum; n++) {
+  for (var n = startNum; n <= maxNum; n++) {
     var score = 0;
-    for (var m = 1; m <= maxNum; m++) {
+    for (var m = startNum; m <= maxNum; m++) {
       if (m === n) continue;
       var coocCount = 0;
       var totalCount = 0;
@@ -75,9 +77,10 @@ function cooccurrenceAnalysis(history, maxNum) {
 }
 
 // ==================== 算法3：位置模式学习 ====================
-function positionPatternLearning(history, maxNum, pickCount) {
+function positionPatternLearning(history, maxNum, pickCount, startNum) {
+  startNum = (startNum !== undefined) ? startNum : 1;
   var scores = {};
-  for (var n = 1; n <= maxNum; n++) {
+  for (var n = startNum; n <= maxNum; n++) {
     var score = 0;
     for (var pos = 0; pos < pickCount; pos++) {
       var posCount = 0;
@@ -92,11 +95,12 @@ function positionPatternLearning(history, maxNum, pickCount) {
 }
 
 // ==================== 算法4：趋势动量分析 ====================
-function trendMomentumAnalysis(history, maxNum) {
+function trendMomentumAnalysis(history, maxNum, startNum) {
+  startNum = (startNum !== undefined) ? startNum : 1;
   var scores = {};
   var half = Math.floor(history.length / 2);
   if (half < 1) half = 1;
-  for (var n = 1; n <= maxNum; n++) {
+  for (var n = startNum; n <= maxNum; n++) {
     var recent = 0, older = 0;
     for (var i = 0; i < half && i < history.length; i++) {
       if (arrayContains(history[i], n)) recent++;
@@ -119,9 +123,10 @@ var FUSION_WEIGHTS = {
   trend: 0.20
 };
 
-function bayesianFusion(markovScores, coocScores, posScores, trendScores, maxNum) {
+function bayesianFusion(markovScores, coocScores, posScores, trendScores, maxNum, startNum) {
+  startNum = (startNum !== undefined) ? startNum : 1;
   var totalM = 0, totalC = 0, totalP = 0, totalT = 0;
-  for (var k = 1; k <= maxNum; k++) {
+  for (var k = startNum; k <= maxNum; k++) {
     totalM += markovScores[k] || 0;
     totalC += coocScores[k] || 0;
     totalP += posScores[k] || 0;
@@ -130,7 +135,7 @@ function bayesianFusion(markovScores, coocScores, posScores, trendScores, maxNum
 
   var w = FUSION_WEIGHTS;
   var results = [];
-  for (var n = 1; n <= maxNum; n++) {
+  for (var n = startNum; n <= maxNum; n++) {
     var mScore = markovScores[n] || 0;
     var cScore = coocScores[n] || 0;
     var pScore = posScores[n] || 0;
@@ -266,6 +271,22 @@ function smartRecommendDLT(history, lastDraw) {
   var trend = trendMomentumAnalysis(allFronts, 35);
   var fused = bayesianFusion(markov, cooc, pos, trend, 35);
 
+  // V3模型评分融合：将V3模型评分与贝叶斯融合评分进行加权混合
+  var v3Last = lastDraw.front.concat(lastDraw.back);
+  var v3History = allFronts.map(function(f,i){ return f.concat(allBacks[i]); });
+  var v3FrontScores = scoreDLTNumbers_V3(v3Last, v3History);
+  var v3FrontMap = {};
+  for (var i = 0; i < v3FrontScores.length; i++) {
+    v3FrontMap[v3FrontScores[i].num] = v3FrontScores[i].totalScore;
+  }
+  // 重新计算融合分：70%贝叶斯 + 30%V3模型
+  for (var i = 0; i < fused.length; i++) {
+    var v3Score = v3FrontMap[fused[i].num] || 0;
+    fused[i].score = fused[i].score * 0.7 + v3Score * 0.3;
+    fused[i].v3Score = v3Score;
+  }
+  fused.sort(function(a, b) { return b.score - a.score; });
+
   // 计算平均融合分
   var avgScore = 0;
   for (var i = 0; i < fused.length; i++) avgScore += fused[i].score;
@@ -306,16 +327,21 @@ function smartRecommendDLT(history, lastDraw) {
     if (lastFrontSorted[i+1] - lastFrontSorted[i] === 1) { lastHasPair = true; break; }
   }
 
-  // 后区胆拖
-  var backFused = [];
-  for (var n = 1; n <= 12; n++) {
-    var score = 0;
-    for (var j = 0; j < lastDraw.back.length; j++) {
-      for (var i = 1; i < allBacks.length; i++) {
-        if (allBacks[i-1].indexOf(lastDraw.back[j]) >= 0 && allBacks[i].indexOf(n) >= 0) score++;
-      }
-    }
-    backFused.push({num: n, score: score});
+  // 后区胆拖：使用4算法贝叶斯融合（与前区一致）
+  var backMarkov = markovTransitionProb(allBacks, lastDraw.back, 12, 2);
+  var backCooc = cooccurrenceAnalysis(allBacks, 12);
+  var backPos = positionPatternLearning(allBacks, 12, 2);
+  var backTrend = trendMomentumAnalysis(allBacks, 12);
+  var backFused = bayesianFusion(backMarkov, backCooc, backPos, backTrend, 12);
+  // V3后区评分融合
+  var v3BackScores = scoreDLTBlueNumbers_V3(v3Last, v3History);
+  var v3BackMap = {};
+  for (var i = 0; i < v3BackScores.length; i++) {
+    v3BackMap[v3BackScores[i].num] = v3BackScores[i].totalScore;
+  }
+  for (var i = 0; i < backFused.length; i++) {
+    var bs = v3BackMap[backFused[i].num] || 0;
+    backFused[i].score = backFused[i].score * 0.7 + bs * 0.3;
   }
   backFused.sort(function(a, b) { return b.score - a.score; });
   var backDan = backFused[0].num;
@@ -441,6 +467,20 @@ function smartRecommendSSQ(history, lastDraw) {
   var pos = positionPatternLearning(allReds, 33, 6);
   var trend = trendMomentumAnalysis(allReds, 33);
   var fused = bayesianFusion(markov, cooc, pos, trend, 33);
+
+  // V3模型评分融合：将V3模型评分与贝叶斯融合评分进行加权混合
+  var v3SSQScores = scoreSSQNumbers(lastDraw, allReds);
+  var v3SSQMap = {};
+  for (var i = 0; i < v3SSQScores.length; i++) {
+    v3SSQMap[v3SSQScores[i].num] = v3SSQScores[i].totalScore;
+  }
+  // 重新计算融合分：70%贝叶斯 + 30%V3模型
+  for (var i = 0; i < fused.length; i++) {
+    var v3Score = v3SSQMap[fused[i].num] || 0;
+    fused[i].score = fused[i].score * 0.7 + v3Score * 0.3;
+    fused[i].v3Score = v3Score;
+  }
+  fused.sort(function(a, b) { return b.score - a.score; });
 
   // 计算平均融合分
   var avgScore = 0;
@@ -589,6 +629,20 @@ function smartRecommendKL8(history, lastDraw) {
   var trend = trendMomentumAnalysis(allNums, 80);
   var fused = bayesianFusion(markov, cooc, pos, trend, 80);
 
+  // V3模型评分融合：将KL8评分与贝叶斯融合评分进行加权混合
+  var v3KL8Scores = scoreKL8Numbers(lastDraw, allNums);
+  var v3KL8Map = {};
+  for (var i = 0; i < v3KL8Scores.length; i++) {
+    v3KL8Map[v3KL8Scores[i].num] = v3KL8Scores[i].totalScore;
+  }
+  // 重新计算融合分：70%贝叶斯 + 30%KL8评分
+  for (var i = 0; i < fused.length; i++) {
+    var v3Score = v3KL8Map[fused[i].num] || 0;
+    fused[i].score = fused[i].score * 0.7 + v3Score * 0.3;
+    fused[i].v3Score = v3Score;
+  }
+  fused.sort(function(a, b) { return b.score - a.score; });
+
   // 计算平均融合分
   var avgScore = 0;
   for (var i = 0; i < fused.length; i++) avgScore += fused[i].score;
@@ -681,11 +735,11 @@ function smartRecommendPL3(history, lastDraw) {
     allNums.push(history[i].numbers);
   }
 
-  var markov = markovTransitionProb(allNums, lastDraw, 9, 3);
-  var cooc = cooccurrenceAnalysis(allNums, 9);
-  var pos = positionPatternLearning(allNums, 9, 3);
-  var trend = trendMomentumAnalysis(allNums, 9);
-  var fused = bayesianFusion(markov, cooc, pos, trend, 9);
+  var markov = markovTransitionProb(allNums, lastDraw, 9, 3, 0);
+  var cooc = cooccurrenceAnalysis(allNums, 9, 0);
+  var pos = positionPatternLearning(allNums, 9, 3, 0);
+  var trend = trendMomentumAnalysis(allNums, 9, 0);
+  var fused = bayesianFusion(markov, cooc, pos, trend, 9, 0);
 
   // 计算平均融合分
   var avgScore = 0;
@@ -779,11 +833,11 @@ function smartRecommendPL5(history, lastDraw) {
     allNums.push(history[i].numbers);
   }
 
-  var markov = markovTransitionProb(allNums, lastDraw, 9, 5);
-  var cooc = cooccurrenceAnalysis(allNums, 9);
-  var pos = positionPatternLearning(allNums, 9, 5);
-  var trend = trendMomentumAnalysis(allNums, 9);
-  var fused = bayesianFusion(markov, cooc, pos, trend, 9);
+  var markov = markovTransitionProb(allNums, lastDraw, 9, 5, 0);
+  var cooc = cooccurrenceAnalysis(allNums, 9, 0);
+  var pos = positionPatternLearning(allNums, 9, 5, 0);
+  var trend = trendMomentumAnalysis(allNums, 9, 0);
+  var fused = bayesianFusion(markov, cooc, pos, trend, 9, 0);
 
   // 计算平均融合分
   var avgScore = 0;
