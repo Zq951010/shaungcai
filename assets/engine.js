@@ -2360,6 +2360,7 @@ function renderSSQTail(allReds) {
 var KL8_ZONES = [[1,20],[21,40],[41,60],[61,80]];
 
 var kl8SampleHistory = [
+  '02,07,11,13,18,21,23,25,30,31,48,53,54,55,61,62,69,76,77,80',
   '01,03,05,08,09,12,19,24,27,30,32,47,51,52,59,64,67,74,75,80',
   '04,05,11,16,17,19,20,26,37,44,46,47,51,55,61,63,66,68,70,75',
   '01,02,08,13,16,18,19,30,33,37,39,40,56,57,63,69,71,73,76,78',
@@ -2729,6 +2730,11 @@ function scoreKL8Numbers(last, history) {
     }
     var zoneAvg = recentZoneCounts[zoneIdx] / recentN;
     var zoneScore = zoneAvg < 4 ? 0.9 : zoneAvg < 5 ? 0.7 : 0.4;
+    // 上期区间偏态回补：26174期三区(41-60)仅4个偏少，下期三区号码加分
+    var lastZoneCounts = [0, 0, 0, 0];
+    last.forEach(function(x){ lastZoneCounts[x<=20?0:x<=40?1:x<=60?2:3]++; });
+    if (lastZoneCounts[zoneIdx] <= 4 && zoneIdx === 2) { zoneScore += 0.15; }
+    else if (lastZoneCounts[zoneIdx] >= 6 && zoneIdx === 3) { zoneScore -= 0.08; }
 
     var odd = n % 2 === 1;
     var recentOdds = 0;
@@ -2743,6 +2749,10 @@ function scoreKL8Numbers(last, history) {
         oddEvenScore += 0.15;
       }
     }
+    // 26174期奇偶12:8奇数偏多，下期偶数回补信号强化
+    var lastOddCount = last.filter(function(x){return x%2===1;}).length;
+    if (lastOddCount >= 12 && !odd) { oddEvenScore += 0.12; }
+    else if (lastOddCount <= 8 && odd) { oddEvenScore += 0.12; }
 
     var big = n > 40;
     var recentBig = 0;
@@ -2768,6 +2778,11 @@ function scoreKL8Numbers(last, history) {
     var totalTails = tails.reduce(function(a,b){return a+b;},0) || 1;
     var tailFreq = tails.map(function(t){return t/totalTails;});
     var tailScore = 1 - Math.abs(tailFreq[tail] - 0.1) * 5;
+    // 上期尾数偏态回补：26174期尾数1出现4次，下期关注其他尾数
+    var lastTails = {};
+    last.forEach(function(x){ lastTails[x%10] = (lastTails[x%10]||0) + 1; });
+    if (lastTails[tail] >= 3) { tailScore -= 0.15; }
+    else if (lastTails[tail] === 0) { tailScore += 0.10; }
 
     var neighborScore = 0;
     if (last.indexOf(n) >= 0) neighborScore = 0.9;
@@ -2776,6 +2791,13 @@ function scoreKL8Numbers(last, history) {
         if (Math.abs(n - last[i]) === 1) { neighborScore = 0.7; break; }
       }
     }
+    // 重号历史频率优化：计算近5期平均重号数，若偏低则上期号码额外加分
+    var repeatHistory = [];
+    for (var ri = 0; ri < Math.min(5, history.length - 1); ri++) {
+      repeatHistory.push(history[ri].filter(function(x){ return history[ri+1].indexOf(x) >= 0; }).length);
+    }
+    var avgRepeat = kl8Avg(repeatHistory);
+    if (avgRepeat >= 3 && last.indexOf(n) >= 0) { neighborScore += 0.08; }
 
     // KL8连号历史频率评分
     var consecutiveScore = pairHistoryScore(n, history);
