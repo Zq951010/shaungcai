@@ -778,6 +778,43 @@ function scorePL3Position(pos, last, history) {
     if (patternScore > 0) score.reasons.push('形态延续');
     score.total += patternScore;
 
+    // 9. 近5期012路分析（排列三专用）
+    if (posHistory.length >= 5) {
+      var roadCounts = [0, 0, 0];
+      for (var i = 0; i < 5; i++) {
+        var road = posHistory[i] % 3;
+        roadCounts[road]++;
+      }
+      var nRoad = n % 3;
+      for (var r = 0; r < 3; r++) {
+        if (roadCounts[r] >= 4 && nRoad !== r) {
+          score.total += 1.5;
+          if (score.reasons.indexOf('012路回补') < 0) score.reasons.push('012路回补');
+          break;
+        }
+      }
+      for (var r = 0; r < 3; r++) {
+        if (roadCounts[r] === 0 && nRoad === r) {
+          score.total += 2;
+          if (score.reasons.indexOf('012路补充') < 0) score.reasons.push('012路补充');
+          break;
+        }
+      }
+    }
+
+    // 10. 近5期均值回归辅助
+    if (posHistory.length >= 5) {
+      var recent5 = posHistory.slice(0, 5);
+      var r5Sum = 0;
+      for (var i = 0; i < recent5.length; i++) r5Sum += recent5[i];
+      var r5Avg = r5Sum / 5;
+      if (r5Avg >= 6.5 && n <= 3) {
+        score.total += 1;
+      } else if (r5Avg <= 3.5 && n >= 6) {
+        score.total += 1;
+      }
+    }
+
     scores.push(score);
   }
 
@@ -1448,6 +1485,48 @@ function scorePL5Position(pos, last, history) {
       } else if (oddEvenDir === -1 && n % 2 === 0) {
         // 三期全偶，杀偶数（偶数扣分）
         score.total -= 3;
+      }
+    }
+
+    // 11. 近5期012路分析（排列五专用）
+    // 统计近5期该位置数字的012路分布，偏态时修正
+    if (posHistory.length >= 5) {
+      var roadCounts = [0, 0, 0]; // 0路(0369), 1路(147), 2路(258)
+      for (var i = 0; i < 5; i++) {
+        var road = posHistory[i] % 3;
+        roadCounts[road]++;
+      }
+      var nRoad = n % 3;
+      // 如果某路近5期出现>=4次，下期倾向补缺
+      for (var r = 0; r < 3; r++) {
+        if (roadCounts[r] >= 4 && nRoad !== r) {
+          score.total += 1.5;
+          if (score.reasons.indexOf('012路回补') < 0) score.reasons.push('012路回补');
+          break;
+        }
+      }
+      // 如果某路近5期出现0次，下期可能补充
+      for (var r = 0; r < 3; r++) {
+        if (roadCounts[r] === 0 && nRoad === r) {
+          score.total += 2;
+          if (score.reasons.indexOf('012路补充') < 0) score.reasons.push('012路补充');
+          break;
+        }
+      }
+    }
+
+    // 12. 近5期和值/跨度范围辅助（排列五专用）
+    // 分析该位置近5期的数字范围，辅助判断回归方向
+    if (posHistory.length >= 5) {
+      var recent5 = posHistory.slice(0, 5);
+      var r5Sum = 0;
+      for (var i = 0; i < recent5.length; i++) r5Sum += recent5[i];
+      var r5Avg = r5Sum / 5;
+      // 如果近5期均值偏高（>=6），下期倾向偏小数字回归
+      if (r5Avg >= 6.5 && n <= 3) {
+        score.total += 1;
+      } else if (r5Avg <= 3.5 && n >= 6) {
+        score.total += 1;
       }
     }
 
