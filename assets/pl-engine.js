@@ -522,6 +522,49 @@ function pl5PatternBoost(n, pos, last) {
   return 0;
 }
 
+/**
+ * 近三期同位趋势分析（排列三/五专用）
+ * 分析近三期同一位置的数字变化趋势，对符合趋势的数字加分
+ */
+function pl3Recent3Trend(n, pos, history) {
+  if (history.length < 3) return 0;
+  var a = history[2][pos]; // 三期前
+  var b = history[1][pos]; // 两期前
+  var c = history[0][pos]; // 上期
+
+  // 趋势判断
+  var ab = b - a;
+  var bc = c - b;
+
+  // 同向持续趋势（递增或递减）：下期可能继续同向
+  if (ab > 0 && bc > 0) {
+    // 持续递增，下期更大
+    if (n > c) return 1.5;
+  } else if (ab < 0 && bc < 0) {
+    // 持续递减，下期更小
+    if (n < c) return 1.5;
+  } else if (ab > 0 && bc < 0) {
+    // 先增后减（峰值），下期可能继续减或反弹
+    if (n < c) return 1;
+  } else if (ab < 0 && bc > 0) {
+    // 先减后增（谷值），下期可能继续增或回调
+    if (n > c) return 1;
+  }
+
+  // 三期同号（豹子或重号）：下期可能变化
+  if (a === b && b === c) {
+    if (n !== c) return 2;
+  }
+
+  // 三期对称（如3→5→3）：下期可能居中
+  if (a === c && a !== b) {
+    var mid = Math.round((a + b) / 2);
+    if (n === mid || Math.abs(n - mid) <= 1) return 1.5;
+  }
+
+  return 0;
+}
+
 // ==================== 排列五专用选号公式 ====================
 
 /**
@@ -685,6 +728,11 @@ function scorePL3Position(pos, last, history) {
       neighborScore = 2;
     }
     score.total += neighborScore;
+
+    // 4.5 近三期同位趋势评分（排列三专用）
+    var trend3Score = pl3Recent3Trend(n, pos, history);
+    if (trend3Score > 0) score.reasons.push('三期趋势');
+    score.total += trend3Score;
 
     // 5. stability (10%): variance of intervals
     var dist = getMissDistribution(n, [posHistory]);
@@ -1329,6 +1377,11 @@ function scorePL5Position(pos, last, history) {
       neighborScore = 2;
     }
     score.total += neighborScore;
+
+    // 4.5 近三期同位趋势评分（排列五专用）
+    var trend3Score = pl3Recent3Trend(n, pos, history);
+    if (trend3Score > 0) score.reasons.push('三期趋势');
+    score.total += trend3Score;
 
     // 5. stability (8%): variance of intervals
     var dist = getMissDistribution(n, [posHistory]);

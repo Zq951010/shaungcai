@@ -1311,6 +1311,7 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
 var SSQ_ZONES = [[1,11],[12,22],[23,33]];
 
 var ssqSampleHistory = [
+  '08,12,18,21,24,30|01',
   '03,06,08,14,26,27|08',
   '03,05,16,18,29,32|04',
   '04,19,27,29,30,32|13',
@@ -1683,9 +1684,60 @@ function renderSSQDanTuo(last, allReds, allBlues) {
   document.getElementById('ssq-dantuo').innerHTML = html;
 }
 
+// 分析近15期趋势特征，用于动态调整评分权重
+function getRecent15Trend(allDraws) {
+  var recent = allDraws.slice(0, Math.min(15, allDraws.length));
+  var oddCounts = [], bigCounts = [], pairCounts = [], sameTailCounts = [];
+  var zoneCounts = [[], [], []];
+
+  for (var i = 0; i < recent.length; i++) {
+    var draw = recent[i].slice().sort(function(a,b){return a-b;});
+    var odd = draw.filter(function(x){return x%2===1;}).length;
+    var big = draw.filter(function(x){return x>16;}).length;
+    oddCounts.push(odd);
+    bigCounts.push(big);
+
+    var pairs = 0;
+    for (var j = 0; j < draw.length - 1; j++) {
+      if (draw[j+1] - draw[j] === 1) pairs++;
+    }
+    pairCounts.push(pairs);
+
+    var tails = {};
+    for (var j = 0; j < draw.length; j++) {
+      var t = draw[j] % 10;
+      tails[t] = (tails[t] || 0) + 1;
+    }
+    var sameTail = 0;
+    for (var t in tails) { if (tails[t] >= 2) sameTail++; }
+    sameTailCounts.push(sameTail);
+
+    var z1 = draw.filter(function(x){return x<=11;}).length;
+    var z2 = draw.filter(function(x){return x>11&&x<=22;}).length;
+    var z3 = draw.filter(function(x){return x>22;}).length;
+    zoneCounts[0].push(z1);
+    zoneCounts[1].push(z2);
+    zoneCounts[2].push(z3);
+  }
+
+  function avg(arr) { return arr.reduce(function(a,b){return a+b;},0) / arr.length; }
+
+  return {
+    avgOdd: avg(oddCounts),
+    avgBig: avg(bigCounts),
+    avgPair: avg(pairCounts),
+    avgSameTail: avg(sameTailCounts),
+    avgZone: [avg(zoneCounts[0]), avg(zoneCounts[1]), avg(zoneCounts[2])],
+    oddBias: oddCounts.filter(function(x){return x>=4||x<=2;}).length,
+    bigBias: bigCounts.filter(function(x){return x>=4||x<=2;}).length,
+    pairFreq: pairCounts.filter(function(x){return x>=1;}).length
+  };
+}
+
 function scoreSSQNumbers(last, allReds) {
   var scores = [];
   var co = buildCoOccurrence(allReds);
+  var trend15 = getRecent15Trend(allReds);
   for (var n = 1; n <= 33; n++) {
     var wf = weightedFreq(n, allReds, 10);
     var dist = getMissDistribution(n, allReds);
@@ -1728,8 +1780,20 @@ function scoreSSQNumbers(last, allReds) {
     } else {
       oddAltScore = (isOdd && oddRatio <= 0.6) || (!isOdd && oddRatio >= 0.4) ? 0.8 : 0.5;
     }
+    // 近15期趋势强化：如果近15期奇偶偏态持续，额外强化回归
+    if (trend15.oddBias >= 5) {
+      if ((trend15.avgOdd >= 3.5 && !isOdd) || (trend15.avgOdd <= 2.5 && isOdd)) {
+        oddAltScore += 0.15;
+      }
+    }
 
     var sizeScore = (n <= 16 && last.red.filter(function(x){return x<=16;}).length <= 3) || (n > 16 && last.red.filter(function(x){return x>16;}).length <= 3) ? 0.8 : 0.5;
+    // 近15期趋势强化：大小偏态持续时额外强化回归
+    if (trend15.bigBias >= 5) {
+      if ((trend15.avgBig >= 3.5 && n <= 16) || (trend15.avgBig <= 2.5 && n > 16)) {
+        sizeScore += 0.15;
+      }
+    }
 
     var neighborScore = 0;
     if (last.red.indexOf(n) >= 0) neighborScore = 0.9;
@@ -1740,6 +1804,10 @@ function scoreSSQNumbers(last, allReds) {
     }
 
     var pairScore = pairHistoryScore(n, allReds);
+    // 近15期趋势强化：如果近15期连号频繁，提升连号评分权重
+    if (trend15.pairFreq >= 5) {
+      pairScore *= 1.2;
+    }
 
     var isHot = wf > 0.18;
     var isCold = mp > 0.7;
@@ -2292,6 +2360,7 @@ function renderSSQTail(allReds) {
 var KL8_ZONES = [[1,20],[21,40],[41,60],[61,80]];
 
 var kl8SampleHistory = [
+  '01,03,05,08,09,12,19,24,27,30,32,47,51,52,59,64,67,74,75,80',
   '04,05,11,16,17,19,20,26,37,44,46,47,51,55,61,63,66,68,70,75',
   '01,02,08,13,16,18,19,30,33,37,39,40,56,57,63,69,71,73,76,78',
   '02,04,06,09,13,26,32,36,38,41,44,47,56,58,60,69,72,76,78,80',
@@ -2617,6 +2686,29 @@ function renderKL8DanTuo(last, history, playType) {
 
 function scoreKL8Numbers(last, history) {
   var scores = [];
+  // KL8近15期趋势分析
+  var recent15 = history.slice(0, Math.min(15, history.length));
+  var kl8OddCounts = [], kl8BigCounts = [], kl8PairCounts = [];
+  for (var i = 0; i < recent15.length; i++) {
+    var draw = recent15[i].slice().sort(function(a,b){return a-b;});
+    kl8OddCounts.push(draw.filter(function(x){return x%2===1;}).length);
+    kl8BigCounts.push(draw.filter(function(x){return x>40;}).length);
+    var pairs = 0;
+    for (var j = 0; j < draw.length - 1; j++) {
+      if (draw[j+1] - draw[j] === 1) pairs++;
+    }
+    kl8PairCounts.push(pairs);
+  }
+  function kl8Avg(arr) { return arr.reduce(function(a,b){return a+b;},0) / arr.length; }
+  var kl8Trend = {
+    avgOdd: kl8Avg(kl8OddCounts),
+    avgBig: kl8Avg(kl8BigCounts),
+    avgPair: kl8Avg(kl8PairCounts),
+    oddBias: kl8OddCounts.filter(function(x){return x>=12||x<=8;}).length,
+    bigBias: kl8BigCounts.filter(function(x){return x>=12||x<=8;}).length,
+    pairFreq: kl8PairCounts.filter(function(x){return x>=4;}).length
+  };
+
   for (var n = 1; n <= 80; n++) {
     var wf = weightedFreq(n, history, 12);
     var dist = getMissDistribution(n, history);
@@ -2645,6 +2737,12 @@ function scoreKL8Numbers(last, history) {
     }
     var oddRatio = recentOdds / (recentN * 20);
     var oddEvenScore = (odd && oddRatio <= 0.55) || (!odd && oddRatio >= 0.45) ? 0.85 : 0.5;
+    // 近15期趋势强化
+    if (kl8Trend.oddBias >= 5) {
+      if ((kl8Trend.avgOdd >= 11 && !odd) || (kl8Trend.avgOdd <= 9 && odd)) {
+        oddEvenScore += 0.15;
+      }
+    }
 
     var big = n > 40;
     var recentBig = 0;
@@ -2653,6 +2751,12 @@ function scoreKL8Numbers(last, history) {
     }
     var bigRatio = recentBig / (recentN * 20);
     var bigSmallScore = (big && bigRatio <= 0.55) || (!big && bigRatio >= 0.45) ? 0.85 : 0.5;
+    // 近15期趋势强化
+    if (kl8Trend.bigBias >= 5) {
+      if ((kl8Trend.avgBig >= 11 && !big) || (kl8Trend.avgBig <= 9 && big)) {
+        bigSmallScore += 0.15;
+      }
+    }
 
     var tail = n % 10;
     var tails = [0,0,0,0,0,0,0,0,0,0];
