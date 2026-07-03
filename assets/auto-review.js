@@ -1347,10 +1347,10 @@ function autoReviewDLT() {
     simAllBacks.push(parts[1].split(',').map(Number));
   }
 
-  var simLast = { front: simAllFronts[0], back: simAllBacks[0] };
+  var simLast = simAllFronts[0].concat(simAllBacks[0]);
 
-  var simScores = scoreDLTNumbers(simLast, simAllFronts, simAllBacks);
-  var simBackScores = scoreDLTBackNumbers(simLast, simAllBacks);
+  var simScores = scoreDLTNumbers_V3(simLast, simAllFronts.map(function(f,i){ return f.concat(simAllBacks[i]); }));
+  var simBackScores = scoreDLTBlueNumbers_V3(simLast, simAllFronts.map(function(f,i){ return f.concat(simAllBacks[i]); }));
 
   var simRecommendations = generateDLTSimPicks(simScores, simBackScores);
 

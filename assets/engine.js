@@ -1621,13 +1621,13 @@ function renderSSQHotCold(allReds, allBlues) {
 
 function renderSSQDanTuo(last, allReds, allBlues) {
   var scores = scoreSSQNumbers(last, allReds);
-  scores.sort(function(a, b) { return b.total - a.total; });
+  scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 
   var danCandidates = scores.slice(0, 5);
   var tuoCandidates = scores.slice(5, 15);
 
   var backScores = scoreSSQBlueNumbers(last, allBlues);
-  backScores.sort(function(a, b) { return b.total - a.total; });
+  backScores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 
   var html = '<div class="dantuo-section"><div class="dantuo-grid">';
 
@@ -1635,7 +1635,7 @@ function renderSSQDanTuo(last, allReds, allBlues) {
   html += '<h4><span class="dot" style="background:var(--accent3)"></span> 红球胆码推荐（' + danCandidates.length + '个）</h4>';
   html += '<div class="ball-row">';
   for (var i = 0; i < danCandidates.length; i++) {
-    html += '<div class="ball green tooltip" data-tip="评分:' + danCandidates[i].total.toFixed(1) + '">' + pad(danCandidates[i].num) + '</div>';
+    html += '<div class="ball green tooltip" data-tip="评分:' + danCandidates[i].totalScore.toFixed(1) + '">' + pad(danCandidates[i].num) + '</div>';
   }
   html += '</div>';
   html += '<div style="margin-top:0.75rem">';
@@ -1643,7 +1643,7 @@ function renderSSQDanTuo(last, allReds, allBlues) {
     var c = danCandidates[i];
     html += '<div style="margin-bottom:0.5rem;font-size:0.82rem">';
     html += '<span class="hl-green">' + pad(c.num) + '</span> ';
-    html += '<span style="color:var(--muted)">评分 ' + c.total.toFixed(1) + '</span> ';
+    html += '<span style="color:var(--muted)">评分 ' + c.totalScore.toFixed(1) + '</span> ';
     html += c.reasons.map(function(r) { return '<span class="reason-tag">' + r + '</span>'; }).join('');
     html += '</div>';
   }
@@ -1652,7 +1652,7 @@ function renderSSQDanTuo(last, allReds, allBlues) {
   html += '<h4 style="margin-top:1rem"><span class="dot" style="background:var(--accent5)"></span> 红球拖码推荐</h4>';
   html += '<div class="ball-row">';
   for (var i = 0; i < tuoCandidates.length; i++) {
-    html += '<div class="ball purple tooltip" data-tip="评分:' + tuoCandidates[i].total.toFixed(1) + '">' + pad(tuoCandidates[i].num) + '</div>';
+    html += '<div class="ball purple tooltip" data-tip="评分:' + tuoCandidates[i].totalScore.toFixed(1) + '">' + pad(tuoCandidates[i].num) + '</div>';
   }
   html += '</div></div>';
 
@@ -1660,14 +1660,14 @@ function renderSSQDanTuo(last, allReds, allBlues) {
   html += '<h4><span class="dot" style="background:var(--accent3)"></span> 蓝球胆码推荐</h4>';
   html += '<div class="ball-row">';
   for (var i = 0; i < Math.min(3, backScores.length); i++) {
-    html += '<div class="ball green tooltip" data-tip="评分:' + backScores[i].total.toFixed(1) + '">' + pad(backScores[i].num) + '</div>';
+    html += '<div class="ball green tooltip" data-tip="评分:' + backScores[i].totalScore.toFixed(1) + '">' + pad(backScores[i].num) + '</div>';
   }
   html += '</div>';
   html += '<div style="margin-top:0.75rem">';
   for (var i = 0; i < Math.min(3, backScores.length); i++) {
     html += '<div style="margin-bottom:0.5rem;font-size:0.82rem">';
     html += '<span class="hl-green">' + pad(backScores[i].num) + '</span> ';
-    html += '<span style="color:var(--muted)">评分 ' + backScores[i].total.toFixed(1) + '</span> ';
+    html += '<span style="color:var(--muted)">评分 ' + backScores[i].totalScore.toFixed(1) + '</span> ';
     html += backScores[i].reasons.map(function(r) { return '<span class="reason-tag">' + r + '</span>'; }).join('');
     html += '</div>';
   }
@@ -1676,7 +1676,7 @@ function renderSSQDanTuo(last, allReds, allBlues) {
   html += '<h4 style="margin-top:1rem"><span class="dot" style="background:var(--accent5)"></span> 蓝球拖码推荐</h4>';
   html += '<div class="ball-row">';
   for (var i = 3; i < Math.min(8, backScores.length); i++) {
-    html += '<div class="ball purple tooltip" data-tip="评分:' + backScores[i].total.toFixed(1) + '">' + pad(backScores[i].num) + '</div>';
+    html += '<div class="ball purple tooltip" data-tip="评分:' + backScores[i].totalScore.toFixed(1) + '">' + pad(backScores[i].num) + '</div>';
   }
   html += '</div></div>';
 
@@ -2642,7 +2642,7 @@ function renderKL8HotCold(history) {
 
 function renderKL8DanTuo(last, history, playType) {
   var scores = scoreKL8Numbers(last, history);
-  scores.sort(function(a, b) { return b.total - a.total; });
+  scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 
   var danCount = Math.min(3, Math.floor(playType / 2));
   var tuoCount = Math.min(10, playType + 5);
@@ -2656,7 +2656,7 @@ function renderKL8DanTuo(last, history, playType) {
   html += '<h4><span class="dot" style="background:var(--accent3)"></span> 胆码推荐（' + danCandidates.length + '个）</h4>';
   html += '<div class="ball-row">';
   for (var i = 0; i < danCandidates.length; i++) {
-    html += '<div class="ball green tooltip" data-tip="评分:' + danCandidates[i].total.toFixed(1) + '">' + pad(danCandidates[i].num) + '</div>';
+    html += '<div class="ball green tooltip" data-tip="评分:' + danCandidates[i].totalScore.toFixed(1) + '">' + pad(danCandidates[i].num) + '</div>';
   }
   html += '</div>';
   html += '<div style="margin-top:0.75rem">';
@@ -2664,7 +2664,7 @@ function renderKL8DanTuo(last, history, playType) {
     var c = danCandidates[i];
     html += '<div style="margin-bottom:0.5rem;font-size:0.82rem">';
     html += '<span class="hl-green">' + pad(c.num) + '</span> ';
-    html += '<span style="color:var(--muted)">评分 ' + c.total.toFixed(1) + '</span> ';
+    html += '<span style="color:var(--muted)">评分 ' + c.totalScore.toFixed(1) + '</span> ';
     html += c.reasons.map(function(r) { return '<span class="reason-tag">' + r + '</span>'; }).join('');
     html += '</div>';
   }
@@ -2674,7 +2674,7 @@ function renderKL8DanTuo(last, history, playType) {
   html += '<h4><span class="dot" style="background:var(--accent5)"></span> 拖码推荐（' + tuoCandidates.length + '个）</h4>';
   html += '<div class="ball-row">';
   for (var i = 0; i < tuoCandidates.length; i++) {
-    html += '<div class="ball purple tooltip" data-tip="评分:' + tuoCandidates[i].total.toFixed(1) + '">' + pad(tuoCandidates[i].num) + '</div>';
+    html += '<div class="ball purple tooltip" data-tip="评分:' + tuoCandidates[i].totalScore.toFixed(1) + '">' + pad(tuoCandidates[i].num) + '</div>';
   }
   html += '</div>';
   html += '<div style="margin-top:0.75rem;font-size:0.82rem;color:var(--muted)">提示：选' + playType + '玩法，' + danCandidates.length + '个胆码 + ' + (playType - danCandidates.length) + '个拖码 = C(' + tuoCandidates.length + ',' + (playType - danCandidates.length) + ') 注</div>';
