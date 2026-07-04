@@ -3252,6 +3252,133 @@ function scoreKL8Numbers(last, history) {
   return scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 }
 
+/**
+ * 快乐八自动复盘：对最近3期回溯测试，对比推荐与实际开奖
+ * 返回复盘报告HTML和各维度偏差分析
+ */
+function runKL8AutoReview(history) {
+  var testCount = Math.min(3, history.length - 1);
+  if (testCount < 1) return { html: '', insights: [] };
+
+  var results = [];
+  for (var t = 0; t < testCount; t++) {
+    var actualIdx = history.length - testCount + t;
+    var trainData = history.slice(0, actualIdx);
+    var actual = history[actualIdx];
+    var lastTrain = trainData[trainData.length - 1];
+
+    var scores = scoreKL8Numbers(lastTrain, trainData.slice(0, -1));
+
+    // 模拟4个策略的选十推荐
+    var rec1 = scores.slice(0, 10).map(function(s){ return s.num; });
+
+    var cold = scores.slice().sort(function(a,b){return b.mp - a.mp;}).slice(0, 10).map(function(s){return s.num;});
+    var hot = scores.slice(0, 8).map(function(s){return s.num;});
+    var rec2 = cold.slice(0, 6).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0, 4));
+    var unique2 = [];
+    for (var i2=0; i2<rec2.length && unique2.length<10; i2++) if (unique2.indexOf(rec2[i2])<0) unique2.push(rec2[i2]);
+    for (var j2=0; j2<scores.length && unique2.length<10; j2++) if (unique2.indexOf(scores[j2].num)<0) unique2.push(scores[j2].num);
+
+    var cycleSorted = scores.slice().sort(function(a,b){
+      var ca = cycleAnalysis(a.num, trainData.slice(0,-1));
+      var cb = cycleAnalysis(b.num, trainData.slice(0,-1));
+      return cb.score - ca.score || b.mkScore - a.mkScore;
+    });
+    var rec3 = cycleSorted.slice(0, 10).map(function(s){return s.num;});
+
+    var tailUsed = {};
+    var rec4 = [];
+    for (var i4 = 0; i4 < scores.length && rec4.length < 10; i4++) {
+      var n4 = scores[i4].num;
+      var t4 = n4 % 10;
+      if (!tailUsed[t4] || rec4.length >= 8) { rec4.push(n4); tailUsed[t4] = true; }
+    }
+
+    function hitCount(rec, actual) {
+      return rec.filter(function(n){ return actual.indexOf(n) >= 0; }).length;
+    }
+
+    results.push({
+      period: '第' + (actualIdx + 1) + '期（模拟）',
+      actual: actual,
+      s1: { picks: rec1, hit: hitCount(rec1, actual) },
+      s2: { picks: unique2, hit: hitCount(unique2, actual) },
+      s3: { picks: rec3, hit: hitCount(rec3, actual) },
+      s4: { picks: rec4, hit: hitCount(rec4, actual) },
+      top10: rec1
+    });
+  }
+
+  // 计算各策略平均命中
+  var avgHits = [
+    results.reduce(function(s,r){return s+r.s1.hit;},0) / results.length,
+    results.reduce(function(s,r){return s+r.s2.hit;},0) / results.length,
+    results.reduce(function(s,r){return s+r.s3.hit;},0) / results.length,
+    results.reduce(function(s,r){return s.s4.hit;},0) / results.length
+  ];
+
+  // 分析偏差：实际开奖但未被Top10推荐的号码
+  var missedByTop = [];
+  results.forEach(function(r){
+    r.actual.forEach(function(n){
+      if (r.top10.indexOf(n) < 0) missedByTop.push(n);
+    });
+  });
+
+  // 统计missed号码的维度特征
+  var missedZones = [0,0,0,0];
+  var missedOdd = 0, missedEven = 0;
+  var missedTails = {};
+  missedByTop.forEach(function(n){
+    missedZones[n<=20?0:n<=40?1:n<=60?2:3]++;
+    if (n%2===1) missedOdd++; else missedEven++;
+    missedTails[n%10] = (missedTails[n%10]||0) + 1;
+  });
+
+  var insights = [];
+  var bestStrategy = avgHits.indexOf(Math.max.apply(null, avgHits)) + 1;
+  insights.push('近' + testCount + '期回溯中，方案' + bestStrategy + '命中率最高（平均' + avgHits[bestStrategy-1].toFixed(1) + '个）');
+
+  var maxMissedZone = missedZones.indexOf(Math.max.apply(null, missedZones));
+  var zoneNames = ['一区(01-20)', '二区(21-40)', '三区(41-60)', '四区(61-80)'];
+  if (missedZones[maxMissedZone] > missedByTop.length * 0.3) {
+    insights.push('实际开奖中' + zoneNames[maxMissedZone] + '被遗漏最多（' + missedZones[maxMissedZone] + '个），建议提升该区权重');
+  }
+
+  if (missedOdd > missedEven * 1.3) {
+    insights.push('实际开奖奇数被模型遗漏较多，奇数评分权重可适当上调');
+  } else if (missedEven > missedOdd * 1.3) {
+    insights.push('实际开奖偶数被模型遗漏较多，偶数评分权重可适当上调');
+  }
+
+  // 生成HTML
+  var html = '<div style="margin-top:16px;padding:12px;background:var(--bg3);border-radius:8px;border:2px solid var(--accent3)">';
+  html += '<h4 style="margin:0 0 8px 0;color:var(--ink)">🤖 自动复盘报告（近' + testCount + '期回溯）</h4>';
+
+  results.forEach(function(r, idx){
+    html += '<div style="margin:8px 0;padding:8px;background:var(--bg2);border-radius:6px">';
+    html += '<div style="font-weight:bold;color:var(--ink);font-size:12px">' + r.period + '</div>';
+    html += '<div style="color:var(--muted);font-size:11px;margin:2px 0">实际开奖：' + r.actual.map(function(n){return String(n).padStart(2,'0');}).join(',') + '</div>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">';
+    html += '<span style="font-size:11px;background:var(--accent3);color:#000;padding:2px 6px;border-radius:4px">方案1命中:' + r.s1.hit + '</span>';
+    html += '<span style="font-size:11px;background:var(--accent);color:#000;padding:2px 6px;border-radius:4px">方案2命中:' + r.s2.hit + '</span>';
+    html += '<span style="font-size:11px;background:var(--accent5);color:#000;padding:2px 6px;border-radius:4px">方案3命中:' + r.s3.hit + '</span>';
+    html += '<span style="font-size:11px;background:var(--accent4);color:#000;padding:2px 6px;border-radius:4px">方案4命中:' + r.s4.hit + '</span>';
+    html += '</div>';
+    html += '</div>';
+  });
+
+  html += '<div style="margin-top:8px;padding:8px;background:rgba(245,158,11,0.1);border-radius:6px;border-left:3px solid var(--accent3)">';
+  html += '<div style="font-weight:bold;color:var(--ink);font-size:12px;margin-bottom:4px">💡 模型优化建议</div>';
+  insights.forEach(function(ins){
+    html += '<div style="color:var(--muted);font-size:11px;margin:2px 0">• ' + ins + '</div>';
+  });
+  html += '</div>';
+  html += '</div>';
+
+  return { html: html, insights: insights, avgHits: avgHits };
+}
+
 
 function renderKL8AllPlayTypes_V2(last, history) {
   var scores = scoreKL8Numbers(last, history);
@@ -3458,6 +3585,12 @@ function renderKL8AllPlayTypes_V2(last, history) {
     html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:4px">🧪 回测验证（近'+bt.tests+'期）</div>';
     html += '<div style="color:var(--muted);font-size:11px">选十Top10平均命中：'+bt.avgHit.toFixed(2)+'个（命中率 '+bt.avgRate.toFixed(1)+'%）</div>';
     html += '</div>';
+  }
+
+  // 自动复盘
+  var autoReview = runKL8AutoReview(history);
+  if (autoReview.html) {
+    html += autoReview.html;
   }
 
   html += '<div class="disclaimer" style="margin-top:1.5rem"><strong>声明：</strong>以上推荐号码基于历史数据统计分析生成，仅供娱乐参考。彩票开奖为随机事件，不构成任何投注建议。</div>';
