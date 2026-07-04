@@ -3116,19 +3116,20 @@ function renderKL8AllPlayTypes_V2(last, history) {
     }
     html += '</div>';
 
-    // 选五/六/九复式：每组7个号码
+    // 选五/六/九复式：基础选号 + 额外2个号码
     if (pt === 5 || pt === 6 || pt === 9) {
-      var fushiPicks = scores.slice(0, 7).map(function(s){return s.num;});
+      var fushiCount = pt === 5 ? 7 : pt === 6 ? 8 : 11;
+      var fushiPicks = scores.slice(0, fushiCount).map(function(s){return s.num;});
       var fushiQ = qualityScoreKL8(fushiPicks);
       var fushiName = pt === 5 ? '五' : pt === 6 ? '六' : '九';
       html += '<div class="strategy-box" style="margin:12px 0;padding:12px;border:1px solid var(--rule);border-radius:8px;background:linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(59,130,246,0.08) 100%)">';
-      html += '<h4 style="margin:0 0 6px 0;color:var(--ink)">选'+fushiName+'复式（7个号码·C(7,'+pt+')注）</h4>';
+      html += '<h4 style="margin:0 0 6px 0;color:var(--ink)">选'+fushiName+'复式（'+fushiCount+'个号码·C('+fushiCount+','+pt+')注）</h4>';
       html += '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;flex-wrap:wrap">';
       html += '<span style="font-weight:bold;color:var(--accent)">复式方案：</span>';
       html += '<span style="color:var(--ink)">'+fushiPicks.map(function(n){return String(n).padStart(2,'0');}).join(', ')+'</span>';
       html += '<span style="margin-left:auto;background:'+(fushiQ>=85?'var(--accent3)':(fushiQ>=70?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:12px">质量分 '+fushiQ+'</span>';
       html += '</div>';
-      html += '<p style="margin:4px 0 0 0;color:var(--muted);font-size:11px">从7个号码中选取'+pt+'个，复式投注覆盖更多组合</p>';
+      html += '<p style="margin:4px 0 0 0;color:var(--muted);font-size:11px">从'+fushiCount+'个号码中选取'+pt+'个，复式投注覆盖更多组合</p>';
       html += '</div>';
     }
   }
