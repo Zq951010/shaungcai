@@ -3115,6 +3115,22 @@ function renderKL8AllPlayTypes_V2(last, history) {
       html += '</div>';
     }
     html += '</div>';
+
+    // 选五/六/九复式：每组7个号码
+    if (pt === 5 || pt === 6 || pt === 9) {
+      var复式Picks = scores.slice(0, 7).map(function(s){return s.num;});
+      var复式Q = qualityScoreKL8(复式Picks);
+      var 复式Name = pt === 5 ? '五' : pt === 6 ? '六' : '九';
+      html += '<div class="strategy-box" style="margin:12px 0;padding:12px;border:1px solid var(--rule);border-radius:8px;background:linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(59,130,246,0.08) 100%)">';
+      html += '<h4 style="margin:0 0 6px 0;color:var(--ink)">选'+复式Name+'复式（7个号码·C(7,'+pt+')注）</h4>';
+      html += '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;flex-wrap:wrap">';
+      html += '<span style="font-weight:bold;color:var(--accent)">复式方案：</span>';
+      html += '<span style="color:var(--ink)">'+复式Picks.map(function(n){return String(n).padStart(2,'0');}).join(', ')+'</span>';
+      html += '<span style="margin-left:auto;background:'+(复式Q>=85?'var(--accent3)':(复式Q>=70?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:12px">质量分 '+复式Q+'</span>';
+      html += '</div>';
+      html += '<p style="margin:4px 0 0 0;color:var(--muted);font-size:11px">从7个号码中选取'+pt+'个，复式投注覆盖更多组合</p>';
+      html += '</div>';
+    }
   }
 
   html += '<h4 style="margin-top:16px;color:var(--ink)">📊 Top15 号码评分详情</h4>';
