@@ -3299,10 +3299,11 @@ function renderKL8AllPlayTypes_V2(last, history) {
   }
 
   function genStrategy2(playType) {
-    var hot = scores.slice(0, Math.max(playType, 10)).map(function(s){return s.num;});
-    var cold = scores.filter(function(s){return s.mp>0.7;}).slice(0, Math.max(playType, 10)).map(function(s){return s.num;});
-    var hotCount = Math.ceil(playType*0.5);
-    var picks = hot.slice(0, hotCount).concat(cold.slice(0, playType-hotCount));
+    // 热号+遗漏双轨：严格区分，冷号权重更高
+    var cold = scores.slice().sort(function(a,b){return b.mp - a.mp;}).slice(0, 10).map(function(s){return s.num;});
+    var hot = scores.slice(0, 8).map(function(s){return s.num;});
+    var hotCount = Math.ceil(playType * 0.4); // 冷号占60%
+    var picks = cold.slice(0, playType - hotCount).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0, hotCount));
     var unique = [];
     for (var i=0;i<picks.length && unique.length<playType;i++) if (unique.indexOf(picks[i])<0) unique.push(picks[i]);
     for (var i=0;i<scores.length && unique.length<playType;i++) {
@@ -3313,14 +3314,29 @@ function renderKL8AllPlayTypes_V2(last, history) {
   }
 
   function genStrategy3(playType) {
-    var mk = scores.filter(function(s){return s.mkScore>0.7;}).slice(0, Math.max(playType, 12)).map(function(s){return s.num;});
-    if (mk.length < playType) {
-      var missSorted = scores.slice().sort(function(a,b){return b.mp - a.mp;});
-      for (var i=0;i<missSorted.length && mk.length<playType;i++) {
-        if (mk.indexOf(missSorted[i].num)<0) mk.push(missSorted[i].num);
+    // 马尔可夫+周期驱动：以周期评分排序
+    var cycleSorted = scores.slice().sort(function(a,b){
+      var ca = cycleAnalysis(a.num, history);
+      var cb = cycleAnalysis(b.num, history);
+      return cb.score - ca.score || b.mkScore - a.mkScore;
+    });
+    var picks = cycleSorted.slice(0, playType).map(function(s){return s.num;});
+    picks.sort(function(a,b){return a-b;});
+    return picks;
+  }
+
+  function genStrategy4(playType) {
+    // 尾数分散策略：确保选出的号码尾数尽量不重复
+    var tailUsed = {};
+    var picks = [];
+    for (var i = 0; i < scores.length && picks.length < playType; i++) {
+      var n = scores[i].num;
+      var t = n % 10;
+      if (!tailUsed[t] || picks.length >= playType - 2) {
+        picks.push(n);
+        tailUsed[t] = true;
       }
     }
-    var picks = mk.slice(0, playType);
     picks.sort(function(a,b){return a-b;});
     return picks;
   }
@@ -3334,10 +3350,12 @@ function renderKL8AllPlayTypes_V2(last, history) {
     var s1 = genStrategy1(pt);
     var s2 = genStrategy2(pt);
     var s3 = genStrategy3(pt);
+    var s4 = genStrategy4(pt);
     var strategies = [
       {name:'区间均衡+热号', picks:s1, q:qualityScoreKL8(s1)},
-      {name:'热号+遗漏双轨', picks:s2, q:qualityScoreKL8(s2)},
-      {name:'马尔可夫转移驱动', picks:s3, q:qualityScoreKL8(s3)}
+      {name:'冷号优先+遗漏', picks:s2, q:qualityScoreKL8(s2)},
+      {name:'周期+马尔可夫', picks:s3, q:qualityScoreKL8(s3)},
+      {name:'尾数分散', picks:s4, q:qualityScoreKL8(s4)}
     ];
 
     html += '<div class="strategy-box" style="margin:12px 0;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--bg2)">';
