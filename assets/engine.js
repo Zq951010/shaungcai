@@ -2770,6 +2770,7 @@ function renderSSQTail(allReds) {
 var KL8_ZONES = [[1,20],[21,40],[41,60],[61,80]];
 
 var kl8SampleHistory = [
+  '09,15,16,21,27,32,33,34,36,38,39,44,45,54,60,67,77,78,79,80',
   '02,07,11,13,18,21,23,25,30,31,48,53,54,55,61,62,69,76,77,80',
   '01,03,05,08,09,12,19,24,27,30,32,47,51,52,59,64,67,74,75,80',
   '04,05,11,16,17,19,20,26,37,44,46,47,51,55,61,63,66,68,70,75',
@@ -3140,11 +3141,13 @@ function scoreKL8Numbers(last, history) {
     }
     var zoneAvg = recentZoneCounts[zoneIdx] / recentN;
     var zoneScore = zoneAvg < 4 ? 0.9 : zoneAvg < 5 ? 0.7 : 0.4;
-    // 上期区间偏态回补：26174期三区(41-60)仅4个偏少，下期三区号码加分
+    // 动态区间偏态回补：基于上期区间分布自动判断
     var lastZoneCounts = [0, 0, 0, 0];
     last.forEach(function(x){ lastZoneCounts[x<=20?0:x<=40?1:x<=60?2:3]++; });
-    if (lastZoneCounts[zoneIdx] <= 4 && zoneIdx === 2) { zoneScore += 0.15; }
-    else if (lastZoneCounts[zoneIdx] >= 6 && zoneIdx === 3) { zoneScore -= 0.08; }
+    var maxZoneIdx = lastZoneCounts.indexOf(Math.max.apply(null, lastZoneCounts));
+    var minZoneIdx = lastZoneCounts.indexOf(Math.min.apply(null, lastZoneCounts));
+    if (zoneIdx === minZoneIdx && lastZoneCounts[maxZoneIdx] - lastZoneCounts[zoneIdx] >= 3) { zoneScore += 0.15; }
+    else if (zoneIdx === maxZoneIdx && lastZoneCounts[zoneIdx] >= 7) { zoneScore -= 0.10; }
 
     var odd = n % 2 === 1;
     var recentOdds = 0;
@@ -3188,11 +3191,17 @@ function scoreKL8Numbers(last, history) {
     var totalTails = tails.reduce(function(a,b){return a+b;},0) || 1;
     var tailFreq = tails.map(function(t){return t/totalTails;});
     var tailScore = 1 - Math.abs(tailFreq[tail] - 0.1) * 5;
-    // 上期尾数偏态回补：26174期尾数1出现4次，下期关注其他尾数
+    // 上期尾数偏态回补（动态）：上期某尾数>=3次则降温，=0次则升温
     var lastTails = {};
     last.forEach(function(x){ lastTails[x%10] = (lastTails[x%10]||0) + 1; });
     if (lastTails[tail] >= 3) { tailScore -= 0.15; }
     else if (lastTails[tail] === 0) { tailScore += 0.10; }
+    // 连续两期尾数升温追踪：若近2期同一尾数都>=2次则额外降温
+    var prevTails = {};
+    if (history.length > 1) {
+      history[1].forEach(function(x){ prevTails[x%10] = (prevTails[x%10]||0) + 1; });
+      if (lastTails[tail] >= 2 && prevTails[tail] >= 2) { tailScore -= 0.10; }
+    }
 
     var neighborScore = 0;
     if (last.indexOf(n) >= 0) neighborScore = 0.9;
