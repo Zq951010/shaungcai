@@ -37,6 +37,138 @@ function range(a, b) {
   return r;
 }
 
+// ==================== 高级分析工具函数 ====================
+
+/**
+ * 信息熵分析：衡量号码分布的均匀程度
+ * 熵值高 = 分布均匀，熵值低 = 分布集中（冷热分明）
+ */
+function entropyAnalysis(history, maxNum) {
+  var freq = {};
+  for (var i = 1; i <= maxNum; i++) freq[i] = 0;
+  var total = 0;
+  for (var i = 0; i < history.length; i++) {
+    for (var j = 0; j < history[i].length; j++) {
+      freq[history[i][j]] = (freq[history[i][j]] || 0) + 1;
+      total++;
+    }
+  }
+  if (!total) return { entropy: 0, maxEntropy: Math.log(maxNum) / Math.LN2, ratio: 0 };
+  var entropy = 0;
+  for (var n = 1; n <= maxNum; n++) {
+    var p = freq[n] / total;
+    if (p > 0) entropy -= p * Math.log(p) / Math.LN2;
+  }
+  var maxEntropy = Math.log(maxNum) / Math.LN2;
+  return { entropy: entropy, maxEntropy: maxEntropy, ratio: entropy / maxEntropy };
+}
+
+/**
+ * 移动平均趋势线：追踪号码在多个时间窗口的出现频率
+ * 返回短期(5期)、中期(15期)、长期(全部)的频率及趋势方向
+ */
+function movingAverageTrend(num, history) {
+  var shortWindow = Math.min(5, history.length);
+  var midWindow = Math.min(15, history.length);
+  var longWindow = history.length;
+
+  var shortCount = 0, midCount = 0, longCount = 0;
+  for (var i = 0; i < history.length; i++) {
+    var hasNum = history[i].indexOf(num) >= 0;
+    if (hasNum) {
+      if (i < shortWindow) shortCount++;
+      if (i < midWindow) midCount++;
+      longCount++;
+    }
+  }
+
+  var shortFreq = shortWindow > 0 ? shortCount / shortWindow : 0;
+  var midFreq = midWindow > 0 ? midCount / midWindow : 0;
+  var longFreq = longWindow > 0 ? longCount / longWindow : 0;
+
+  var trend = 'stable';
+  if (shortFreq > midFreq * 1.3 && midFreq >= longFreq) trend = 'up';
+  else if (shortFreq < midFreq * 0.7 && midFreq <= longFreq) trend = 'down';
+  else if (shortFreq > longFreq * 1.2) trend = 'warming';
+  else if (shortFreq < longFreq * 0.8) trend = 'cooling';
+
+  return { shortFreq: shortFreq, midFreq: midFreq, longFreq: longFreq, trend: trend };
+}
+
+/**
+ * 周期性分析：计算号码的平均出现周期
+ * 返回平均周期、当前遗漏/周期比值（接近1时该"出"了）
+ */
+function cycleAnalysis(num, history) {
+  var gaps = [];
+  var lastIdx = -1;
+  for (var i = history.length - 1; i >= 0; i--) {
+    if (history[i].indexOf(num) >= 0) {
+      if (lastIdx >= 0) gaps.push(lastIdx - i);
+      lastIdx = i;
+    }
+  }
+  var avgCycle = gaps.length > 0 ? gaps.reduce(function(a, b) { return a + b; }, 0) / gaps.length : history.length;
+  var currentGap = lastIdx >= 0 ? lastIdx + 1 : history.length;
+  var cycleRatio = avgCycle > 0 ? currentGap / avgCycle : 0;
+  var score = 0.5;
+  if (cycleRatio >= 0.8 && cycleRatio <= 1.2) score = 1.0; // 恰好在周期点
+  else if (cycleRatio >= 0.6 && cycleRatio <= 1.5) score = 0.85;
+  else if (cycleRatio >= 1.5) score = 0.95; // 超周期，强烈回补
+  else if (cycleRatio <= 0.4) score = 0.3; // 刚出不久
+  return { avgCycle: avgCycle, currentGap: currentGap, cycleRatio: cycleRatio, score: score };
+}
+
+/**
+ * 组合间多样性评分：计算多个推荐方案的差异度
+ * 返回0-1的值，1表示完全多样化，0表示完全相同
+ */
+function comboDiversityScore(combos) {
+  if (combos.length <= 1) return 1;
+  var totalPairs = 0;
+  var totalDiff = 0;
+  for (var i = 0; i < combos.length; i++) {
+    for (var j = i + 1; j < combos.length; j++) {
+      var a = combos[i].slice().sort(function(a, b) { return a - b; });
+      var b = combos[j].slice().sort(function(a, b) { return a - b; });
+      var common = 0;
+      for (var ai = 0; ai < a.length; ai++) {
+        if (b.indexOf(a[ai]) >= 0) common++;
+      }
+      var maxLen = Math.max(a.length, b.length);
+      var diffRate = maxLen > 0 ? 1 - common / maxLen : 1;
+      totalDiff += diffRate;
+      totalPairs++;
+    }
+  }
+  return totalPairs > 0 ? totalDiff / totalPairs : 1;
+}
+
+/**
+ * 回测系统：用历史数据验证推荐模型的命中率
+ * 用前N期数据训练，预测第N+1期，对比实际结果
+ */
+function backtestModel(history, scoreFunc, recommendFunc, count, numPerDraw) {
+  var results = [];
+  var testCount = Math.min(10, Math.floor(history.length / 2));
+  for (var i = 0; i < testCount; i++) {
+    var trainEnd = history.length - testCount + i;
+    var trainData = history.slice(0, trainEnd);
+    var actual = history[trainEnd];
+    if (!actual || trainData.length < 5) continue;
+    var recommendation = recommendFunc(trainData, count);
+    var hit = 0;
+    for (var j = 0; j < recommendation.length; j++) {
+      if (actual.indexOf(recommendation[j]) >= 0) hit++;
+    }
+    results.push({ hit: hit, total: count, actualInDraw: numPerDraw, rate: hit / count });
+  }
+  if (!results.length) return { avgHit: 0, avgRate: 0, tests: 0 };
+  var avgHit = results.reduce(function(s, r) { return s + r.hit; }, 0) / results.length;
+  var avgRate = results.reduce(function(s, r) { return s + r.rate; }, 0) / results.length;
+  return { avgHit: avgHit, avgRate: avgRate, tests: results.length, details: results };
+}
+
 // ==================== 大乐透分析 ====================
 
 var DLT_ZONES = [[1,12],[13,23],[24,35]];
@@ -1025,13 +1157,22 @@ function scoreDLTNumbers_V3(lastDraw, history) {
     else if (consecutiveMiss >= 5) hotColdAltScore = 0.9; // 遗漏5期+，强烈回补
     else if (consecutiveMiss >= 3) hotColdAltScore = 0.75; // 遗漏3-4期，回补
 
+    // 移动平均趋势评分
+    var ma = movingAverageTrend(n, fronts);
+    var maScore = ma.trend === 'up' ? 0.9 : ma.trend === 'warming' ? 0.75 : ma.trend === 'stable' ? 0.6 : 0.4;
+
+    // 周期性分析评分
+    var cycle = cycleAnalysis(n, fronts);
+    var cycleScore = cycle.score;
+
     scores.push({
       num: n,
       wf: wf, currentGap: currentGap, mp: mp, mpScore: mpScore, mkScore: mkScore,
       tailScore: tailScore, oddAltScore: oddAltScore, sizeScore: sizeScore, zoneScore: zoneScore,
       neighborScore: neighborScore, pairScore: pairScore, stability: stability,
       diagonalScore: diagonalScore, hotColdAltScore: hotColdAltScore,
-      baseScore: wf*0.15 + mpScore*0.16 + tailScore*0.08 + oddAltScore*0.04 + sizeScore*0.03 + zoneScore*0.04 + neighborScore*0.04 + pairScore*0.05 + stability*0.04 + mkScore*0.11 + diagonalScore*0.05 + hotColdAltScore*0.06,
+      maScore: maScore, cycleScore: cycleScore,
+      baseScore: wf*0.14 + mpScore*0.14 + tailScore*0.07 + oddAltScore*0.04 + sizeScore*0.03 + zoneScore*0.04 + neighborScore*0.04 + pairScore*0.05 + stability*0.03 + mkScore*0.10 + diagonalScore*0.04 + hotColdAltScore*0.05 + maScore*0.05 + cycleScore*0.05,
       coScore: 0
     });
   }
@@ -1124,7 +1265,15 @@ function scoreDLTBlueNumbers_V3(lastDraw, history) {
       }
     }
 
-    scores.push({num: n, wf: wf, currentGap: currentGap, mp: mp, mpScore: mpScore, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, tailScore: tailScore, consecutiveScore: consecutiveScore, sumTrendScore: sumTrendScore, totalScore: wf*0.20 + mpScore*0.16 + oddScore*0.08 + sizeScore*0.06 + tailScore*0.07 + mkScore*0.09 + consecutiveScore*0.05 + sumTrendScore*0.04});
+    // 移动平均趋势评分
+    var ma = movingAverageTrend(n, backs);
+    var maScore = ma.trend === 'up' ? 0.9 : ma.trend === 'warming' ? 0.75 : ma.trend === 'stable' ? 0.6 : 0.4;
+
+    // 周期性分析评分
+    var cycle = cycleAnalysis(n, backs);
+    var cycleScore = cycle.score;
+
+    scores.push({num: n, wf: wf, currentGap: currentGap, mp: mp, mpScore: mpScore, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, tailScore: tailScore, consecutiveScore: consecutiveScore, sumTrendScore: sumTrendScore, maScore: maScore, cycleScore: cycleScore, totalScore: wf*0.18 + mpScore*0.14 + oddScore*0.07 + sizeScore*0.06 + tailScore*0.06 + mkScore*0.08 + consecutiveScore*0.05 + sumTrendScore*0.04 + maScore*0.04 + cycleScore*0.04});
   }
   return scores.sort(function(a,b){return b.totalScore-a.totalScore;});
 }
@@ -1482,6 +1631,35 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     html += '</div>';
   });
   html += '</div>';
+
+  // 多样性评分
+  var allFrontCombos = [s1[0].slice(0,5), s2[0].slice(0,5), s3[0].slice(0,5), s4[0].slice(0,5), s5[0].slice(0,5)];
+  var diversity = comboDiversityScore(allFrontCombos);
+  html += '<div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent3)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:4px">🎲 方案多样性评分：'+(diversity*100).toFixed(0)+'%</div>';
+  html += '<div style="color:var(--muted);font-size:11px">5个方案前区的差异度，越高表示方案越多样化</div>';
+  html += '</div>';
+
+  // 熵值分析
+  var ent = entropyAnalysis(allFronts, 35);
+  html += '<div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent5)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:4px">📈 号码分布熵值：'+(ent.ratio*100).toFixed(1)+'%</div>';
+  html += '<div style="color:var(--muted);font-size:11px">'+(ent.ratio > 0.85 ? '近期号码分布均匀，冷热平衡' : ent.ratio > 0.7 ? '分布适中，有轻微集中趋势' : '分布集中，冷热分化明显')+'</div>';
+  html += '</div>';
+
+  // 回测结果
+  var backtestFunc = function(trainData) {
+    var scores = scoreDLTNumbers_V3(trainData[trainData.length-1], trainData.slice(0,-1));
+    return scores.slice(0,5).map(function(s){return s.num;});
+  };
+  var bt = backtestModel(history, null, backtestFunc, 5, 5);
+  if (bt.tests > 0) {
+    html += '<div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent2)">';
+    html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:4px">🧪 回测验证（近'+bt.tests+'期）</div>';
+    html += '<div style="color:var(--muted);font-size:11px">前区Top5平均命中：'+bt.avgHit.toFixed(2)+'个（命中率 '+bt.avgRate.toFixed(1)+'%）</div>';
+    html += '</div>';
+  }
+
   html += '</div>';
 
   document.getElementById('dlt-recommend').innerHTML = html;
@@ -1997,7 +2175,15 @@ function scoreSSQNumbers(last, allReds) {
 
     var stability = 1 - Math.abs(wf - 0.18) * 3;
 
-    var baseScore = wf*0.18 + mpScore*0.15 + mkScore*0.12 + zoneScore*0.10 + tailScore*0.08 + oddAltScore*0.05 + sizeScore*0.05 + neighborScore*0.08 + pairScore*0.06 + hcScore*0.08 + stability*0.05;
+    // 移动平均趋势评分
+    var ma = movingAverageTrend(n, allReds);
+    var maScore = ma.trend === 'up' ? 0.9 : ma.trend === 'warming' ? 0.75 : ma.trend === 'stable' ? 0.6 : 0.4;
+
+    // 周期性分析评分
+    var cycle = cycleAnalysis(n, allReds);
+    var cycleScore = cycle.score;
+
+    var baseScore = wf*0.16 + mpScore*0.14 + mkScore*0.11 + zoneScore*0.09 + tailScore*0.07 + oddAltScore*0.04 + sizeScore*0.04 + neighborScore*0.07 + pairScore*0.05 + hcScore*0.07 + stability*0.04 + maScore*0.04 + cycleScore*0.04;
 
     var reasons = [];
     if (wf > 0.2) reasons.push('高频');
@@ -2009,8 +2195,10 @@ function scoreSSQNumbers(last, allReds) {
     if (hcScore > 0.7) reasons.push('冷热');
     if (stability > 0.7) reasons.push('稳定');
     if (pairScore > 0.5) reasons.push('连号');
+    if (ma.trend === 'up') reasons.push('趋势升');
+    if (cycleScore > 0.85) reasons.push('周期到');
 
-    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, tailScore: tailScore, oddAltScore: oddAltScore, sizeScore: sizeScore, neighborScore: neighborScore, pairScore: pairScore, hcScore: hcScore, stability: stability, baseScore: baseScore, coScore: 0, totalScore: baseScore, reasons: reasons });
+    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, tailScore: tailScore, oddAltScore: oddAltScore, sizeScore: sizeScore, neighborScore: neighborScore, pairScore: pairScore, hcScore: hcScore, stability: stability, maScore: maScore, cycleScore: cycleScore, baseScore: baseScore, coScore: 0, totalScore: baseScore, reasons: reasons });
   }
   var top10 = scores.slice().sort(function(a,b){return b.baseScore-a.baseScore;}).slice(0,10).map(function(s){return s.num;});
   scores.forEach(function(s){
@@ -2053,7 +2241,15 @@ function scoreSSQBlueNumbers(last, allBlues) {
     var tailFreq = tails.map(function(t){return t/totalTails;});
     var tailScore = 1 - Math.abs(tailFreq[tail] - 0.1) * 5;
 
-    var totalScore = wf * 0.28 + mpScore * 0.22 + mkScore * 0.13 + oddScore * 0.13 + sizeScore * 0.13 + tailScore * 0.11;
+    // 移动平均趋势评分
+    var ma = movingAverageTrend(n, blueHistory);
+    var maScore = ma.trend === 'up' ? 0.9 : ma.trend === 'warming' ? 0.75 : ma.trend === 'stable' ? 0.6 : 0.4;
+
+    // 周期性分析评分
+    var cycle = cycleAnalysis(n, blueHistory);
+    var cycleScore = cycle.score;
+
+    var totalScore = wf * 0.25 + mpScore * 0.20 + mkScore * 0.11 + oddScore * 0.11 + sizeScore * 0.11 + tailScore * 0.09 + maScore * 0.04 + cycleScore * 0.04;
 
     var reasons = [];
     if (wf > 0.2) reasons.push('高频');
@@ -2062,8 +2258,10 @@ function scoreSSQBlueNumbers(last, allBlues) {
     if (oddScore > 0.7) reasons.push('奇偶');
     if (sizeScore > 0.7) reasons.push('大小');
     if (tailScore > 0.7) reasons.push('尾数');
+    if (ma.trend === 'up') reasons.push('趋势升');
+    if (cycleScore > 0.85) reasons.push('周期到');
 
-    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, tailScore: tailScore, totalScore: totalScore, reasons: reasons });
+    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, tailScore: tailScore, maScore: maScore, cycleScore: cycleScore, totalScore: totalScore, reasons: reasons });
   }
   return scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 }
@@ -2244,6 +2442,35 @@ function renderSSQRecommend(last, allReds, allBlues) {
     html += '</div>';
   });
   html += '</div>';
+
+  // 多样性评分
+  var allRedCombos = [s1[0].reds, s2[0].reds, s3[0].reds];
+  var diversity = comboDiversityScore(allRedCombos);
+  html += '<div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent3)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:4px">🎲 方案多样性评分：'+(diversity*100).toFixed(0)+'%</div>';
+  html += '<div style="color:var(--muted);font-size:11px">3个方案红球的差异度，越高表示方案越多样化</div>';
+  html += '</div>';
+
+  // 熵值分析
+  var ent = entropyAnalysis(allReds, 33);
+  html += '<div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent5)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:4px">📈 号码分布熵值：'+(ent.ratio*100).toFixed(1)+'%</div>';
+  html += '<div style="color:var(--muted);font-size:11px">'+(ent.ratio > 0.85 ? '近期号码分布均匀，冷热平衡' : ent.ratio > 0.7 ? '分布适中，有轻微集中趋势' : '分布集中，冷热分化明显')+'</div>';
+  html += '</div>';
+
+  // 回测结果
+  var backtestFunc = function(trainData) {
+    var scores = scoreSSQNumbers(trainData[trainData.length-1], trainData.slice(0,-1));
+    return scores.slice(0,6).map(function(s){return s.num;});
+  };
+  var bt = backtestModel(allReds, null, backtestFunc, 6, 6);
+  if (bt.tests > 0) {
+    html += '<div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent2)">';
+    html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:4px">🧪 回测验证（近'+bt.tests+'期）</div>';
+    html += '<div style="color:var(--muted);font-size:11px">红球Top6平均命中：'+bt.avgHit.toFixed(2)+'个（命中率 '+bt.avgRate.toFixed(1)+'%）</div>';
+    html += '</div>';
+  }
+
   html += '<div class="disclaimer" style="margin-top:1.5rem"><strong>声明：</strong>以上推荐号码基于历史数据统计分析生成，仅供娱乐参考。彩票开奖为随机事件，不构成任何投注建议。</div>';
   html += '</div>';
 
@@ -2986,7 +3213,15 @@ function scoreKL8Numbers(last, history) {
 
     var stability = 1 - Math.abs(wf - 0.25) * 3;
 
-    var totalScore = wf * 0.19 + mpScore * 0.17 + mkScore * 0.12 + zoneScore * 0.11 + oddEvenScore * 0.10 + bigSmallScore * 0.10 + tailScore * 0.08 + neighborScore * 0.04 + stability * 0.05 + consecutiveScore * 0.04;
+    // 移动平均趋势评分
+    var ma = movingAverageTrend(n, history);
+    var maScore = ma.trend === 'up' ? 0.9 : ma.trend === 'warming' ? 0.75 : ma.trend === 'stable' ? 0.6 : 0.4;
+
+    // 周期性分析评分
+    var cycle = cycleAnalysis(n, history);
+    var cycleScore = cycle.score;
+
+    var totalScore = wf * 0.17 + mpScore * 0.15 + mkScore * 0.11 + zoneScore * 0.10 + oddEvenScore * 0.09 + bigSmallScore * 0.09 + tailScore * 0.07 + neighborScore * 0.04 + stability * 0.04 + consecutiveScore * 0.04 + maScore * 0.03 + cycleScore * 0.03;
 
     var reasons = [];
     if (wf > 0.25) reasons.push('高频');
@@ -2999,8 +3234,10 @@ function scoreKL8Numbers(last, history) {
     if (neighborScore > 0.7) reasons.push('邻号');
     if (consecutiveScore > 0.5) reasons.push('连号');
     if (stability > 0.7) reasons.push('稳定');
+    if (ma.trend === 'up') reasons.push('趋势升');
+    if (cycleScore > 0.85) reasons.push('周期到');
 
-    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, oddEvenScore: oddEvenScore, bigSmallScore: bigSmallScore, tailScore: tailScore, neighborScore: neighborScore, stability: stability, totalScore: totalScore, reasons: reasons });
+    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, oddEvenScore: oddEvenScore, bigSmallScore: bigSmallScore, tailScore: tailScore, neighborScore: neighborScore, stability: stability, maScore: maScore, cycleScore: cycleScore, totalScore: totalScore, reasons: reasons });
   }
   return scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 }
@@ -3174,6 +3411,27 @@ function renderKL8AllPlayTypes_V2(last, history) {
   });
 
   html += '</tbody></table></div>';
+
+  // 熵值分析
+  var ent = entropyAnalysis(history, 80);
+  html += '<div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent5)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:4px">📈 号码分布熵值：'+(ent.ratio*100).toFixed(1)+'%</div>';
+  html += '<div style="color:var(--muted);font-size:11px">'+(ent.ratio > 0.85 ? '近期号码分布均匀，冷热平衡' : ent.ratio > 0.7 ? '分布适中，有轻微集中趋势' : '分布集中，冷热分化明显')+'</div>';
+  html += '</div>';
+
+  // 回测结果（选十玩法）
+  var backtestFunc = function(trainData) {
+    var scores = scoreKL8Numbers(trainData[trainData.length-1], trainData.slice(0,-1));
+    return scores.slice(0,10).map(function(s){return s.num;});
+  };
+  var bt = backtestModel(history, null, backtestFunc, 10, 20);
+  if (bt.tests > 0) {
+    html += '<div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent2)">';
+    html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:4px">🧪 回测验证（近'+bt.tests+'期）</div>';
+    html += '<div style="color:var(--muted);font-size:11px">选十Top10平均命中：'+bt.avgHit.toFixed(2)+'个（命中率 '+bt.avgRate.toFixed(1)+'%）</div>';
+    html += '</div>';
+  }
+
   html += '<div class="disclaimer" style="margin-top:1.5rem"><strong>声明：</strong>以上推荐号码基于历史数据统计分析生成，仅供娱乐参考。彩票开奖为随机事件，不构成任何投注建议。</div>';
   html += '</div>';
 
