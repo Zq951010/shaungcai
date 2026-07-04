@@ -943,6 +943,25 @@ function scoreDLTNumbers_V3(lastDraw, history) {
   var co = buildCoOccurrence(fronts);
   var last = lastDraw.slice(0,5);
   var scores = [];
+
+  // 近5期区间均值偏移计算
+  var recentN = Math.min(5, fronts.length);
+  var recentZoneCounts = [0, 0, 0];
+  var allZoneCounts = [0, 0, 0];
+  for (var i = 0; i < fronts.length; i++) {
+    for (var j = 0; j < fronts[i].length; j++) {
+      var zn = fronts[i][j] <= 12 ? 0 : fronts[i][j] <= 23 ? 1 : 2;
+      allZoneCounts[zn]++;
+      if (i < recentN) recentZoneCounts[zn]++;
+    }
+  }
+  var zoneAvgAll = allZoneCounts.map(function(c){ return c / fronts.length; });
+  var zoneAvgRecent = recentZoneCounts.map(function(c){ return c / recentN; });
+
+  // 上期尾数频次（用于尾数偏态回补）
+  var lastTailFreq = {};
+  last.forEach(function(x){ lastTailFreq[x%10] = (lastTailFreq[x%10]||0) + 1; });
+
   for (var n = 1; n <= 35; n++) {
     var wf = weightedFreq(n, fronts, 8);
     var dist = getMissDistribution(n, fronts);
@@ -953,31 +972,66 @@ function scoreDLTNumbers_V3(lastDraw, history) {
     var mkScore = mk.pBtoA > mk.pAtoA ? 0.9 : (mk.pBtoA > 0.3 ? 0.7 : 0.4);
     var tail = n % 10;
     var tailScore = 1 - Math.abs(tailStats(fronts)[tail] - 0.1) * 5;
+    // 尾数偏态回补：上期某尾数出现>=2次则该尾数降分，=0次则加分
+    if (lastTailFreq[tail] >= 2) tailScore -= 0.12;
+    else if (!lastTailFreq[tail]) tailScore += 0.08;
+
     var isOdd = n % 2 === 1;
     var oddRatio = last.filter(function(x){return x%2===1;}).length / 5;
     var oddAltScore;
     if (oddRatio >= 0.8) {
-      // 上期奇数极多，下期倾向偶数（回归）
       oddAltScore = isOdd ? 0.3 : 0.95;
     } else if (oddRatio <= 0.2) {
-      // 上期奇数极少，下期倾向奇数（回归）
       oddAltScore = isOdd ? 0.95 : 0.3;
     } else {
       oddAltScore = (isOdd && oddRatio <= 0.6) || (!isOdd && oddRatio >= 0.4) ? 0.8 : 0.5;
     }
     var sizeScore = (n <= 17 && last.filter(function(x){return x<=17;}).length <= 3) || (n > 17 && last.filter(function(x){return x>17;}).length <= 3) ? 0.8 : 0.5;
+
+    // 区间评分增强：结合近5期均值偏移
+    var zoneIdx = n <= 12 ? 0 : n <= 23 ? 1 : 2;
     var zoneScore = ((n<=12 && last.filter(function(x){return x<=12;}).length<=2) || (n>12&&n<=23 && last.filter(function(x){return x>12&&x<=23;}).length<=2) || (n>23 && last.filter(function(x){return x>23;}).length<=2)) ? 0.8 : 0.5;
+    var zoneShift = zoneAvgRecent[zoneIdx] - zoneAvgAll[zoneIdx];
+    if (zoneShift <= -0.3) zoneScore += 0.12; // 近期偏少，回补预期
+    else if (zoneShift >= 0.3) zoneScore -= 0.08; // 近期偏多，降温
+
+    // 斜连号评分：与上期号码差2或差3
+    var diagonalScore = 0;
+    for (var di = 0; di < last.length; di++) {
+      var diff = Math.abs(n - last[di]);
+      if (diff === 2) { diagonalScore = 0.75; break; }
+      else if (diff === 3) { diagonalScore = 0.55; break; }
+    }
+
     // neighborScore 优化：结合上期邻号判断 + 该号码作为连号一部分的历史频率
     var hasNeighbor = last.some(function(x){ return Math.abs(x-n)<=1 && x!==n; });
     var pairScore = pairHistoryScore(n, fronts);
     var neighborScore = hasNeighbor ? (0.6 + pairScore * 0.4) : (0.2 + pairScore * 0.2);
     var stability = 1 - Math.abs(wf - 0.15) * 3;
+
+    // 冷热交替评分：连续出现期数或连续遗漏期数
+    var hotColdAltScore = 0.5;
+    var consecutiveAppear = 0, consecutiveMiss = 0;
+    for (var ci = 0; ci < fronts.length; ci++) {
+      if (fronts[ci].indexOf(n) >= 0) {
+        if (consecutiveMiss > 0) break;
+        consecutiveAppear++;
+      } else {
+        if (consecutiveAppear > 0) break;
+        consecutiveMiss++;
+      }
+    }
+    if (consecutiveAppear >= 2) hotColdAltScore = 0.3; // 连出2期+，降温
+    else if (consecutiveMiss >= 5) hotColdAltScore = 0.9; // 遗漏5期+，强烈回补
+    else if (consecutiveMiss >= 3) hotColdAltScore = 0.75; // 遗漏3-4期，回补
+
     scores.push({
       num: n,
       wf: wf, currentGap: currentGap, mp: mp, mpScore: mpScore, mkScore: mkScore,
       tailScore: tailScore, oddAltScore: oddAltScore, sizeScore: sizeScore, zoneScore: zoneScore,
       neighborScore: neighborScore, pairScore: pairScore, stability: stability,
-      baseScore: wf*0.17 + mpScore*0.17 + tailScore*0.09 + oddAltScore*0.04 + sizeScore*0.03 + zoneScore*0.03 + neighborScore*0.04 + pairScore*0.06 + stability*0.05 + mkScore*0.12,
+      diagonalScore: diagonalScore, hotColdAltScore: hotColdAltScore,
+      baseScore: wf*0.15 + mpScore*0.16 + tailScore*0.08 + oddAltScore*0.04 + sizeScore*0.03 + zoneScore*0.04 + neighborScore*0.04 + pairScore*0.05 + stability*0.04 + mkScore*0.11 + diagonalScore*0.05 + hotColdAltScore*0.06,
       coScore: 0
     });
   }
@@ -997,6 +1051,25 @@ function scoreDLTBlueNumbers_V3(lastDraw, history) {
   var backs = history.map(function(h){ return h.slice(5); });
   var lastB = lastDraw.slice(5);
   var scores = [];
+
+  // 后区连号概率统计
+  var consecutiveCount = 0, consecutiveTotal = 0;
+  for (var ci = 0; ci < backs.length; ci++) {
+    var b = backs[ci].sort(function(a,b){return a-b;});
+    if (Math.abs(b[0]-b[1]) === 1) { consecutiveCount++; }
+    consecutiveTotal++;
+  }
+  var consecutiveProb = consecutiveTotal > 0 ? consecutiveCount / consecutiveTotal : 0.2;
+
+  // 后区和值历史统计
+  var backSums = backs.map(function(b){ return b[0]+b[1]; });
+  var avgBackSum = backSums.reduce(function(a,b){return a+b;},0) / (backSums.length||1);
+  var lastBackSum = lastB[0] + lastB[1];
+
+  // 后区奇偶比历史统计
+  var oddHistory = backs.map(function(b){ return b.filter(function(x){return x%2===1;}).length; });
+  var avgOddBack = oddHistory.reduce(function(a,b){return a+b;},0) / (oddHistory.length||1);
+
   for (var n = 1; n <= 12; n++) {
     var wf = weightedFreq(n, backs, 6);
     var dist = getMissDistribution(n, backs);
@@ -1005,11 +1078,53 @@ function scoreDLTBlueNumbers_V3(lastDraw, history) {
     var mpScore = mp > 0.85 ? 1.0 : (mp > 0.7 ? 0.8 : (mp > 0.5 ? 0.6 : 0.3));
     var mk = markovProb(n, backs);
     var mkScore = mk.pBtoA > mk.pAtoA ? 0.9 : (mk.pBtoA > 0.3 ? 0.7 : 0.4);
-    var oddScore = (n%2===1 && lastB.filter(function(x){return x%2===1;}).length<=1) || (n%2===0 && lastB.filter(function(x){return x%2===0;}).length<=1) ? 0.85 : 0.5;
+
+    // 奇偶评分增强：结合历史奇偶比均值
+    var lastOddCount = lastB.filter(function(x){return x%2===1;}).length;
+    var oddScore;
+    if (lastOddCount === 2) {
+      // 上期全奇，下期倾向偶数
+      oddScore = n%2===0 ? 0.9 : 0.4;
+    } else if (lastOddCount === 0) {
+      // 上期全偶，下期倾向奇数
+      oddScore = n%2===1 ? 0.9 : 0.4;
+    } else {
+      oddScore = (n%2===1 && lastOddCount<=1) || (n%2===0 && lastOddCount>=1) ? 0.8 : 0.55;
+    }
+    // 历史奇偶比回归：历史均值偏离1.0较大时强化回归
+    if (avgOddBack >= 1.3 && n%2===0) oddScore += 0.08;
+    else if (avgOddBack <= 0.7 && n%2===1) oddScore += 0.08;
+
     var sizeScore = (n<=6 && lastB.filter(function(x){return x<=6;}).length<=1) || (n>6 && lastB.filter(function(x){return x>6;}).length<=1) ? 0.85 : 0.5;
     // 同尾组合评分：该尾数在历史上作为后区同尾出现的频率
     var tailScore = backTailPairScore(n, backs);
-    scores.push({num: n, wf: wf, currentGap: currentGap, mp: mp, mpScore: mpScore, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, tailScore: tailScore, totalScore: wf*0.23 + mpScore*0.18 + oddScore*0.07 + sizeScore*0.07 + tailScore*0.08 + mkScore*0.10});
+
+    // 连号评分：若历史连号概率高且n与上期某号差1则加分
+    var consecutiveScore = 0;
+    if (consecutiveProb > 0.25) {
+      for (var cj = 0; cj < lastB.length; cj++) {
+        if (Math.abs(n - lastB[cj]) === 1) { consecutiveScore = 0.7; break; }
+      }
+    }
+
+    // 和值趋势评分：若n参与的组合和值接近历史均值则加分
+    var sumTrendScore = 0.5;
+    for (var sj = 0; sj < lastB.length; sj++) {
+      var pairSum = n + lastB[sj];
+      if (Math.abs(pairSum - avgBackSum) <= 3) { sumTrendScore = 0.8; break; }
+    }
+    // 上期和值偏态回补
+    if (Math.abs(lastBackSum - avgBackSum) > 5) {
+      for (var sk = 0; sk < lastB.length; sk++) {
+        var ps = n + lastB[sk];
+        if ((lastBackSum > avgBackSum && ps < avgBackSum) || (lastBackSum < avgBackSum && ps > avgBackSum)) {
+          sumTrendScore += 0.1;
+          break;
+        }
+      }
+    }
+
+    scores.push({num: n, wf: wf, currentGap: currentGap, mp: mp, mpScore: mpScore, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, tailScore: tailScore, consecutiveScore: consecutiveScore, sumTrendScore: sumTrendScore, totalScore: wf*0.20 + mpScore*0.16 + oddScore*0.08 + sizeScore*0.06 + tailScore*0.07 + mkScore*0.09 + consecutiveScore*0.05 + sumTrendScore*0.04});
   }
   return scores.sort(function(a,b){return b.totalScore-a.totalScore;});
 }
@@ -1062,6 +1177,29 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     s.forEach(function(n){ var t=n%10; if(tailSeen[t]) sameTailPairs++; else tailSeen[t]=true; });
     if (sameTailPairs===1) q+=5;
 
+    // AC值分析（号码离散度）：AC值越大号码分布越分散
+    var acValue = 0;
+    var diffs = [];
+    for (var ai=0; ai<s.length-1; ai++) {
+      for (var aj=ai+1; aj<s.length; aj++) {
+        diffs.push(s[aj]-s[ai]);
+      }
+    }
+    var uniqueDiffs = {};
+    diffs.forEach(function(d){ uniqueDiffs[d]=true; });
+    acValue = Object.keys(uniqueDiffs).length;
+    if (acValue>=8) q+=8; else if (acValue>=6) q+=4;
+
+    // 斜连号质量分：与上期号码差2/3的个数
+    var diagonalCount = 0;
+    for (var di=0; di<s.length; di++) {
+      for (var dj=0; dj<lastFront.length; dj++) {
+        var diff = Math.abs(s[di]-lastFront[dj]);
+        if (diff===2 || diff===3) { diagonalCount++; break; }
+      }
+    }
+    if (diagonalCount>=2) q+=5; else if (diagonalCount>=1) q+=3;
+
     // ========== 基于上期特征的动态回归调整 ==========
     // 1. 奇偶回归：上期极端则下期强烈反向回归
     if ((lastOddRatio >= 0.8 && odd <= 2) || (lastOddRatio <= 0.2 && odd >= 3)) q += 4;
@@ -1076,6 +1214,13 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
       var backTailSame = (back[0] % 10) === (back[1] % 10);
       if (!backTailSame) q += 5;
     }
+    // 5. 区间均值偏移回补：上期某区间偏多则下期该区间偏少加分
+    var lastZ1 = lastFront.filter(function(x){return x<=12;}).length;
+    var lastZ2 = lastFront.filter(function(x){return x>12&&x<=23;}).length;
+    var lastZ3 = lastFront.filter(function(x){return x>23;}).length;
+    if (lastZ1 >= 3 && z1 <= 2) q += 3;
+    if (lastZ2 >= 3 && z2 <= 2) q += 3;
+    if (lastZ3 >= 3 && z3 <= 2) q += 3;
 
     var fScore = s.reduce(function(sum,n){var sc=frontScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
     var bScore = back.reduce(function(sum,n){var sc=backScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
@@ -1223,14 +1368,50 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     return baseCombo;
   }
 
+  // 策略5：区间偏移驱动
+  function genStrategy5() {
+    var zonePool = [[], [], []];
+    for (var zi = 0; zi < frontScores.length; zi++) {
+      var n = frontScores[zi].num;
+      var idx = n <= 12 ? 0 : n <= 23 ? 1 : 2;
+      zonePool[idx].push(n);
+    }
+    // 上期区间分布
+    var lastZone = [0, 0, 0];
+    lastFront.forEach(function(x){ lastZone[x<=12?0:x<=23?1:2]++; });
+    // 优先从近期偏少的区间选取
+    var zoneOrder = [0, 1, 2].sort(function(a,b){ return lastZone[a] - lastZone[b]; });
+    var picks = [];
+    // 每个区间至少选1个，优先从偏少区间多选
+    for (var zi = 0; zi < 3; zi++) {
+      var zidx = zoneOrder[zi];
+      var need = zi === 0 ? 2 : zi === 1 ? 2 : 1;
+      for (var pj = 0; pj < zonePool[zidx].length && picks.length < 5; pj++) {
+        if (picks.indexOf(zonePool[zidx][pj]) < 0) {
+          picks.push(zonePool[zidx][pj]);
+          need--;
+          if (need <= 0) break;
+        }
+      }
+    }
+    // 补足到5个
+    for (var fi = 0; fi < frontScores.length && picks.length < 5; fi++) {
+      if (picks.indexOf(frontScores[fi].num) < 0) picks.push(frontScores[fi].num);
+    }
+    picks.sort(function(a,b){return a-b;});
+    var b = [backScores[0].num, backScores[Math.min(2, backScores.length-1)].num];
+    return [picks.concat(b)];
+  }
+
   var s1 = genStrategy1();
   var s2 = genStrategy2();
   var s3 = genStrategy3();
   var s4 = genStrategy4();
+  var s5 = genStrategy5();
 
-  // 去重：确保四个策略的推荐不完全相同
+  // 去重：确保五个策略的推荐不完全相同
   var allCombos = [];
-  [s1, s2, s3, s4].forEach(function(strat) {
+  [s1, s2, s3, s4, s5].forEach(function(strat) {
     for (var i=0;i<strat.length;i++) {
       var dup = false;
       for (var j=0;j<allCombos.length;j++) {
@@ -1243,14 +1424,15 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     }
   });
 
-  var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V3 严谨模型推荐</h3>';
-  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·共现矩阵·马尔可夫转移·尾数分散·区间均衡·连号历史·邻号·奇偶回归·大小均衡·稳定性 十一维评分体系（含上期特征动态回归）</p>';
+  var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V3+ 增强模型推荐</h3>';
+  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·共现矩阵·马尔可夫转移·尾数分散·区间偏移·连号历史·邻号·奇偶回归·大小均衡·稳定性·斜连号·冷热交替·AC值 十四维评分体系（含上期特征动态回归）</p>';
 
   var strategies = [
-    {name:'严格约束优化', desc:'在Top14热号中遍历所有组合，通过硬性约束（和值/跨度/区间/奇偶/大小/尾数/连号）筛选最高分', combos:s1},
+    {name:'严格约束优化', desc:'在Top14热号中遍历所有组合，通过硬性约束（和值/跨度/区间/奇偶/大小/尾数/连号/AC值/斜连号）筛选最高分', combos:s1},
     {name:'热号+遗漏双轨', desc:'前3球从Top8热号抽取，后2球从遗漏百分位>70%的冷号补充', combos:s2},
     {name:'马尔可夫转移驱动', desc:'优先选择p(B→A) > p(A→A)的号码（冷转热概率高），辅以遗漏百分位', combos:s3},
-    {name:'共现聚类', desc:'以Top1号码为种子，迭代添加共现概率最高的号码形成聚类', combos:s4}
+    {name:'共现聚类', desc:'以Top1号码为种子，迭代添加共现概率最高的号码形成聚类', combos:s4},
+    {name:'区间偏移回补', desc:'优先从近期偏少的区间选取号码，实现区间均值回归', combos:s5}
   ];
 
   strategies.forEach(function(st,i){
