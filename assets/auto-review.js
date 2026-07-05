@@ -2420,19 +2420,22 @@ function autoReviewPL5() {
 }
 
 function generatePLSimPicks(scores, pickCount) {
-  var sorted = scores.slice().sort(function(a, b) { return b.total - a.total; });
-  var recommendations = [];
+  // scores 是按位置分组的二维数组: [pos0Scores, pos1Scores, ...]
+  // 每个位置内部按 total 降序排列
+  var sortedByPos = [];
+  for (var pos = 0; pos < scores.length; pos++) {
+    sortedByPos.push(scores[pos].slice().sort(function(a, b) { return b.total - a.total; }));
+  }
 
+  var recommendations = [];
   for (var set = 0; set < 3; set++) {
     var picks = [];
-    var usedNums = {};
-    picks.push(sorted[set].num);
-    usedNums[sorted[set].num] = true;
-    for (var i = 0; i < sorted.length && picks.length < pickCount; i++) {
-      var n = sorted[i].num;
-      if (!usedNums[n]) {
-        picks.push(n);
-        usedNums[n] = true;
+    for (var pos = 0; pos < pickCount; pos++) {
+      // 每个位置取排名第 set 的数字
+      if (sortedByPos[pos] && sortedByPos[pos][set]) {
+        picks.push(sortedByPos[pos][set].num);
+      } else if (sortedByPos[pos] && sortedByPos[pos][0]) {
+        picks.push(sortedByPos[pos][0].num);
       }
     }
     recommendations.push(picks);
