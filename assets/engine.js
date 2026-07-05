@@ -273,14 +273,14 @@ function analyzeDLT() {
   document.getElementById('dlt-empty').style.display = 'none';
   document.getElementById('dlt-results').style.display = 'block';
 
-  renderDLTStats(last, history);
-  renderDLTRepeat(last, history);
-  renderDLTZone(allFronts);
-  renderDLTSum(allFronts);
-  renderDLTSpan(allFronts);
-  renderDLTHotCold(allFronts, allBacks);
-  renderDLTDanTuo(last, allFronts, allBacks);
-  renderDLTRecommend_V3(last.front.concat(last.back), allFronts, allBacks);
+  try { renderDLTStats(last, history); } catch(e) { console.log('renderDLTStats error:', e.message); }
+  try { renderDLTRepeat(last, history); } catch(e) { console.log('renderDLTRepeat error:', e.message); }
+  try { renderDLTZone(allFronts); } catch(e) { console.log('renderDLTZone error:', e.message); }
+  try { renderDLTSum(allFronts); } catch(e) { console.log('renderDLTSum error:', e.message); }
+  try { renderDLTSpan(allFronts); } catch(e) { console.log('renderDLTSpan error:', e.message); }
+  try { renderDLTHotCold(allFronts, allBacks); } catch(e) { console.log('renderDLTHotCold error:', e.message); }
+  try { renderDLTDanTuo(last, allFronts, allBacks); } catch(e) { console.log('renderDLTDanTuo error:', e.message); }
+  try { renderDLTRecommend_V3(last.front.concat(last.back), allFronts, allBacks); } catch(e) { console.log('renderDLTRecommend_V3 error:', e.message); }
 
   // Scroll to results
   document.getElementById('dlt-results').scrollIntoView({ behavior: 'smooth' });
@@ -1757,18 +1757,18 @@ function analyzeSSQ() {
   document.getElementById('ssq-empty').style.display = 'none';
   document.getElementById('ssq-results').style.display = 'block';
 
-  renderSSQStats(last, history);
-  renderSSQRepeat(last, history);
-  renderSSQZone(allReds);
-  renderSSQSum(allReds);
-  renderSSQSpan(allReds);
-  renderSSQHotCold(allReds, allBlues);
-  renderSSQBlueTrend(allBlues);
-  renderSSQOddEven(allReds, allBlues);
-  renderSSQBlueMiss(allBlues);
-  renderSSQTail(allReds);
-  renderSSQDanTuo(last, allReds, allBlues);
-  renderSSQRecommend(last, allReds, allBlues);
+  try { renderSSQStats(last, history); } catch(e) { console.log('renderSSQStats error:', e.message); }
+  try { renderSSQRepeat(last, history); } catch(e) { console.log('renderSSQRepeat error:', e.message); }
+  try { renderSSQZone(allReds); } catch(e) { console.log('renderSSQZone error:', e.message); }
+  try { renderSSQSum(allReds); } catch(e) { console.log('renderSSQSum error:', e.message); }
+  try { renderSSQSpan(allReds); } catch(e) { console.log('renderSSQSpan error:', e.message); }
+  try { renderSSQHotCold(allReds, allBlues); } catch(e) { console.log('renderSSQHotCold error:', e.message); }
+  try { renderSSQBlueTrend(allBlues); } catch(e) { console.log('renderSSQBlueTrend error:', e.message); }
+  try { renderSSQOddEven(allReds, allBlues); } catch(e) { console.log('renderSSQOddEven error:', e.message); }
+  try { renderSSQBlueMiss(allBlues); } catch(e) { console.log('renderSSQBlueMiss error:', e.message); }
+  try { renderSSQTail(allReds); } catch(e) { console.log('renderSSQTail error:', e.message); }
+  try { renderSSQDanTuo(last, allReds, allBlues); } catch(e) { console.log('renderSSQDanTuo error:', e.message); }
+  try { renderSSQRecommend(last, allReds, allBlues); } catch(e) { console.log('renderSSQRecommend error:', e.message); }
 
   document.getElementById('ssq-results').scrollIntoView({ behavior: 'smooth' });
 }
@@ -2849,18 +2849,18 @@ function analyzeKL8() {
   document.getElementById('kl8-empty').style.display = 'none';
   document.getElementById('kl8-results').style.display = 'block';
 
-  renderKL8Stats(last, history);
-  renderKL8Repeat(last, history);
-  renderKL8Zone(history);
-  renderKL8Sum(history);
-  renderKL8Span(history);
-  renderKL8HotCold(history);
-  renderKL8OddEven(history);
-  renderKL8Tail(history);
-  renderKL8Consecutive(history);
-  renderKL8AC(history);
-  renderKL8DanTuo(last, history, playType);
-  renderKL8AllPlayTypes_V2(last, history);
+  try { renderKL8Stats(last, history); } catch(e) { console.log('renderKL8Stats error:', e.message); }
+  try { renderKL8Repeat(last, history); } catch(e) { console.log('renderKL8Repeat error:', e.message); }
+  try { renderKL8Zone(history); } catch(e) { console.log('renderKL8Zone error:', e.message); }
+  try { renderKL8Sum(history); } catch(e) { console.log('renderKL8Sum error:', e.message); }
+  try { renderKL8Span(history); } catch(e) { console.log('renderKL8Span error:', e.message); }
+  try { renderKL8HotCold(history); } catch(e) { console.log('renderKL8HotCold error:', e.message); }
+  try { renderKL8OddEven(history); } catch(e) { console.log('renderKL8OddEven error:', e.message); }
+  try { renderKL8Tail(history); } catch(e) { console.log('renderKL8Tail error:', e.message); }
+  try { renderKL8Consecutive(history); } catch(e) { console.log('renderKL8Consecutive error:', e.message); }
+  try { renderKL8AC(history); } catch(e) { console.log('renderKL8AC error:', e.message); }
+  try { renderKL8DanTuo(last, history, playType); } catch(e) { console.log('renderKL8DanTuo error:', e.message); }
+  try { renderKL8AllPlayTypes_V2(last, history); } catch(e) { console.log('renderKL8AllPlayTypes_V2 error:', e.message); }
 
   document.getElementById('kl8-results').scrollIntoView({ behavior: 'smooth' });
 }
