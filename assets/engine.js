@@ -3257,7 +3257,7 @@ function scoreKL8Numbers(last, history) {
  * 返回复盘报告HTML和各维度偏差分析
  */
 function runKL8AutoReview(history) {
-  var testCount = Math.min(3, history.length - 1);
+  var testCount = Math.min(2, history.length - 1);
   if (testCount < 1) return { html: '', insights: [] };
 
   var results = [];
@@ -3269,29 +3269,24 @@ function runKL8AutoReview(history) {
 
     var scores = scoreKL8Numbers(lastTrain, trainData.slice(0, -1));
 
-    // 模拟4个策略的选十推荐
+    // 仅模拟方案1（区间均衡+热号），避免嵌套重计算
     var rec1 = scores.slice(0, 10).map(function(s){ return s.num; });
 
+    // 方案2：冷号优先
     var cold = scores.slice().sort(function(a,b){return b.mp - a.mp;}).slice(0, 10).map(function(s){return s.num;});
     var hot = scores.slice(0, 8).map(function(s){return s.num;});
-    var rec2 = cold.slice(0, 6).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0, 4));
-    var unique2 = [];
-    for (var i2=0; i2<rec2.length && unique2.length<10; i2++) if (unique2.indexOf(rec2[i2])<0) unique2.push(rec2[i2]);
-    for (var j2=0; j2<scores.length && unique2.length<10; j2++) if (unique2.indexOf(scores[j2].num)<0) unique2.push(scores[j2].num);
+    var rec2raw = cold.slice(0, 6).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0, 4));
+    var rec2 = [];
+    for (var i2=0; i2<rec2raw.length && rec2.length<10; i2++) if (rec2.indexOf(rec2raw[i2])<0) rec2.push(rec2raw[i2]);
+    for (var j2=0; j2<scores.length && rec2.length<10; j2++) if (rec2.indexOf(scores[j2].num)<0) rec2.push(scores[j2].num);
 
-    var cycleSorted = scores.slice().sort(function(a,b){
-      var ca = cycleAnalysis(a.num, trainData.slice(0,-1));
-      var cb = cycleAnalysis(b.num, trainData.slice(0,-1));
-      return cb.score - ca.score || b.mkScore - a.mkScore;
-    });
-    var rec3 = cycleSorted.slice(0, 10).map(function(s){return s.num;});
-
+    // 方案3：尾数分散
     var tailUsed = {};
-    var rec4 = [];
-    for (var i4 = 0; i4 < scores.length && rec4.length < 10; i4++) {
-      var n4 = scores[i4].num;
-      var t4 = n4 % 10;
-      if (!tailUsed[t4] || rec4.length >= 8) { rec4.push(n4); tailUsed[t4] = true; }
+    var rec3 = [];
+    for (var i3 = 0; i3 < scores.length && rec3.length < 10; i3++) {
+      var n3 = scores[i3].num;
+      var t3 = n3 % 10;
+      if (!tailUsed[t3] || rec3.length >= 8) { rec3.push(n3); tailUsed[t3] = true; }
     }
 
     function hitCount(rec, actual) {
@@ -3302,9 +3297,8 @@ function runKL8AutoReview(history) {
       period: '第' + (actualIdx + 1) + '期（模拟）',
       actual: actual,
       s1: { picks: rec1, hit: hitCount(rec1, actual) },
-      s2: { picks: unique2, hit: hitCount(unique2, actual) },
+      s2: { picks: rec2, hit: hitCount(rec2, actual) },
       s3: { picks: rec3, hit: hitCount(rec3, actual) },
-      s4: { picks: rec4, hit: hitCount(rec4, actual) },
       top10: rec1
     });
   }
@@ -3313,8 +3307,7 @@ function runKL8AutoReview(history) {
   var avgHits = [
     results.reduce(function(s,r){return s+r.s1.hit;},0) / results.length,
     results.reduce(function(s,r){return s+r.s2.hit;},0) / results.length,
-    results.reduce(function(s,r){return s+r.s3.hit;},0) / results.length,
-    results.reduce(function(s,r){return s.s4.hit;},0) / results.length
+    results.reduce(function(s,r){return s+r.s3.hit;},0) / results.length
   ];
 
   // 分析偏差：实际开奖但未被Top10推荐的号码
@@ -3363,7 +3356,6 @@ function runKL8AutoReview(history) {
     html += '<span style="font-size:11px;background:var(--accent3);color:#000;padding:2px 6px;border-radius:4px">方案1命中:' + r.s1.hit + '</span>';
     html += '<span style="font-size:11px;background:var(--accent);color:#000;padding:2px 6px;border-radius:4px">方案2命中:' + r.s2.hit + '</span>';
     html += '<span style="font-size:11px;background:var(--accent5);color:#000;padding:2px 6px;border-radius:4px">方案3命中:' + r.s3.hit + '</span>';
-    html += '<span style="font-size:11px;background:var(--accent4);color:#000;padding:2px 6px;border-radius:4px">方案4命中:' + r.s4.hit + '</span>';
     html += '</div>';
     html += '</div>';
   });
@@ -3587,10 +3579,14 @@ function renderKL8AllPlayTypes_V2(last, history) {
     html += '</div>';
   }
 
-  // 自动复盘
-  var autoReview = runKL8AutoReview(history);
-  if (autoReview.html) {
-    html += autoReview.html;
+  // 自动复盘（try-catch保护，不影响主推荐）
+  try {
+    var autoReview = runKL8AutoReview(history);
+    if (autoReview.html) {
+      html += autoReview.html;
+    }
+  } catch(e) {
+    console.log('自动复盘执行失败:', e.message);
   }
 
   html += '<div class="disclaimer" style="margin-top:1.5rem"><strong>声明：</strong>以上推荐号码基于历史数据统计分析生成，仅供娱乐参考。彩票开奖为随机事件，不构成任何投注建议。</div>';
