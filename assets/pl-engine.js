@@ -815,6 +815,11 @@ function scorePL3Position(pos, last, history) {
       }
     }
 
+    // 保存子分数供复盘优化使用
+    score.freqScore = freqScore;
+    score.missScore = missScore;
+    score.repeatScore = neighborScore;
+
     scores.push(score);
   }
 
@@ -1533,11 +1538,17 @@ function scorePL5Position(pos, last, history) {
     // 确保总分不为负
     if (score.total < 0) score.total = 0;
 
+    // 保存子分数供复盘优化使用
+    score.freqScore = freqScore;
+    score.missScore = missScore;
+    score.repeatScore = neighborScore;
+
     scores.push(score);
   }
 
   return scores;
 }
+
 
 function renderPL5Recommend_V2(last, history) {
   var posScores = scorePL5Numbers(last, history);

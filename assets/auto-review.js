@@ -2365,7 +2365,8 @@ function autoReviewPL3() {
     });
   }
 
-  var optimizedWeights = optimizePLWeights(reviewResults, simScores, 'PL3');
+  var flatSimScores = simScores[0].concat(simScores[1]).concat(simScores[2]);
+  var optimizedWeights = optimizePLWeights(reviewResults, flatSimScores, 'PL3');
 
   var fullHistory = [actualNums].concat(simHistory);
   var optScores = scorePL3NumbersOptimized(actualNums, fullHistory, optimizedWeights);
@@ -2409,7 +2410,8 @@ function autoReviewPL5() {
     });
   }
 
-  var optimizedWeights = optimizePLWeights(reviewResults, simScores, 'PL5');
+  var flatSimScores = simScores[0].concat(simScores[1]).concat(simScores[2]).concat(simScores[3]).concat(simScores[4]);
+  var optimizedWeights = optimizePLWeights(reviewResults, flatSimScores, 'PL5');
 
   var fullHistory = [actualNums].concat(simHistory);
   var optScores = scorePL5NumbersOptimized(actualNums, fullHistory, optimizedWeights);
