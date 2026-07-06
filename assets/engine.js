@@ -1166,15 +1166,29 @@ function scoreDLTNumbers_V3(lastDraw, history) {
     var cycle = cycleAnalysis(n, fronts);
     var cycleScore = cycle.score;
 
+    // V4 跨彩种关联：SSQ红区斜连号 → DLT前区加分
+    var crossLotteryScore = 0;
+    if (typeof ssqSampleHistory !== 'undefined' && ssqSampleHistory.length > 0) {
+      var lastSSQ = ssqSampleHistory[0].split('|')[0].split(',').map(Number);
+      for (var si = 0; si < lastSSQ.length; si++) {
+        var sdiff = Math.abs(n - lastSSQ[si]);
+        if (sdiff === 1) { crossLotteryScore = 0.7; break; }
+        else if (sdiff === 2) { crossLotteryScore = 0.85; break; }
+        else if (sdiff === 3) { crossLotteryScore = 0.65; break; }
+        if (n === lastSSQ[si]) { crossLotteryScore = 0.5; }
+      }
+    }
+
     scores.push({
       num: n,
       wf: wf, currentGap: currentGap, mp: mp, mpScore: mpScore, mkScore: mkScore,
       tailScore: tailScore, oddAltScore: oddAltScore, sizeScore: sizeScore, zoneScore: zoneScore,
       neighborScore: neighborScore, pairScore: pairScore, stability: stability,
       diagonalScore: diagonalScore, hotColdAltScore: hotColdAltScore,
+      crossLotteryScore: crossLotteryScore,
       maScore: maScore, cycleScore: cycleScore,
-      // V4权重优化：提升斜连号(7%)、冷热交替(8%)、邻号(6%)，降低纯频率(12%)、共现(12%)
-      baseScore: wf*0.12 + mpScore*0.12 + tailScore*0.06 + oddAltScore*0.04 + sizeScore*0.03 + zoneScore*0.04 + neighborScore*0.06 + pairScore*0.05 + stability*0.03 + mkScore*0.10 + diagonalScore*0.07 + hotColdAltScore*0.08 + maScore*0.04 + cycleScore*0.04,
+      // V4权重优化：新增跨彩种斜连(6%)，调整其他权重
+      baseScore: wf*0.11 + mpScore*0.11 + tailScore*0.06 + oddAltScore*0.04 + sizeScore*0.03 + zoneScore*0.04 + neighborScore*0.06 + pairScore*0.05 + stability*0.03 + mkScore*0.10 + diagonalScore*0.07 + hotColdAltScore*0.08 + crossLotteryScore*0.06 + maScore*0.04 + cycleScore*0.04,
       coScore: 0
     });
   }

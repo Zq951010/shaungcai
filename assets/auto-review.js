@@ -1389,10 +1389,10 @@ function autoReviewDLT() {
 function generateDLTSimPicks(scores, backScores) {
   // V4策略多样化：4个方案各有不同的维度偏向，覆盖不同中奖模式
   var strategies = [
-    { name: '斜连优选', bias: { diagonal: 1.30, neighbor: 1.15, hotCold: 0.85, mp: 1.0, mk: 1.0, co: 1.0, pair: 1.0 } },
-    { name: '遗漏回补', bias: { hotCold: 1.30, mp: 1.10, mk: 1.10, diagonal: 1.0, neighbor: 1.0, co: 1.0, pair: 1.0 } },
-    { name: '共现关联', bias: { co: 1.25, neighbor: 0.90, pair: 1.15, diagonal: 1.0, hotCold: 1.0, mp: 1.0, mk: 1.0 } },
-    { name: '综合最优', bias: { diagonal: 1.10, hotCold: 1.10, mk: 1.10, neighbor: 1.05, mp: 1.0, co: 1.0, pair: 1.0 } }
+    { name: '斜连优选', bias: { diagonal: 1.30, neighbor: 1.15, hotCold: 0.85, mp: 1.0, mk: 1.0, co: 1.0, pair: 1.0, cross: 1.20 } },
+    { name: '遗漏回补', bias: { hotCold: 1.30, mp: 1.10, mk: 1.10, diagonal: 1.0, neighbor: 1.0, co: 1.0, pair: 1.0, cross: 0.90 } },
+    { name: '共现关联', bias: { co: 1.25, neighbor: 0.90, pair: 1.15, diagonal: 1.0, hotCold: 1.0, mp: 1.0, mk: 1.0, cross: 1.0 } },
+    { name: '综合最优', bias: { diagonal: 1.10, hotCold: 1.10, mk: 1.10, neighbor: 1.05, mp: 1.0, co: 1.0, pair: 1.0, cross: 1.10 } }
   ];
 
   var recommendations = [];
@@ -1409,6 +1409,7 @@ function generateDLTSimPicks(scores, backScores) {
       adj += (s.mkScore - 0.5) * (strat.bias.mk - 1) * 0.20;
       adj += (s.coScore - 0.3) * (strat.bias.co - 1) * 0.25;
       adj += (s.pairScore - 0.3) * (strat.bias.pair - 1) * 0.20;
+      adj += (s.crossLotteryScore - 0.3) * (strat.bias.cross - 1) * 0.25;
       return { num: s.num, total: adj };
     });
     adjusted.sort(function(a, b) { return b.total - a.total; });
