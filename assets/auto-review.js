@@ -676,9 +676,9 @@ function smartRecommendKL8(history, lastDraw) {
     }
   }
 
-  // 生成3组方案
+  // 生成4组方案（与综合推荐4个策略对齐）
   var recommendations = [];
-  for (var set = 0; set < 3; set++) {
+  for (var set = 0; set < 4; set++) {
     var tuomaOffset = set * 2;
     var picks = danma.slice();
     for (var i = tuomaOffset; i < tuomaOffset + 7 && i < tuomaPool.length; i++) {
@@ -2343,6 +2343,22 @@ function renderAutoReviewKL8(reviewResults, weights, optScores, actualNums, play
       var isDan = sr.danma.indexOf(sr.picks[j]) >= 0;
       html += '<div class="ball ' + (isDan ? 'gold' : 'red') + '" style="width:36px;height:36px;font-size:0.75rem">' + pad(sr.picks[j]) + '</div>';
     }
+    html += '</div>';
+
+    // 选五推荐号码（前5个号码）
+    var xuan5Picks = sr.picks.slice(0, 5);
+    var xuan5Hits = xuan5Picks.filter(function(n){ return actualNums.indexOf(n) >= 0; });
+    html += '<div style="margin-top:0.35rem">';
+    html += '<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.15rem">选五方案</div>';
+    html += '<div class="ball-row">';
+    for (var j = 0; j < xuan5Picks.length; j++) {
+      var isHit5 = actualNums.indexOf(xuan5Picks[j]) >= 0;
+      var isDan5 = sr.danma.indexOf(xuan5Picks[j]) >= 0;
+      html += '<div class="ball ' + (isHit5 ? 'gold' : isDan5 ? 'red' : 'gray') + '" style="width:32px;height:32px;font-size:0.7rem">' + pad(xuan5Picks[j]) + '</div>';
+    }
+    html += '</div>';
+    var x5Color = xuan5Hits.length >= 3 ? 'var(--accent3)' : xuan5Hits.length >= 1 ? 'var(--accent)' : 'var(--muted)';
+    html += '<div style="font-size:0.7rem;color:' + x5Color + '">选五命中 ' + xuan5Hits.length + '/5 个' + (xuan5Hits.length > 0 ? '（' + xuan5Hits.map(function(n){return pad(n);}).join(',') + '）' : '') + '</div>';
     html += '</div>';
 
     // 选号理由（仅第一组显示）
