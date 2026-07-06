@@ -374,9 +374,9 @@ function smartRecommendDLT(history, lastDraw) {
     });
   }
 
-  // 生成3组方案
+  // 生成4组方案（与综合推荐4个策略对齐）
   var recommendations = [];
-  for (var set = 0; set < 3; set++) {
+  for (var set = 0; set < 4; set++) {
     var tuomaOffset = set;
     var frontPicks = danma.slice();
     for (var i = tuomaOffset; i < tuomaOffset + 3 && i < tuomaPool.length; i++) {
@@ -546,9 +546,9 @@ function smartRecommendSSQ(history, lastDraw) {
   var blueFused = bayesianFusion(blueMarkov, blueCooc, bluePos, blueTrend, 16);
   var bluePick = blueFused[0].num;
 
-  // 生成3组方案
+  // 生成4组方案（与综合推荐4个策略对齐）
   var recommendations = [];
-  for (var set = 0; set < 3; set++) {
+  for (var set = 0; set < 4; set++) {
     var tuomaOffset = set;
     var redPicks = danma.slice();
     for (var i = tuomaOffset; i < tuomaOffset + 4 && i < tuomaPool.length; i++) {
@@ -774,9 +774,9 @@ function smartRecommendPL3(history, lastDraw) {
     }
   }
 
-  // 生成3组方案
+  // 生成4组方案（与综合推荐4个策略对齐）
   var recommendations = [];
-  for (var set = 0; set < 3; set++) {
+  for (var set = 0; set < 4; set++) {
     var tuomaOffset = set;
     var picks = danma.slice();
     for (var i = tuomaOffset; i < tuomaOffset + 2 && i < tuomaPool.length; i++) {
@@ -872,9 +872,9 @@ function smartRecommendPL5(history, lastDraw) {
     }
   }
 
-  // 生成3组方案
+  // 生成4组方案（与综合推荐4个策略对齐）
   var recommendations = [];
-  for (var set = 0; set < 3; set++) {
+  for (var set = 0; set < 4; set++) {
     var tuomaOffset = set;
     var picks = danma.slice();
     for (var i = tuomaOffset; i < tuomaOffset + 3 && i < tuomaPool.length; i++) {
@@ -1358,7 +1358,7 @@ function autoReviewDLT() {
   var bestHitRate = 0;
   var bestSetIdx = 0;
 
-  for (var set = 0; set < 3; set++) {
+  for (var set = 0; set < 4; set++) {
     var frontHits = simRecommendations[set].front.filter(function(n) { return actualFront.indexOf(n) >= 0; });
     var backHits = simRecommendations[set].back.filter(function(n) { return actualBack.indexOf(n) >= 0; });
     var hitRate = (frontHits.length * 10 + backHits.length * 15);
@@ -1391,7 +1391,7 @@ function generateDLTSimPicks(scores, backScores) {
   var sortedBack = backScores.slice().sort(function(a, b) { return b.total - a.total; });
   var recommendations = [];
 
-  for (var set = 0; set < 3; set++) {
+  for (var set = 0; set < 4; set++) {
     var frontPicks = [];
     var usedNums = {};
 
@@ -1750,7 +1750,7 @@ function autoReviewSSQ() {
   var reviewResults = [];
   var bestHitRate = 0;
 
-  for (var set = 0; set < 3; set++) {
+  for (var set = 0; set < 4; set++) {
     var redHits = simRecommendations[set].red.filter(function(n) { return actualRed.indexOf(n) >= 0; });
     var blueHit = simRecommendations[set].blue === actualBlue;
     var hitRate = (redHits.length * 10 + (blueHit ? 15 : 0));
@@ -1780,7 +1780,7 @@ function generateSSQSimPicks(scores, backScores) {
   var sortedBack = backScores.slice().sort(function(a, b) { return b.total - a.total; });
   var recommendations = [];
 
-  for (var set = 0; set < 3; set++) {
+  for (var set = 0; set < 4; set++) {
     var redPicks = [];
     var usedNums = {};
     redPicks.push(sorted[set].num);
@@ -2401,7 +2401,7 @@ function autoReviewPL3() {
   var simRecommendations = generatePLSimPicks(simScores, 3);
 
   var reviewResults = [];
-  for (var set = 0; set < 3; set++) {
+  for (var set = 0; set < 4; set++) {
     var hits = 0;
     var posHits = 0;
     for (var i = 0; i < 3; i++) {
@@ -2446,7 +2446,7 @@ function autoReviewPL5() {
   var simRecommendations = generatePLSimPicks(simScores, 5);
 
   var reviewResults = [];
-  for (var set = 0; set < 3; set++) {
+  for (var set = 0; set < 4; set++) {
     var hits = 0;
     var posHits = 0;
     for (var i = 0; i < 5; i++) {
@@ -2481,7 +2481,7 @@ function generatePLSimPicks(scores, pickCount) {
   }
 
   var recommendations = [];
-  for (var set = 0; set < 3; set++) {
+  for (var set = 0; set < 4; set++) {
     var picks = [];
     for (var pos = 0; pos < pickCount; pos++) {
       // 每个位置取排名第 set 的数字
