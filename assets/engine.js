@@ -1173,7 +1173,8 @@ function scoreDLTNumbers_V3(lastDraw, history) {
       neighborScore: neighborScore, pairScore: pairScore, stability: stability,
       diagonalScore: diagonalScore, hotColdAltScore: hotColdAltScore,
       maScore: maScore, cycleScore: cycleScore,
-      baseScore: wf*0.14 + mpScore*0.14 + tailScore*0.07 + oddAltScore*0.04 + sizeScore*0.03 + zoneScore*0.04 + neighborScore*0.04 + pairScore*0.05 + stability*0.03 + mkScore*0.10 + diagonalScore*0.04 + hotColdAltScore*0.05 + maScore*0.05 + cycleScore*0.05,
+      // V4权重优化：提升斜连号(7%)、冷热交替(8%)、邻号(6%)，降低纯频率(12%)、共现(12%)
+      baseScore: wf*0.12 + mpScore*0.12 + tailScore*0.06 + oddAltScore*0.04 + sizeScore*0.03 + zoneScore*0.04 + neighborScore*0.06 + pairScore*0.05 + stability*0.03 + mkScore*0.10 + diagonalScore*0.07 + hotColdAltScore*0.08 + maScore*0.04 + cycleScore*0.04,
       coScore: 0
     });
   }
@@ -1184,7 +1185,7 @@ function scoreDLTNumbers_V3(lastDraw, history) {
       if (t !== s.num && co[s.num] && co[s.num][t]) { coSum += co[s.num][t]; coCount++; }
     });
     s.coScore = coCount ? Math.min(coSum/coCount/3, 1) : 0;
-    s.totalScore = s.baseScore + s.coScore * 0.15;
+    s.totalScore = s.baseScore + s.coScore * 0.12;
   });
   return scores.sort(function(a,b){return b.totalScore-a.totalScore;});
 }
@@ -1266,6 +1267,18 @@ function scoreDLTBlueNumbers_V3(lastDraw, history) {
       }
     }
 
+    // 后区遗漏回补评分
+    var lastMissScore = 0;
+    if (lastB.indexOf(n) < 0) {
+      var missCount = 0;
+      for (var mi = 0; mi < backs.length; mi++) {
+        if (backs[mi].indexOf(n) >= 0) break;
+        missCount++;
+      }
+      if (missCount >= 3 && missCount <= 8) lastMissScore = 0.8;
+      else if (missCount >= 9) lastMissScore = 0.6;
+    }
+
     // 移动平均趋势评分
     var ma = movingAverageTrend(n, backs);
     var maScore = ma.trend === 'up' ? 0.9 : ma.trend === 'warming' ? 0.75 : ma.trend === 'stable' ? 0.6 : 0.4;
@@ -1274,7 +1287,8 @@ function scoreDLTBlueNumbers_V3(lastDraw, history) {
     var cycle = cycleAnalysis(n, backs);
     var cycleScore = cycle.score;
 
-    scores.push({num: n, wf: wf, currentGap: currentGap, mp: mp, mpScore: mpScore, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, tailScore: tailScore, consecutiveScore: consecutiveScore, sumTrendScore: sumTrendScore, maScore: maScore, cycleScore: cycleScore, totalScore: wf*0.18 + mpScore*0.14 + oddScore*0.07 + sizeScore*0.06 + tailScore*0.06 + mkScore*0.08 + consecutiveScore*0.05 + sumTrendScore*0.04 + maScore*0.04 + cycleScore*0.04});
+    // V4权重优化：降低纯频率(14%)，提升遗漏(15%)+回补(8%)+Markov(10%)，总和达90%
+    scores.push({num: n, wf: wf, currentGap: currentGap, mp: mp, mpScore: mpScore, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, tailScore: tailScore, consecutiveScore: consecutiveScore, sumTrendScore: sumTrendScore, lastMissScore: lastMissScore, maScore: maScore, cycleScore: cycleScore, totalScore: wf*0.14 + mpScore*0.15 + oddScore*0.08 + sizeScore*0.07 + tailScore*0.07 + mkScore*0.10 + consecutiveScore*0.06 + sumTrendScore*0.05 + lastMissScore*0.08 + maScore*0.05 + cycleScore*0.05});
   }
   return scores.sort(function(a,b){return b.totalScore-a.totalScore;});
 }

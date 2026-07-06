@@ -1387,23 +1387,44 @@ function autoReviewDLT() {
 }
 
 function generateDLTSimPicks(scores, backScores) {
-  var sorted = scores.slice().sort(function(a, b) { return b.total - a.total; });
-  var sortedBack = backScores.slice().sort(function(a, b) { return b.total - a.total; });
+  // V4策略多样化：4个方案各有不同的维度偏向，覆盖不同中奖模式
+  var strategies = [
+    { name: '斜连优选', bias: { diagonal: 1.30, neighbor: 1.15, hotCold: 0.85, mp: 1.0, mk: 1.0, co: 1.0, pair: 1.0 } },
+    { name: '遗漏回补', bias: { hotCold: 1.30, mp: 1.10, mk: 1.10, diagonal: 1.0, neighbor: 1.0, co: 1.0, pair: 1.0 } },
+    { name: '共现关联', bias: { co: 1.25, neighbor: 0.90, pair: 1.15, diagonal: 1.0, hotCold: 1.0, mp: 1.0, mk: 1.0 } },
+    { name: '综合最优', bias: { diagonal: 1.10, hotCold: 1.10, mk: 1.10, neighbor: 1.05, mp: 1.0, co: 1.0, pair: 1.0 } }
+  ];
+
   var recommendations = [];
 
   for (var set = 0; set < 4; set++) {
+    var strat = strategies[set];
+    // 前区根据策略偏向重新调整分数
+    var adjusted = scores.map(function(s) {
+      var adj = s.totalScore;
+      adj += (s.diagonalScore - 0.5) * (strat.bias.diagonal - 1) * 0.30;
+      adj += (s.neighborScore - 0.5) * (strat.bias.neighbor - 1) * 0.25;
+      adj += (s.hotColdAltScore - 0.5) * (strat.bias.hotCold - 1) * 0.30;
+      adj += (s.mpScore - 0.5) * (strat.bias.mp - 1) * 0.20;
+      adj += (s.mkScore - 0.5) * (strat.bias.mk - 1) * 0.20;
+      adj += (s.coScore - 0.3) * (strat.bias.co - 1) * 0.25;
+      adj += (s.pairScore - 0.3) * (strat.bias.pair - 1) * 0.20;
+      return { num: s.num, total: adj };
+    });
+    adjusted.sort(function(a, b) { return b.total - a.total; });
+
     var frontPicks = [];
     var usedNums = {};
 
-    frontPicks.push(sorted[set].num);
-    usedNums[sorted[set].num] = true;
+    frontPicks.push(adjusted[0].num);
+    usedNums[adjusted[0].num] = true;
 
     var zoneCounts = [0, 0, 0];
     var firstZone = frontPicks[0] <= 12 ? 0 : frontPicks[0] <= 23 ? 1 : 2;
     zoneCounts[firstZone]++;
 
-    for (var i = 0; i < sorted.length && frontPicks.length < 5; i++) {
-      var n = sorted[i].num;
+    for (var i = 1; i < adjusted.length && frontPicks.length < 5; i++) {
+      var n = adjusted[i].num;
       if (usedNums[n]) continue;
       var z = n <= 12 ? 0 : n <= 23 ? 1 : 2;
       if (zoneCounts[z] < 3) {
@@ -1412,15 +1433,24 @@ function generateDLTSimPicks(scores, backScores) {
         zoneCounts[z]++;
       }
     }
-    for (var i = 0; i < sorted.length && frontPicks.length < 5; i++) {
-      if (!usedNums[sorted[i].num]) {
-        frontPicks.push(sorted[i].num);
-        usedNums[sorted[i].num] = true;
+    for (var i = 1; i < adjusted.length && frontPicks.length < 5; i++) {
+      if (!usedNums[adjusted[i].num]) {
+        frontPicks.push(adjusted[i].num);
+        usedNums[adjusted[i].num] = true;
       }
     }
     frontPicks.sort(function(a, b) { return a - b; });
 
-    var backPicks = [sortedBack[set].num, sortedBack[(set + 1) % sortedBack.length].num].sort(function(a, b) { return a - b; });
+    // 后区也做策略调整（利用遗漏回补和Markov维度）
+    var backAdjusted = backScores.map(function(s) {
+      var adj = s.totalScore;
+      adj += (s.lastMissScore - 0.3) * (strat.bias.hotCold - 1) * 0.25;
+      adj += (s.mpScore - 0.5) * (strat.bias.mp - 1) * 0.20;
+      adj += (s.mkScore - 0.5) * (strat.bias.mk - 1) * 0.20;
+      return { num: s.num, total: adj };
+    });
+    backAdjusted.sort(function(a, b) { return b.total - a.total; });
+    var backPicks = [backAdjusted[set].num, backAdjusted[(set + 1) % backAdjusted.length].num].sort(function(a, b) { return a - b; });
     recommendations.push({ front: frontPicks, back: backPicks });
   }
   return recommendations;
