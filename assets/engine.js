@@ -2462,7 +2462,7 @@ function renderSSQRecommend(last, allReds, allBlues) {
 
   // 回测结果
   var backtestFunc = function(trainData) {
-    var scores = scoreSSQNumbers(trainData[trainData.length-1], trainData.slice(0,-1));
+    var scores = scoreSSQNumbers({red: trainData[trainData.length-1]}, trainData.slice(0,-1));
     return scores.slice(0,6).map(function(s){return s.num;});
   };
   var bt = backtestModel(allReds, null, backtestFunc, 6, 6);
