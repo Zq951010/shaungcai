@@ -1658,13 +1658,13 @@ function renderAutoReviewDLT(reviewResults, weights, optScores, optBackScores, a
   var smartRecs = smartRecommendDLT(dltSampleHistory, lastDraw2);
 
   html += '<div style="margin-bottom:1rem">';
-  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem">优化后精准推荐（AI五层融合引擎）</div>';
-  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合，与综合推荐采用不同算法</div>';
+  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem">下期预测推荐（AI五层融合引擎）</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">基于历史数据持续学习训练，对<strong>下一期</strong>开奖号码的预测推荐。与综合推荐采用不同算法路径。</div>';
 
   for (var si = 0; si < smartRecs.length; si++) {
     var sr = smartRecs[si];
     html += '<div style="margin-bottom:1rem;background:var(--bg3);border:1px solid var(--rule);border-radius:8px;padding:0.75rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">优化方案 ' + (si + 1) + '</div>';
+    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">预测方案 ' + (si + 1) + '</div>';
     html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">前区 胆码: ';
     for (var j = 0; j < sr.danma.length; j++) {
       html += '<span style="font-weight:700">' + pad(sr.danma[j]) + '</span>';
@@ -2013,13 +2013,13 @@ function renderAutoReviewSSQ(reviewResults, weights, optScores, optBackScores, a
   var smartRecs = smartRecommendSSQ(ssqSampleHistory, lastDraw2);
 
   html += '<div style="margin-bottom:1rem">';
-  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem">优化后精准推荐（AI五层融合引擎）</div>';
-  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合，与综合推荐采用不同算法</div>';
+  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem">下期预测推荐（AI五层融合引擎）</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">基于历史数据持续学习训练，对<strong>下一期</strong>开奖号码的预测推荐。与综合推荐采用不同算法路径。</div>';
 
   for (var si = 0; si < smartRecs.length; si++) {
     var sr = smartRecs[si];
     html += '<div style="margin-bottom:1rem;background:var(--bg3);border:1px solid var(--rule);border-radius:8px;padding:0.75rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">优化方案 ' + (si + 1) + '</div>';
+    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">预测方案 ' + (si + 1) + '</div>';
     html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">胆码: ';
     for (var j = 0; j < sr.danma.length; j++) {
       html += '<span style="font-weight:700">' + pad(sr.danma[j]) + '</span>';
@@ -2320,13 +2320,13 @@ function renderAutoReviewKL8(reviewResults, weights, optScores, actualNums, play
   var smartRecs = smartRecommendKL8(kl8SampleHistory, lastDraw2);
 
   html += '<div style="margin-bottom:1rem">';
-  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem">优化后精准推荐（AI五层融合引擎）</div>';
-  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合，与综合推荐采用不同算法</div>';
+  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem">下期预测推荐（AI五层融合引擎）</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">基于历史数据持续学习训练，对<strong>下一期</strong>开奖号码的预测推荐。与综合推荐采用不同算法路径。</div>';
 
   for (var si = 0; si < smartRecs.length; si++) {
     var sr = smartRecs[si];
     html += '<div style="margin-bottom:1rem;background:var(--bg3);border:1px solid var(--rule);border-radius:8px;padding:0.75rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">优化方案 ' + (si + 1) + '（选' + playType + '）</div>';
+    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">预测方案 ' + (si + 1) + '（选' + playType + '）</div>';
     html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">胆码: ';
     for (var j = 0; j < sr.danma.length; j++) {
       html += '<span style="font-weight:700">' + pad(sr.danma[j]) + '</span>';
@@ -2345,20 +2345,17 @@ function renderAutoReviewKL8(reviewResults, weights, optScores, actualNums, play
     }
     html += '</div>';
 
-    // 选五推荐号码（前5个号码）
+    // 选五预测方案（前5个号码）——下期预测，无命中标注
     var xuan5Picks = sr.picks.slice(0, 5);
-    var xuan5Hits = xuan5Picks.filter(function(n){ return actualNums.indexOf(n) >= 0; });
     html += '<div style="margin-top:0.35rem">';
-    html += '<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.15rem">选五方案</div>';
+    html += '<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.15rem">选五预测方案</div>';
     html += '<div class="ball-row">';
     for (var j = 0; j < xuan5Picks.length; j++) {
-      var isHit5 = actualNums.indexOf(xuan5Picks[j]) >= 0;
       var isDan5 = sr.danma.indexOf(xuan5Picks[j]) >= 0;
-      html += '<div class="ball ' + (isHit5 ? 'gold' : isDan5 ? 'red' : 'gray') + '" style="width:32px;height:32px;font-size:0.7rem">' + pad(xuan5Picks[j]) + '</div>';
+      html += '<div class="ball ' + (isDan5 ? 'gold' : 'red') + '" style="width:32px;height:32px;font-size:0.7rem">' + pad(xuan5Picks[j]) + '</div>';
     }
     html += '</div>';
-    var x5Color = xuan5Hits.length >= 3 ? 'var(--accent3)' : xuan5Hits.length >= 1 ? 'var(--accent)' : 'var(--muted)';
-    html += '<div style="font-size:0.7rem;color:' + x5Color + '">选五命中 ' + xuan5Hits.length + '/5 个' + (xuan5Hits.length > 0 ? '（' + xuan5Hits.map(function(n){return pad(n);}).join(',') + '）' : '') + '</div>';
+    html += '<div style="font-size:0.7rem;color:var(--muted)">以上号码为模型对下一期的预测，待开奖后验证</div>';
     html += '</div>';
 
     // 选号理由（仅第一组显示）
@@ -2732,13 +2729,13 @@ function renderAutoReviewPL(reviewResults, weights, optScores, actualNums, type,
   var smartRecs = type === 'PL3' ? smartRecommendPL3(PL3_HISTORY, lastDraw2) : smartRecommendPL5(PL5_HISTORY, lastDraw2);
 
   html += '<div style="margin-bottom:1rem">';
-  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem">优化后精准推荐（AI五层融合引擎）</div>';
-  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合，与综合推荐采用不同算法</div>';
+  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--accent);margin-bottom:0.5rem">下期预测推荐（AI五层融合引擎）</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">基于历史数据持续学习训练，对<strong>下一期</strong>开奖号码的预测推荐。与综合推荐采用不同算法路径。</div>';
 
   for (var si = 0; si < smartRecs.length; si++) {
     var sr = smartRecs[si];
     html += '<div style="margin-bottom:1rem;background:var(--bg3);border:1px solid var(--rule);border-radius:8px;padding:0.75rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">优化方案 ' + (si + 1) + '</div>';
+    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">预测方案 ' + (si + 1) + '</div>';
     html += '<div style="font-size:0.75rem;color:var(--accent);margin-bottom:0.3rem">胆码: ';
     for (var j = 0; j < sr.danma.length; j++) {
       html += '<span style="font-weight:700">' + sr.danma[j] + '</span>';
