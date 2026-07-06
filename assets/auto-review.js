@@ -2271,6 +2271,19 @@ function renderAutoReviewKL8(reviewResults, weights, optScores, actualNums, play
       html += '<div class="ball ' + (isHit ? 'gold' : 'gray') + '" style="width:36px;height:36px;font-size:0.75rem">' + pad(r.picks[i]) + '</div>';
     }
     html += '</div>';
+    // 选五号码球对比
+    var xuan5Picks = r.picks.slice(0, 5);
+    var xuan5Hits = xuan5Picks.filter(function(n){ return r.hits.indexOf(n) >= 0; });
+    html += '<div style="margin-top:0.3rem;margin-bottom:0.25rem">';
+    html += '<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.15rem">选五方案</div>';
+    html += '<div class="ball-row">';
+    for (var i = 0; i < xuan5Picks.length; i++) {
+      var isHit5 = r.hits.indexOf(xuan5Picks[i]) >= 0;
+      html += '<div class="ball ' + (isHit5 ? 'gold' : 'gray') + '" style="width:32px;height:32px;font-size:0.7rem">' + pad(xuan5Picks[i]) + '</div>';
+    }
+    html += '</div>';
+    html += '<div style="font-size:0.7rem;color:var(--muted)">命中 ' + xuan5Hits.length + '/5 个</div>';
+    html += '</div>';
     html += '<div style="font-size:0.75rem;color:var(--muted)">命中 ' + r.hits.length + '/' + playType + ' 个</div>';
     // 各玩法命中汇总
     if (allPlayTypeHits) {
