@@ -1672,6 +1672,7 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
 var SSQ_ZONES = [[1,11],[12,22],[23,33]];
 
 var ssqSampleHistory = [
+  '01,03,19,20,24,25|07',
   '08,12,18,21,24,30|01',
   '03,06,08,14,26,27|08',
   '03,05,16,18,29,32|04',
@@ -2770,6 +2771,7 @@ function renderSSQTail(allReds) {
 var KL8_ZONES = [[1,20],[21,40],[41,60],[61,80]];
 
 var kl8SampleHistory = [
+  '07,08,14,21,22,26,29,33,36,39,40,57,59,63,64,67,70,72,73,76',
   '09,15,16,21,27,32,33,34,36,38,39,44,45,54,60,67,77,78,79,80',
   '02,07,11,13,18,21,23,25,30,31,48,53,54,55,61,62,69,76,77,80',
   '01,03,05,08,09,12,19,24,27,30,32,47,51,52,59,64,67,74,75,80',
@@ -3149,6 +3151,15 @@ function scoreKL8Numbers(last, history) {
     if (zoneIdx === minZoneIdx && lastZoneCounts[maxZoneIdx] - lastZoneCounts[zoneIdx] >= 3) { zoneScore += 0.15; }
     else if (zoneIdx === maxZoneIdx && lastZoneCounts[zoneIdx] >= 7) { zoneScore -= 0.10; }
 
+    // 连续两期区间偏态追踪：若某区间连续两期都>=7，额外降温
+    if (history.length > 1) {
+      var prevZoneCounts = [0, 0, 0, 0];
+      history[1].forEach(function(x){ prevZoneCounts[x<=20?0:x<=40?1:x<=60?2:3]++; });
+      if (lastZoneCounts[zoneIdx] >= 7 && prevZoneCounts[zoneIdx] >= 7) { zoneScore -= 0.12; }
+      // 连续两期某区间<=3，额外升温
+      if (lastZoneCounts[zoneIdx] <= 3 && prevZoneCounts[zoneIdx] <= 3) { zoneScore += 0.12; }
+    }
+
     var odd = n % 2 === 1;
     var recentOdds = 0;
     for (var i = 0; i < recentN; i++) {
@@ -3162,10 +3173,15 @@ function scoreKL8Numbers(last, history) {
         oddEvenScore += 0.15;
       }
     }
-    // 26174期奇偶12:8奇数偏多，下期偶数回补信号强化
+    // 动态奇偶偏态回补（替代硬编码）
     var lastOddCount = last.filter(function(x){return x%2===1;}).length;
     if (lastOddCount >= 12 && !odd) { oddEvenScore += 0.12; }
     else if (lastOddCount <= 8 && odd) { oddEvenScore += 0.12; }
+    // 连续两期完美均衡(10:10)后，下期倾向偏态，给奇偶都加分（打破均衡）
+    if (history.length > 1) {
+      var prevOddCount = history[1].filter(function(x){return x%2===1;}).length;
+      if (lastOddCount === 10 && prevOddCount === 10) { oddEvenScore += 0.08; }
+    }
 
     var big = n > 40;
     var recentBig = 0;
