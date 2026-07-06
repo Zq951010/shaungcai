@@ -3226,7 +3226,7 @@ function scoreKL8Numbers(last, history) {
         if (Math.abs(n - last[i]) === 1) { neighborScore = 0.7; break; }
       }
     }
-    // 重号历史频率优化：计算近5期平均重号数，若偏低则上期号码额外加分
+    // 重号历史频率优化：计算近5期平均重号数，若偏高则上期号码额外加分
     var repeatHistory = [];
     for (var ri = 0; ri < Math.min(5, history.length - 1); ri++) {
       repeatHistory.push(history[ri].filter(function(x){ return history[ri+1].indexOf(x) >= 0; }).length);
@@ -3234,8 +3234,23 @@ function scoreKL8Numbers(last, history) {
     var avgRepeat = kl8Avg(repeatHistory);
     if (avgRepeat >= 3 && last.indexOf(n) >= 0) { neighborScore += 0.08; }
 
-    // KL8连号历史频率评分
+    // 连续重号追踪：连续2期出现额外+0.10，连续3期额外再+0.08
+    if (history.length > 1 && last.indexOf(n) >= 0 && history[1].indexOf(n) >= 0) {
+      neighborScore += 0.10;
+      if (history.length > 2 && history[2].indexOf(n) >= 0) neighborScore += 0.08;
+    }
+
+    // KL8连号历史频率评分（增强：近5期连号趋势）
     var consecutiveScore = pairHistoryScore(n, history);
+    // 如果连号趋势强（近5期平均连号组数>=2），提升连号评分权重
+    var pairTrend = 0;
+    for (var pi = 0; pi < Math.min(5, history.length); pi++) {
+      var s = history[pi].slice().sort(function(a,b){return a-b;});
+      var pairs = 0;
+      for (var pj = 1; pj < s.length; pj++) if (s[pj] - s[pj-1] === 1) pairs++;
+      pairTrend += pairs;
+    }
+    if (pairTrend / Math.min(5, history.length) >= 2) { consecutiveScore += 0.06; }
 
     var stability = 1 - Math.abs(wf - 0.25) * 3;
 
