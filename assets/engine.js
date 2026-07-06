@@ -1378,6 +1378,19 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     }
     if (diagonalCount>=2) q+=5; else if (diagonalCount>=1) q+=3;
 
+    // V4跨彩种斜连质量分：与SSQ红区号码的斜连/同下
+    var crossLotteryCount = 0;
+    if (typeof ssqSampleHistory !== 'undefined' && ssqSampleHistory.length > 0) {
+      var lastSSQ = ssqSampleHistory[0].split('|')[0].split(',').map(Number);
+      for (var di=0; di<s.length; di++) {
+        for (var sj=0; sj<lastSSQ.length; sj++) {
+          var cdiff = Math.abs(s[di]-lastSSQ[sj]);
+          if (cdiff<=3) { crossLotteryCount++; break; }
+        }
+      }
+    }
+    if (crossLotteryCount>=3) q+=8; else if (crossLotteryCount>=2) q+=5; else if (crossLotteryCount>=1) q+=2;
+
     // ========== 基于上期特征的动态回归调整 ==========
     // 1. 奇偶回归：上期极端则下期强烈反向回归
     if ((lastOddRatio >= 0.8 && odd <= 2) || (lastOddRatio <= 0.2 && odd >= 3)) q += 4;
@@ -1631,7 +1644,7 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
 
   html += '<h4 style="margin-top:16px;color:var(--ink)">📊 前区 Top10 号码评分详情</h4>';
   html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--bg3)">';
-  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">号码</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">加权频率</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">当前遗漏</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏%位</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">转移概率</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">共现分</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">总评分</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">理由</th>';
+  html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">号码</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">加权频率</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">当前遗漏</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏%位</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">转移概率</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">共现分</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">跨彩种</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">总评分</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">理由</th>';
   html += '</tr></thead><tbody>';
   topFronts.forEach(function(s){
     var reason = [];
@@ -1640,12 +1653,15 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     if (s.mkScore > 0.8) reason.push('冷转热');
     if (s.neighborScore > 0.5) reason.push('邻号');
     if (s.coScore > 0.5) reason.push('共现强');
+    if (s.crossLotteryScore >= 0.65) reason.push('SSQ斜连');
+    else if (s.crossLotteryScore >= 0.5) reason.push('SSQ同下');
     html += '<tr><td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--ink)">'+String(s.num).padStart(2,'0')+'</td>';
     html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.wf*100).toFixed(1)+'%</td>';
     html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+s.currentGap+'期</td>';
     html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.mp*100).toFixed(0)+'%</td>';
     html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.mkScore*100).toFixed(0)+'</td>';
     html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.coScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.crossLotteryScore ? (s.crossLotteryScore*100).toFixed(0) : 0)+'</td>';
     html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--accent4)">'+(s.totalScore*100).toFixed(1)+'</td>';
     html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(reason.join('·')||'-')+'</td></tr>';
   });
