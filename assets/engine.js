@@ -3306,6 +3306,9 @@ function runKL8AutoReview(history) {
   var testCount = Math.min(2, history.length - 1);
   if (testCount < 1) return { html: '', insights: [] };
 
+  var playTypes = [5, 6, 7, 8, 9, 10];
+  var playTypeNames = {5:'五', 6:'六', 7:'七', 8:'八', 9:'九', 10:'十'};
+
   var results = [];
   for (var t = 0; t < testCount; t++) {
     var actualIdx = history.length - testCount + t;
@@ -3315,30 +3318,40 @@ function runKL8AutoReview(history) {
 
     var scores = scoreKL8Numbers(lastTrain, trainData.slice(0, -1));
 
-    // 仅模拟方案1（区间均衡+热号），避免嵌套重计算
-    var rec1 = scores.slice(0, 10).map(function(s){ return s.num; });
+    // 按玩法生成各方案推荐
+    var ptResults = {};
+    for (var pi = 0; pi < playTypes.length; pi++) {
+      var pt = playTypes[pi];
 
-    // 方案2：冷号优先
-    var cold = scores.slice().sort(function(a,b){return b.mp - a.mp;}).slice(0, 10).map(function(s){return s.num;});
-    var hot = scores.slice(0, 8).map(function(s){return s.num;});
-    var rec2raw = cold.slice(0, 6).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0, 4));
-    var rec2 = [];
-    for (var i2=0; i2<rec2raw.length && rec2.length<10; i2++) if (rec2.indexOf(rec2raw[i2])<0) rec2.push(rec2raw[i2]);
-    for (var j2=0; j2<scores.length && rec2.length<10; j2++) if (rec2.indexOf(scores[j2].num)<0) rec2.push(scores[j2].num);
+      // 方案1：区间均衡+热号
+      var s1 = scores.slice(0, pt).map(function(s){ return s.num; });
 
-    // 方案3：尾数分散
-    var tailUsed = {};
-    var rec3 = [];
-    for (var i3 = 0; i3 < scores.length && rec3.length < 10; i3++) {
-      var n3 = scores[i3].num;
-      var t3 = n3 % 10;
-      if (!tailUsed[t3] || rec3.length >= 8) { rec3.push(n3); tailUsed[t3] = true; }
-    }
+      // 方案2：冷号优先
+      var cold = scores.slice().sort(function(a,b){return b.mp - a.mp;}).slice(0, pt).map(function(s){return s.num;});
+      var hot = scores.slice(0, Math.ceil(pt*0.4)).map(function(s){return s.num;});
+      var rec2raw = cold.slice(0, Math.ceil(pt*0.6)).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0, Math.floor(pt*0.4)));
+      var s2 = [];
+      for (var i2=0; i2<rec2raw.length && s2.length<pt; i2++) if (s2.indexOf(rec2raw[i2])<0) s2.push(rec2raw[i2]);
+      for (var j2=0; j2<scores.length && s2.length<pt; j2++) if (s2.indexOf(scores[j2].num)<0) s2.push(scores[j2].num);
 
-    // 方案4：重号优选（从上期号码中选评分最高的）
-    var rec4 = scores.filter(function(s){ return lastTrain.indexOf(s.num) >= 0; }).slice(0, 10).map(function(s){ return s.num; });
-    for (var i4 = 0; i4 < scores.length && rec4.length < 10; i4++) {
-      if (rec4.indexOf(scores[i4].num) < 0) rec4.push(scores[i4].num);
+      // 方案3：尾数分散
+      var tailUsed = {};
+      var s3 = [];
+      for (var i3 = 0; i3 < scores.length && s3.length < pt; i3++) {
+        var n3 = scores[i3].num;
+        var t3 = n3 % 10;
+        if (!tailUsed[t3] || s3.length >= pt - 2) { s3.push(n3); tailUsed[t3] = true; }
+      }
+
+      // 方案4：重号优选
+      var s4 = scores.filter(function(s){ return lastTrain.indexOf(s.num) >= 0; }).slice(0, pt).map(function(s){ return s.num; });
+      for (var i4 = 0; i4 < scores.length && s4.length < pt; i4++) {
+        if (s4.indexOf(scores[i4].num) < 0) s4.push(scores[i4].num);
+      }
+
+      ptResults[pt] = {
+        s1: s1, s2: s2, s3: s3, s4: s4
+      };
     }
 
     function hitCount(rec, actual) {
@@ -3348,20 +3361,23 @@ function runKL8AutoReview(history) {
     results.push({
       period: '第' + (actualIdx + 1) + '期（模拟）',
       actual: actual,
-      s1: { picks: rec1, hit: hitCount(rec1, actual) },
-      s2: { picks: rec2, hit: hitCount(rec2, actual) },
-      s3: { picks: rec3, hit: hitCount(rec3, actual) },
-      s4: { picks: rec4, hit: hitCount(rec4, actual) },
-      top10: rec1
+      ptResults: ptResults,
+      hitCount: hitCount,
+      top10: scores.slice(0, 10).map(function(s){ return s.num; })
     });
   }
 
-  // 计算各策略平均命中
-  var avgHits = [
-    results.reduce(function(s,r){return s+r.s1.hit;},0) / results.length,
-    results.reduce(function(s,r){return s+r.s2.hit;},0) / results.length,
-    results.reduce(function(s,r){return s+r.s3.hit;},0) / results.length
-  ];
+  // 计算各玩法各策略平均命中
+  var avgHits = {};
+  for (var pi = 0; pi < playTypes.length; pi++) {
+    var pt = playTypes[pi];
+    avgHits[pt] = {
+      s1: results.reduce(function(s,r){return s+r.hitCount(r.ptResults[pt].s1, r.actual);},0) / results.length,
+      s2: results.reduce(function(s,r){return s+r.hitCount(r.ptResults[pt].s2, r.actual);},0) / results.length,
+      s3: results.reduce(function(s,r){return s+r.hitCount(r.ptResults[pt].s3, r.actual);},0) / results.length,
+      s4: results.reduce(function(s,r){return s+r.hitCount(r.ptResults[pt].s4, r.actual);},0) / results.length
+    };
+  }
 
   // 分析偏差：实际开奖但未被Top10推荐的号码
   var missedByTop = [];
@@ -3374,16 +3390,22 @@ function runKL8AutoReview(history) {
   // 统计missed号码的维度特征
   var missedZones = [0,0,0,0];
   var missedOdd = 0, missedEven = 0;
-  var missedTails = {};
   missedByTop.forEach(function(n){
     missedZones[n<=20?0:n<=40?1:n<=60?2:3]++;
     if (n%2===1) missedOdd++; else missedEven++;
-    missedTails[n%10] = (missedTails[n%10]||0) + 1;
   });
 
   var insights = [];
-  var bestStrategy = avgHits.indexOf(Math.max.apply(null, avgHits)) + 1;
-  insights.push('近' + testCount + '期回溯中，方案' + bestStrategy + '命中率最高（平均' + avgHits[bestStrategy-1].toFixed(1) + '个）');
+
+  // 找出各玩法最优策略
+  for (var pi = 0; pi < playTypes.length; pi++) {
+    var pt = playTypes[pi];
+    var a = avgHits[pt];
+    var maxHit = Math.max(a.s1, a.s2, a.s3, a.s4);
+    var bestIdx = [a.s1, a.s2, a.s3, a.s4].indexOf(maxHit);
+    var names = ['区间均衡+热号', '冷号优先+遗漏', '尾数分散', '重号优选'];
+    insights.push('选' + playTypeNames[pt] + '最优策略：' + names[bestIdx] + '（平均命中' + maxHit.toFixed(1) + '个）');
+  }
 
   var maxMissedZone = missedZones.indexOf(Math.max.apply(null, missedZones));
   var zoneNames = ['一区(01-20)', '二区(21-40)', '三区(41-60)', '四区(61-80)'];
@@ -3405,12 +3427,19 @@ function runKL8AutoReview(history) {
     html += '<div style="margin:8px 0;padding:8px;background:var(--bg2);border-radius:6px">';
     html += '<div style="font-weight:bold;color:var(--ink);font-size:12px">' + r.period + '</div>';
     html += '<div style="color:var(--muted);font-size:11px;margin:2px 0">实际开奖：' + r.actual.map(function(n){return String(n).padStart(2,'0');}).join(',') + '</div>';
-    html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">';
-    html += '<span style="font-size:11px;background:var(--accent3);color:#000;padding:2px 6px;border-radius:4px">方案1命中:' + r.s1.hit + '</span>';
-    html += '<span style="font-size:11px;background:var(--accent);color:#000;padding:2px 6px;border-radius:4px">方案2命中:' + r.s2.hit + '</span>';
-    html += '<span style="font-size:11px;background:var(--accent5);color:#000;padding:2px 6px;border-radius:4px">方案3命中:' + r.s3.hit + '</span>';
-    html += '<span style="font-size:11px;background:var(--accent2);color:#000;padding:2px 6px;border-radius:4px">方案4(重号)命中:' + r.s4.hit + '</span>';
-    html += '</div>';
+
+    // 按玩法显示对比
+    for (var pi = 0; pi < playTypes.length; pi++) {
+      var pt = playTypes[pi];
+      var ptr = r.ptResults[pt];
+      html += '<div style="margin-top:4px;padding:4px 6px;background:var(--bg);border-radius:4px">';
+      html += '<span style="font-weight:bold;color:var(--ink);font-size:11px">选' + playTypeNames[pt] + '</span> ';
+      html += '<span style="font-size:11px;background:var(--accent3);color:#000;padding:1px 4px;border-radius:3px;margin-left:4px">S1:' + r.hitCount(ptr.s1, r.actual) + '</span>';
+      html += '<span style="font-size:11px;background:var(--accent);color:#000;padding:1px 4px;border-radius:3px;margin-left:2px">S2:' + r.hitCount(ptr.s2, r.actual) + '</span>';
+      html += '<span style="font-size:11px;background:var(--accent5);color:#000;padding:1px 4px;border-radius:3px;margin-left:2px">S3:' + r.hitCount(ptr.s3, r.actual) + '</span>';
+      html += '<span style="font-size:11px;background:var(--accent2);color:#000;padding:1px 4px;border-radius:3px;margin-left:2px">S4:' + r.hitCount(ptr.s4, r.actual) + '</span>';
+      html += '</div>';
+    }
     html += '</div>';
   });
 
