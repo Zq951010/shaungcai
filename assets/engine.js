@@ -1339,36 +1339,30 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     var tails = {}; s.forEach(function(n){var t=n%10; tails[t]=(tails[t]||0)+1;});
     var maxTail = Math.max.apply(null, Object.values(tails));
     var g = gapStats(s);
-    var q = 40;
-    if (sum>=60 && sum<=130) q+=12; else if (sum>=50 && sum<=140) q+=6;
-    if (span>=10 && span<=28) q+=12; else if (span>=8 && span<=32) q+=6;
-    if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)&&(z3>=1&&z3<=3)) q+=15;
-    else if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)) q+=8;
-    if (odd>=2 && odd<=3) q+=10; else if (odd>=1 && odd<=4) q+=5;
-    if (big>=2 && big<=3) q+=10; else if (big>=1 && big<=4) q+=5;
-    if (maxTail<=2) q+=12; else if (maxTail<=3) q+=6;
-    if (g.pairs.length===1) q+=12; else if (g.pairs.length===2) q+=6;
-    if (g.maxGap<=12) q+=8; else if (g.maxGap<=15) q+=4;
-    // 前区同尾加分：最多一对同尾是较优形态
-    var sameTailPairs = 0;
-    var tailSeen = {};
-    s.forEach(function(n){ var t=n%10; if(tailSeen[t]) sameTailPairs++; else tailSeen[t]=true; });
-    if (sameTailPairs===1) q+=5;
+    // V4校准：基础分30，各项分值降低避免全满分
+    var q = 30;
+    if (sum>=65 && sum<=125) q+=8; else if (sum>=55 && sum<=135) q+=4; else if (sum<45 || sum>145) q-=5;
+    if (span>=12 && span<=26) q+=8; else if (span>=8 && span<=30) q+=4; else if (span<6 || span>33) q-=3;
+    if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)&&(z3>=1&&z3<=3)) q+=10;
+    else if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)) q+=5;
+    else if (z1===0||z2===0||z3===0) q-=4;
+    if (odd>=2 && odd<=3) q+=8; else if (odd===0||odd===5) q-=5; else if (odd>=1 && odd<=4) q+=3;
+    if (big>=2 && big<=3) q+=8; else if (big===0||big===5) q-=5; else if (big>=1 && big<=4) q+=3;
+    if (maxTail<=2) q+=8; else if (maxTail<=3) q+=3; else if (maxTail>=4) q-=3;
+    if (g.pairs.length===1) q+=8; else if (g.pairs.length===2) q+=3; else if (g.pairs.length===0) q-=2;
 
-    // AC值分析（号码离散度）：AC值越大号码分布越分散
+    // AC值分析
     var acValue = 0;
     var diffs = [];
     for (var ai=0; ai<s.length-1; ai++) {
-      for (var aj=ai+1; aj<s.length; aj++) {
-        diffs.push(s[aj]-s[ai]);
-      }
+      for (var aj=ai+1; aj<s.length; aj++) diffs.push(s[aj]-s[ai]);
     }
     var uniqueDiffs = {};
     diffs.forEach(function(d){ uniqueDiffs[d]=true; });
     acValue = Object.keys(uniqueDiffs).length;
-    if (acValue>=8) q+=8; else if (acValue>=6) q+=4;
+    if (acValue>=8) q+=6; else if (acValue>=6) q+=3; else if (acValue<=4) q-=3;
 
-    // 斜连号质量分：与上期号码差2/3的个数
+    // 斜连号质量分
     var diagonalCount = 0;
     for (var di=0; di<s.length; di++) {
       for (var dj=0; dj<lastFront.length; dj++) {
@@ -1376,9 +1370,9 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
         if (diff===2 || diff===3) { diagonalCount++; break; }
       }
     }
-    if (diagonalCount>=2) q+=5; else if (diagonalCount>=1) q+=3;
+    if (diagonalCount>=2) q+=4; else if (diagonalCount>=1) q+=2;
 
-    // V4跨彩种斜连质量分：与SSQ红区号码的斜连/同下
+    // V4跨彩种斜连质量分
     var crossLotteryCount = 0;
     if (typeof ssqSampleHistory !== 'undefined' && ssqSampleHistory.length > 0) {
       var lastSSQ = ssqSampleHistory[0].split('|')[0].split(',').map(Number);
@@ -1389,33 +1383,29 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
         }
       }
     }
-    if (crossLotteryCount>=3) q+=8; else if (crossLotteryCount>=2) q+=5; else if (crossLotteryCount>=1) q+=2;
+    if (crossLotteryCount>=3) q+=6; else if (crossLotteryCount>=2) q+=3; else if (crossLotteryCount>=1) q+=1;
 
-    // ========== 基于上期特征的动态回归调整 ==========
-    // 1. 奇偶回归：上期极端则下期强烈反向回归
-    if ((lastOddRatio >= 0.8 && odd <= 2) || (lastOddRatio <= 0.2 && odd >= 3)) q += 4;
-    else if ((lastOddRatio >= 0.6 && odd <= 2) || (lastOddRatio <= 0.4 && odd >= 3)) q += 2;
-    // 2. 大小回归：上期极端则下期反向回归
-    if ((lastBigRatio >= 0.8 && big <= 2) || (lastBigRatio <= 0.2 && big >= 3)) q += 4;
-    else if ((lastBigRatio >= 0.6 && big <= 2) || (lastBigRatio <= 0.4 && big >= 3)) q += 2;
-    // 3. 连号延续：上期有连号则下期有连号适当加分（连号有一定惯性）
-    if (lastHasPair && g.pairs.length >= 1) q += 3;
-    // 4. 后区同尾避免：上期后区同尾则下期优先不同尾
+    // 动态回归调整（降权）
+    if ((lastOddRatio >= 0.8 && odd <= 2) || (lastOddRatio <= 0.2 && odd >= 3)) q += 3;
+    else if ((lastOddRatio >= 0.6 && odd <= 2) || (lastOddRatio <= 0.4 && odd >= 3)) q += 1;
+    if ((lastBigRatio >= 0.8 && big <= 2) || (lastBigRatio <= 0.2 && big >= 3)) q += 3;
+    else if ((lastBigRatio >= 0.6 && big <= 2) || (lastBigRatio <= 0.4 && big >= 3)) q += 1;
+    if (lastHasPair && g.pairs.length >= 1) q += 2;
     if (lastBackSameTail) {
       var backTailSame = (back[0] % 10) === (back[1] % 10);
-      if (!backTailSame) q += 5;
+      if (!backTailSame) q += 3;
     }
-    // 5. 区间均值偏移回补：上期某区间偏多则下期该区间偏少加分
     var lastZ1 = lastFront.filter(function(x){return x<=12;}).length;
     var lastZ2 = lastFront.filter(function(x){return x>12&&x<=23;}).length;
     var lastZ3 = lastFront.filter(function(x){return x>23;}).length;
-    if (lastZ1 >= 3 && z1 <= 2) q += 3;
-    if (lastZ2 >= 3 && z2 <= 2) q += 3;
-    if (lastZ3 >= 3 && z3 <= 2) q += 3;
+    if (lastZ1 >= 3 && z1 <= 2) q += 2;
+    if (lastZ2 >= 3 && z2 <= 2) q += 2;
+    if (lastZ3 >= 3 && z3 <= 2) q += 2;
 
+    // 号码模型评分（降低权重避免膨胀）
     var fScore = s.reduce(function(sum,n){var sc=frontScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
     var bScore = back.reduce(function(sum,n){var sc=backScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
-    q += Math.min(fScore*5, 20) + Math.min(bScore*8, 12);
+    q += Math.min(fScore*3, 12) + Math.min(bScore*5, 8);
     return Math.min(100, Math.round(q));
   }
 
@@ -1462,14 +1452,16 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   }
 
   function genStrategy3() {
-    // 马尔可夫转移驱动：优先选mkScore高的号码
-    var mkPool = frontScores.filter(function(s){return s.mkScore>0.5;}).slice(0,10).map(function(s){return s.num;});
+    // V4马尔可夫转移驱动：优先选mkScore高且crossLotteryScore高的号码，与策略1形成差异化
+    var mkPool = frontScores.filter(function(s){return s.mkScore>0.4 || (s.crossLotteryScore || 0) >= 0.65;}).slice(0,14).map(function(s){return s.num;});
     if (mkPool.length < 5) {
-      for (var i=0;i<frontScores.length && mkPool.length<5;i++) {
+      for (var i=0;i<frontScores.length && mkPool.length<14;i++) {
         if (mkPool.indexOf(frontScores[i].num)<0) mkPool.push(frontScores[i].num);
       }
     }
-    var pool = mkPool.slice(0,12);
+    var pool = mkPool.slice(0,14);
+    // 排除策略1的核心号码，强制差异化
+    var s1Front = s1[0] ? s1[0].slice(0,5) : [];
     var best = null, bestQ = -1;
     for (var a=0;a<pool.length-4;a++)
     for (var b=a+1;b<pool.length-3;b++)
@@ -1477,9 +1469,26 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     for (var d=c+1;d<pool.length-1;d++)
     for (var e=d+1;e<pool.length;e++) {
       var f=[pool[a],pool[b],pool[c],pool[d],pool[e]];
+      // 与策略1的差异度检查：至少2个不同
+      var diffCount = 0;
+      for (var k=0;k<f.length;k++) if (s1Front.indexOf(f[k])<0) diffCount++;
+      if (diffCount < 2) continue;
       var b2 = [backScores[1].num, backScores[Math.min(2,backScores.length-1)].num];
       var q = qualityScore(f,b2);
       if (q>bestQ) {bestQ=q; best=f.concat(b2);}
+    }
+    // 如果没有满足差异化的组合，放宽条件
+    if (!best) {
+      for (var a=0;a<pool.length-4;a++)
+      for (var b=a+1;b<pool.length-3;b++)
+      for (var c=b+1;c<pool.length-2;c++)
+      for (var d=c+1;d<pool.length-1;d++)
+      for (var e=d+1;e<pool.length;e++) {
+        var f=[pool[a],pool[b],pool[c],pool[d],pool[e]];
+        var b2 = [backScores[1].num, backScores[Math.min(2,backScores.length-1)].num];
+        var q = qualityScore(f,b2);
+        if (q>bestQ) {bestQ=q; best=f.concat(b2);}
+      }
     }
     return best ? [best] : [];
   }
