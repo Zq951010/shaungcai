@@ -3262,17 +3262,32 @@ function scoreKL8Numbers(last, history) {
     var cycle = cycleAnalysis(n, history);
     var cycleScore = cycle.score;
 
-    var totalScore = wf * 0.17 + mpScore * 0.15 + mkScore * 0.11 + zoneScore * 0.10 + oddEvenScore * 0.09 + bigSmallScore * 0.09 + tailScore * 0.07 + neighborScore * 0.04 + stability * 0.04 + consecutiveScore * 0.04 + maScore * 0.03 + cycleScore * 0.03;
+    // 上期遗漏回补评分：上期未开但遗漏值适中的号码（遗漏5-15期）加分
+    var lastMissScore = 0;
+    if (last.indexOf(n) < 0) {
+      var lastMiss = 0;
+      for (var mi = 0; mi < history.length; mi++) {
+        if (history[mi].indexOf(n) >= 0) break;
+        lastMiss++;
+      }
+      if (lastMiss >= 3 && lastMiss <= 10) lastMissScore = 0.75;
+      else if (lastMiss >= 11 && lastMiss <= 20) lastMissScore = 0.55;
+    }
+
+    // V3 权重优化：提升重号/邻号权重(4%→10%)，降低纯频率权重(17%→14%)，新增遗漏回补(5%)
+    var totalScore = wf * 0.14 + mpScore * 0.13 + mkScore * 0.10 + zoneScore * 0.10 + neighborScore * 0.10 + oddEvenScore * 0.08 + bigSmallScore * 0.08 + lastMissScore * 0.05 + tailScore * 0.07 + stability * 0.04 + consecutiveScore * 0.04 + maScore * 0.03 + cycleScore * 0.03;
 
     var reasons = [];
     if (wf > 0.25) reasons.push('高频');
     if (mp > 0.8) reasons.push('深冷');
     if (mkScore > 0.8) reasons.push('冷转热');
     if (zoneScore > 0.7) reasons.push('区间');
+    if (neighborScore > 0.9) reasons.push('重号');
+    else if (neighborScore > 0.7) reasons.push('邻号');
+    if (lastMissScore > 0.6) reasons.push('遗漏回补');
     if (oddEvenScore > 0.7) reasons.push('奇偶');
     if (bigSmallScore > 0.7) reasons.push('大小');
     if (tailScore > 0.7) reasons.push('尾数');
-    if (neighborScore > 0.7) reasons.push('邻号');
     if (consecutiveScore > 0.5) reasons.push('连号');
     if (stability > 0.7) reasons.push('稳定');
     if (ma.trend === 'up') reasons.push('趋势升');
@@ -3320,6 +3335,12 @@ function runKL8AutoReview(history) {
       if (!tailUsed[t3] || rec3.length >= 8) { rec3.push(n3); tailUsed[t3] = true; }
     }
 
+    // 方案4：重号优选（从上期号码中选评分最高的）
+    var rec4 = scores.filter(function(s){ return lastTrain.indexOf(s.num) >= 0; }).slice(0, 10).map(function(s){ return s.num; });
+    for (var i4 = 0; i4 < scores.length && rec4.length < 10; i4++) {
+      if (rec4.indexOf(scores[i4].num) < 0) rec4.push(scores[i4].num);
+    }
+
     function hitCount(rec, actual) {
       return rec.filter(function(n){ return actual.indexOf(n) >= 0; }).length;
     }
@@ -3330,6 +3351,7 @@ function runKL8AutoReview(history) {
       s1: { picks: rec1, hit: hitCount(rec1, actual) },
       s2: { picks: rec2, hit: hitCount(rec2, actual) },
       s3: { picks: rec3, hit: hitCount(rec3, actual) },
+      s4: { picks: rec4, hit: hitCount(rec4, actual) },
       top10: rec1
     });
   }
@@ -3387,6 +3409,7 @@ function runKL8AutoReview(history) {
     html += '<span style="font-size:11px;background:var(--accent3);color:#000;padding:2px 6px;border-radius:4px">方案1命中:' + r.s1.hit + '</span>';
     html += '<span style="font-size:11px;background:var(--accent);color:#000;padding:2px 6px;border-radius:4px">方案2命中:' + r.s2.hit + '</span>';
     html += '<span style="font-size:11px;background:var(--accent5);color:#000;padding:2px 6px;border-radius:4px">方案3命中:' + r.s3.hit + '</span>';
+    html += '<span style="font-size:11px;background:var(--accent2);color:#000;padding:2px 6px;border-radius:4px">方案4(重号)命中:' + r.s4.hit + '</span>';
     html += '</div>';
     html += '</div>';
   });
