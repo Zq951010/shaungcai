@@ -3529,7 +3529,7 @@ function renderKL8AllPlayTypes_V2(last, history) {
 
   var playTypeNames = ['一','二','三','四','五','六','七','八','九','十'];
 
-  for (var pt = 1; pt <= 10; pt++) {
+  for (var pt = 5; pt <= 10; pt++) {
     var s1 = genStrategy1(pt);
     var s2 = genStrategy2(pt);
     var s3 = genStrategy3(pt);
