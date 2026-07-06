@@ -2097,12 +2097,25 @@ function autoReviewKL8() {
     });
   }
 
+  // 生成选五到选九各玩法的命中数据
+  var allPlayTypeHits = {};
+  var ptList = [5, 6, 7, 8, 9];
+  for (var pi = 0; pi < ptList.length; pi++) {
+    var pt = ptList[pi];
+    var ptRecs = generateKL8SimPicks(simScores, pt);
+    allPlayTypeHits[pt] = [];
+    for (var set = 0; set < 3; set++) {
+      var h = ptRecs[set].filter(function(n) { return actualNums.indexOf(n) >= 0; });
+      allPlayTypeHits[pt].push({ hits: h, hitRate: h.length * 10 });
+    }
+  }
+
   var optimizedWeights = optimizeKL8Weights(reviewResults, simScores);
 
   var fullNums = [actualNums].concat(simAllNums);
   var optScores = scoreKL8NumbersOptimized(actualNums, fullNums, optimizedWeights);
 
-  renderAutoReviewKL8(reviewResults, optimizedWeights, optScores, actualNums, playType);
+  renderAutoReviewKL8(reviewResults, optimizedWeights, optScores, actualNums, playType, allPlayTypeHits);
 }
 
 function generateKL8SimPicks(scores, playType) {
@@ -2224,7 +2237,7 @@ function scoreKL8NumbersOptimized(last, history, w) {
   return scores;
 }
 
-function renderAutoReviewKL8(reviewResults, weights, optScores, actualNums, playType) {
+function renderAutoReviewKL8(reviewResults, weights, optScores, actualNums, playType, allPlayTypeHits) {
   var card = document.getElementById('kl8-auto-review-card');
   var container = document.getElementById('kl8-auto-review');
   if (!card || !container) return;
@@ -2259,6 +2272,17 @@ function renderAutoReviewKL8(reviewResults, weights, optScores, actualNums, play
     }
     html += '</div>';
     html += '<div style="font-size:0.75rem;color:var(--muted)">命中 ' + r.hits.length + '/' + playType + ' 个</div>';
+    // 各玩法命中汇总
+    if (allPlayTypeHits) {
+      html += '<div style="margin-top:0.4rem;padding:0.3rem 0.4rem;background:var(--bg2);border-radius:4px;display:flex;gap:0.4rem;flex-wrap:wrap">';
+      var ptNames = {5:'选五',6:'选六',7:'选七',8:'选八',9:'选九'};
+      for (var pt in allPlayTypeHits) {
+        var ph = allPlayTypeHits[pt][set];
+        var phColor = ph.hitRate >= 50 ? 'var(--accent3)' : ph.hitRate >= 20 ? 'var(--accent)' : 'var(--muted)';
+        html += '<span style="font-size:0.7rem;color:var(--muted)">' + ptNames[pt] + ':<span style="color:' + phColor + ';font-weight:700">' + ph.hits.length + '</span></span>';
+      }
+      html += '</div>';
+    }
     html += '</div>';
   }
   html += '</div>';
