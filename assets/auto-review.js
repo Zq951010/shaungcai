@@ -2086,7 +2086,7 @@ function autoReviewKL8() {
   var simRecommendations = generateKL8SimPicks(simScores, playType);
 
   var reviewResults = [];
-  for (var set = 0; set < 3; set++) {
+  for (var set = 0; set < 4; set++) {
     var hits = simRecommendations[set].filter(function(n) { return actualNums.indexOf(n) >= 0; });
     var hitRate = hits.length * 10;
     reviewResults.push({
@@ -2104,7 +2104,7 @@ function autoReviewKL8() {
     var pt = ptList[pi];
     var ptRecs = generateKL8SimPicks(simScores, pt);
     allPlayTypeHits[pt] = [];
-    for (var set = 0; set < 3; set++) {
+    for (var set = 0; set < 4; set++) {
       var h = ptRecs[set].filter(function(n) { return actualNums.indexOf(n) >= 0; });
       allPlayTypeHits[pt].push({ hits: h, hitRate: h.length * 10 });
     }
@@ -2122,7 +2122,7 @@ function generateKL8SimPicks(scores, playType) {
   var sorted = scores.slice().sort(function(a, b) { return b.total - a.total; });
   var recommendations = [];
 
-  for (var set = 0; set < 3; set++) {
+  for (var set = 0; set < 4; set++) {
     var picks = [];
     var usedNums = {};
     var zoneCounts = [0, 0, 0, 0];
