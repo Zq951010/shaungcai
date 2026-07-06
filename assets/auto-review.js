@@ -2119,21 +2119,41 @@ function autoReviewKL8() {
 }
 
 function generateKL8SimPicks(scores, playType) {
-  var sorted = scores.slice().sort(function(a, b) { return b.total - a.total; });
+  // V4策略多样化：4个方案各有不同的维度偏向，覆盖不同中奖模式
+  var strategies = [
+    { name: '重号优选', bias: { neighbor: 1.25, lastMiss: 0.85, wf: 1.0, mk: 1.0, zone: 1.0, tail: 1.0 } },
+    { name: '猎冷回补', bias: { lastMiss: 1.30, neighbor: 0.85, mk: 1.15, wf: 0.9, zone: 1.0, tail: 1.0 } },
+    { name: '区间均衡', bias: { zone: 1.20, neighbor: 0.90, wf: 1.0, lastMiss: 1.0, mk: 1.0, tail: 1.0 } },
+    { name: '综合最优', bias: { neighbor: 1.10, lastMiss: 1.10, mk: 1.10, wf: 1.05, zone: 1.0, tail: 1.0 } }
+  ];
+
   var recommendations = [];
 
   for (var set = 0; set < 4; set++) {
+    var strat = strategies[set];
+    // 根据策略偏向重新调整各号码得分
+    var adjusted = scores.map(function(s) {
+      var adj = s.totalScore;
+      adj += (s.neighborScore - 0.5) * (strat.bias.neighbor - 1) * 0.30;
+      adj += (s.lastMissScore - 0.3) * (strat.bias.lastMiss - 1) * 0.30;
+      adj += (s.mkScore - 0.5) * (strat.bias.mk - 1) * 0.20;
+      adj += (s.wf - 0.2) * (strat.bias.wf - 1) * 0.15;
+      adj += (s.zoneScore - 0.5) * (strat.bias.zone - 1) * 0.15;
+      adj += (s.tailScore - 0.5) * (strat.bias.tail - 1) * 0.10;
+      return { num: s.num, total: adj, orig: s };
+    });
+    adjusted.sort(function(a, b) { return b.total - a.total; });
+
     var picks = [];
     var usedNums = {};
     var zoneCounts = [0, 0, 0, 0];
-    var startIdx = set;
 
     for (var pass = 0; pass < 2 && picks.length < playType; pass++) {
-      for (var i = startIdx; i < sorted.length && picks.length < playType; i++) {
-        var n = sorted[i].num;
+      for (var i = 0; i < adjusted.length && picks.length < playType; i++) {
+        var n = adjusted[i].num;
         if (usedNums[n]) continue;
         var z = n <= 20 ? 0 : n <= 40 ? 1 : n <= 60 ? 2 : 3;
-        if (pass === 0 && zoneCounts[z] >= Math.ceil(playType / 3)) continue;
+        if (pass === 0 && zoneCounts[z] >= Math.ceil(playType / 2.5)) continue;
         picks.push(n);
         usedNums[n] = true;
         zoneCounts[z]++;

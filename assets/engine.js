@@ -3274,8 +3274,8 @@ function scoreKL8Numbers(last, history) {
       else if (lastMiss >= 11 && lastMiss <= 20) lastMissScore = 0.55;
     }
 
-    // V3 权重优化：提升重号/邻号权重(4%→10%)，降低纯频率权重(17%→14%)，新增遗漏回补(5%)
-    var totalScore = wf * 0.14 + mpScore * 0.13 + mkScore * 0.10 + zoneScore * 0.10 + neighborScore * 0.10 + oddEvenScore * 0.08 + bigSmallScore * 0.08 + lastMissScore * 0.05 + tailScore * 0.07 + stability * 0.04 + consecutiveScore * 0.04 + maScore * 0.03 + cycleScore * 0.03;
+    // V4 权重优化：修正总和为100%，大幅提升重号(13%)和遗漏回补(9%)权重，降低纯频率(11%)
+    var totalScore = wf * 0.11 + mpScore * 0.12 + mkScore * 0.11 + zoneScore * 0.10 + neighborScore * 0.13 + oddEvenScore * 0.07 + bigSmallScore * 0.07 + lastMissScore * 0.09 + tailScore * 0.06 + stability * 0.03 + consecutiveScore * 0.04 + maScore * 0.03 + cycleScore * 0.04;
 
     var reasons = [];
     if (wf > 0.25) reasons.push('高频');
@@ -3293,7 +3293,7 @@ function scoreKL8Numbers(last, history) {
     if (ma.trend === 'up') reasons.push('趋势升');
     if (cycleScore > 0.85) reasons.push('周期到');
 
-    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, oddEvenScore: oddEvenScore, bigSmallScore: bigSmallScore, tailScore: tailScore, neighborScore: neighborScore, stability: stability, maScore: maScore, cycleScore: cycleScore, totalScore: totalScore, reasons: reasons });
+    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, oddEvenScore: oddEvenScore, bigSmallScore: bigSmallScore, tailScore: tailScore, neighborScore: neighborScore, lastMissScore: lastMissScore, stability: stability, maScore: maScore, cycleScore: cycleScore, totalScore: totalScore, reasons: reasons });
   }
   return scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 }
@@ -3511,10 +3511,14 @@ function renderKL8AllPlayTypes_V2(last, history) {
   }
 
   function genStrategy2(playType) {
-    // 热号+遗漏双轨：严格区分，冷号权重更高
-    var cold = scores.slice().sort(function(a,b){return b.mp - a.mp;}).slice(0, 10).map(function(s){return s.num;});
-    var hot = scores.slice(0, 8).map(function(s){return s.num;});
-    var hotCount = Math.ceil(playType * 0.4); // 冷号占60%
+    // V4猎冷回补策略：优先选取遗漏回补信号强(lastMissScore高)且深冷(mp高)的号码
+    var cold = scores.slice().sort(function(a,b){
+      var aCold = a.lastMissScore * 0.6 + a.mp * 0.4;
+      var bCold = b.lastMissScore * 0.6 + b.mp * 0.4;
+      return bCold - aCold;
+    }).slice(0, 12).map(function(s){return s.num;});
+    var hot = scores.slice(0, 6).map(function(s){return s.num;});
+    var hotCount = Math.ceil(playType * 0.3); // 冷号占70%
     var picks = cold.slice(0, playType - hotCount).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0, hotCount));
     var unique = [];
     for (var i=0;i<picks.length && unique.length<playType;i++) if (unique.indexOf(picks[i])<0) unique.push(picks[i]);
@@ -3538,15 +3542,15 @@ function renderKL8AllPlayTypes_V2(last, history) {
   }
 
   function genStrategy4(playType) {
-    // 尾数分散策略：确保选出的号码尾数尽量不重复
-    var tailUsed = {};
+    // V4重号优选策略：优先选取neighborScore高的号码（重号/邻号）
+    var neighborSorted = scores.slice().sort(function(a,b){return b.neighborScore - a.neighborScore || b.totalScore - a.totalScore;});
     var picks = [];
-    for (var i = 0; i < scores.length && picks.length < playType; i++) {
-      var n = scores[i].num;
-      var t = n % 10;
-      if (!tailUsed[t] || picks.length >= playType - 2) {
+    var used = {};
+    for (var i = 0; i < neighborSorted.length && picks.length < playType; i++) {
+      var n = neighborSorted[i].num;
+      if (!used[n]) {
         picks.push(n);
-        tailUsed[t] = true;
+        used[n] = true;
       }
     }
     picks.sort(function(a,b){return a-b;});
@@ -3567,7 +3571,7 @@ function renderKL8AllPlayTypes_V2(last, history) {
       {name:'区间均衡+热号', picks:s1, q:qualityScoreKL8(s1)},
       {name:'冷号优先+遗漏', picks:s2, q:qualityScoreKL8(s2)},
       {name:'周期+马尔可夫', picks:s3, q:qualityScoreKL8(s3)},
-      {name:'尾数分散', picks:s4, q:qualityScoreKL8(s4)}
+      {name:'重号优选', picks:s4, q:qualityScoreKL8(s4)}
     ];
 
     html += '<div class="strategy-box" style="margin:12px 0;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--bg2)">';
