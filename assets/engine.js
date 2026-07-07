@@ -217,11 +217,13 @@ function loadDLTSample() {
   document.getElementById('dlt-front').value = parts[0];
   document.getElementById('dlt-back').value = parts[1];
   document.getElementById('dlt-history').value = dltSampleHistory.join('\n');
-  // 填充复盘输入框默认值（推荐号码第一组）
+  // 填充复盘输入框默认值（兼容旧版复盘输入框）
   var sampleFront = parts[0].split(',').slice(0,5).join(',');
   var sampleBack = parts[1].split(',').slice(0,2).join(',');
-  document.getElementById('dlt-review-numbers').value = sampleFront;
-  document.getElementById('dlt-review-blue').value = sampleBack;
+  var reviewNums = document.getElementById('dlt-review-numbers');
+  var reviewBack = document.getElementById('dlt-review-blue');
+  if (reviewNums) reviewNums.value = sampleFront;
+  if (reviewBack) reviewBack.value = sampleBack;
 }
 
 function clearDLT() {
@@ -3061,7 +3063,8 @@ function loadKL8Sample() {
   document.getElementById('kl8-numbers').value = last;
   document.getElementById('kl8-history').value = kl8SampleHistory.join('\n');
   // 填充复盘输入框默认值
-  document.getElementById('kl8-review-numbers').value = last;
+  var reviewNums = document.getElementById('kl8-review-numbers');
+  if (reviewNums) reviewNums.value = last;
 }
 
 function clearKL8() {

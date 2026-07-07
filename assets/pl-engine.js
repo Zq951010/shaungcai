@@ -23,7 +23,8 @@ function loadPL3Sample() {
   }
   document.getElementById('pl3-history').value = historyLines.join('\n');
   // 填充复盘输入框默认值
-  document.getElementById('pl3-review-numbers').value = last.numbers.join(',');
+  var reviewNums = document.getElementById('pl3-review-numbers');
+  if (reviewNums) reviewNums.value = last.numbers.join(',');
 }
 
 function clearPL3() {
@@ -958,7 +959,8 @@ function loadPL5Sample() {
   }
   document.getElementById('pl5-history').value = historyLines.join('\n');
   // 填充复盘输入框默认值
-  document.getElementById('pl5-review-numbers').value = last.numbers.join(',');
+  var reviewNums = document.getElementById('pl5-review-numbers');
+  if (reviewNums) reviewNums.value = last.numbers.join(',');
 }
 
 function clearPL5() {
