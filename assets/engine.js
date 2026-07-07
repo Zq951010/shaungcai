@@ -1072,7 +1072,31 @@ function backTailPairScore(num, history) {
 }
 // ========== V3 Helper Functions End ==========
 
-function scoreDLTNumbers_V3(lastDraw, history) {
+function getDLTAdaptiveWeights() {
+  var defaults = {
+    wf: 0.11, mpScore: 0.11, tailScore: 0.06, oddAltScore: 0.04,
+    sizeScore: 0.03, zoneScore: 0.04, neighborScore: 0.06,
+    pairScore: 0.05, stability: 0.03, mkScore: 0.10,
+    diagonalScore: 0.07, hotColdAltScore: 0.08,
+    crossLotteryScore: 0.06, maScore: 0.04, cycleScore: 0.04,
+    coScore: 0.12
+  };
+  try {
+    var saved = localStorage.getItem('dlt_adaptive_weights');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      for (var k in parsed) {
+        if (defaults.hasOwnProperty(k) && typeof parsed[k] === 'number') {
+          defaults[k] = parsed[k];
+        }
+      }
+    }
+  } catch(e) {}
+  return defaults;
+}
+
+function scoreDLTNumbers_V3(lastDraw, history, weights) {
+  var w = weights || getDLTAdaptiveWeights();
   var fronts = history.map(function(h){ return h.slice(0,5); });
   var co = buildCoOccurrence(fronts);
   var last = lastDraw.slice(0,5);
@@ -1188,8 +1212,8 @@ function scoreDLTNumbers_V3(lastDraw, history) {
       diagonalScore: diagonalScore, hotColdAltScore: hotColdAltScore,
       crossLotteryScore: crossLotteryScore,
       maScore: maScore, cycleScore: cycleScore,
-      // V4权重优化：新增跨彩种斜连(6%)，调整其他权重
-      baseScore: wf*0.11 + mpScore*0.11 + tailScore*0.06 + oddAltScore*0.04 + sizeScore*0.03 + zoneScore*0.04 + neighborScore*0.06 + pairScore*0.05 + stability*0.03 + mkScore*0.10 + diagonalScore*0.07 + hotColdAltScore*0.08 + crossLotteryScore*0.06 + maScore*0.04 + cycleScore*0.04,
+      // V4权重参数化：支持自适应学习调整
+      baseScore: wf*w.wf + mpScore*w.mpScore + tailScore*w.tailScore + oddAltScore*w.oddAltScore + sizeScore*w.sizeScore + zoneScore*w.zoneScore + neighborScore*w.neighborScore + pairScore*w.pairScore + stability*w.stability + mkScore*w.mkScore + diagonalScore*w.diagonalScore + hotColdAltScore*w.hotColdAltScore + crossLotteryScore*w.crossLotteryScore + maScore*w.maScore + cycleScore*w.cycleScore,
       coScore: 0
     });
   }
@@ -1200,7 +1224,7 @@ function scoreDLTNumbers_V3(lastDraw, history) {
       if (t !== s.num && co[s.num] && co[s.num][t]) { coSum += co[s.num][t]; coCount++; }
     });
     s.coScore = coCount ? Math.min(coSum/coCount/3, 1) : 0;
-    s.totalScore = s.baseScore + s.coScore * 0.12;
+    s.totalScore = s.baseScore + s.coScore * w.coScore;
   });
   return scores.sort(function(a,b){return b.totalScore-a.totalScore;});
 }
@@ -2170,7 +2194,30 @@ function getRecent15Trend(allDraws) {
   };
 }
 
-function scoreSSQNumbers(last, allReds) {
+function getSSQAdaptiveWeights() {
+  var defaults = {
+    wf: 0.16, mpScore: 0.14, mkScore: 0.11, zoneScore: 0.09,
+    tailScore: 0.07, oddAltScore: 0.04, sizeScore: 0.04,
+    neighborScore: 0.07, pairScore: 0.05, hcScore: 0.07,
+    stability: 0.04, maScore: 0.04, cycleScore: 0.04,
+    coScore: 0.15
+  };
+  try {
+    var saved = localStorage.getItem('ssq_adaptive_weights');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      for (var k in parsed) {
+        if (defaults.hasOwnProperty(k) && typeof parsed[k] === 'number') {
+          defaults[k] = parsed[k];
+        }
+      }
+    }
+  } catch(e) {}
+  return defaults;
+}
+
+function scoreSSQNumbers(last, allReds, weights) {
+  var w = weights || getSSQAdaptiveWeights();
   var scores = [];
   var co = buildCoOccurrence(allReds);
   var trend15 = getRecent15Trend(allReds);
@@ -2259,7 +2306,7 @@ function scoreSSQNumbers(last, allReds) {
     var cycle = cycleAnalysis(n, allReds);
     var cycleScore = cycle.score;
 
-    var baseScore = wf*0.16 + mpScore*0.14 + mkScore*0.11 + zoneScore*0.09 + tailScore*0.07 + oddAltScore*0.04 + sizeScore*0.04 + neighborScore*0.07 + pairScore*0.05 + hcScore*0.07 + stability*0.04 + maScore*0.04 + cycleScore*0.04;
+    var baseScore = wf*w.wf + mpScore*w.mpScore + mkScore*w.mkScore + zoneScore*w.zoneScore + tailScore*w.tailScore + oddAltScore*w.oddAltScore + sizeScore*w.sizeScore + neighborScore*w.neighborScore + pairScore*w.pairScore + hcScore*w.hcScore + stability*w.stability + maScore*w.maScore + cycleScore*w.cycleScore;
 
     var reasons = [];
     if (wf > 0.2) reasons.push('高频');
@@ -2283,7 +2330,7 @@ function scoreSSQNumbers(last, allReds) {
       if (t !== s.num && co[s.num] && co[s.num][t]) { coSum += co[s.num][t]; coCount++; }
     });
     s.coScore = coCount ? Math.min(coSum/coCount/3, 1) : 0;
-    s.totalScore = s.baseScore + s.coScore * 0.15;
+    s.totalScore = s.baseScore + s.coScore * w.coScore;
   });
   return scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 }
@@ -2551,6 +2598,26 @@ function renderSSQRecommend(last, allReds, allBlues) {
   html += '</div>';
 
   document.getElementById('ssq-recommend').innerHTML = html;
+
+  // 保存当前推荐到 localStorage，供下期回测直接使用（避免重新计算导致号码不一致）
+  try {
+    var newLastDraw = last.red.join(',') + '|' + last.blue;
+    var currentSaved = localStorage.getItem('ssq_recommendations');
+    if (currentSaved) {
+      var currentParsed = JSON.parse(currentSaved);
+      if (currentParsed.lastDraw !== newLastDraw) {
+        localStorage.setItem('ssq_previous_recommendations', currentSaved);
+      }
+    }
+    var recsData = {
+      date: new Date().toISOString().split('T')[0],
+      lastDraw: newLastDraw,
+      recommendations: strategies
+    };
+    localStorage.setItem('ssq_recommendations', JSON.stringify(recsData));
+  } catch(e) {
+    console.log('保存SSQ推荐失败:', e.message);
+  }
 }
 
 
@@ -3173,7 +3240,29 @@ function renderKL8DanTuo(last, history, playType) {
   document.getElementById('kl8-dantuo').innerHTML = html;
 }
 
-function scoreKL8Numbers(last, history) {
+function getKL8AdaptiveWeights() {
+  var defaults = {
+    wf: 0.11, mpScore: 0.12, mkScore: 0.11, zoneScore: 0.10,
+    neighborScore: 0.13, oddEvenScore: 0.07, bigSmallScore: 0.07,
+    lastMissScore: 0.09, tailScore: 0.06, stability: 0.03,
+    consecutiveScore: 0.04, maScore: 0.03, cycleScore: 0.04
+  };
+  try {
+    var saved = localStorage.getItem('kl8_adaptive_weights');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      for (var k in parsed) {
+        if (defaults.hasOwnProperty(k) && typeof parsed[k] === 'number') {
+          defaults[k] = parsed[k];
+        }
+      }
+    }
+  } catch(e) {}
+  return defaults;
+}
+
+function scoreKL8Numbers(last, history, weights) {
+  var w = weights || getKL8AdaptiveWeights();
   var scores = [];
   // KL8近15期趋势分析
   var recent15 = history.slice(0, Math.min(15, history.length));
@@ -3349,8 +3438,8 @@ function scoreKL8Numbers(last, history) {
       else if (lastMiss >= 11 && lastMiss <= 20) lastMissScore = 0.55;
     }
 
-    // V4 权重优化：修正总和为100%，大幅提升重号(13%)和遗漏回补(9%)权重，降低纯频率(11%)
-    var totalScore = wf * 0.11 + mpScore * 0.12 + mkScore * 0.11 + zoneScore * 0.10 + neighborScore * 0.13 + oddEvenScore * 0.07 + bigSmallScore * 0.07 + lastMissScore * 0.09 + tailScore * 0.06 + stability * 0.03 + consecutiveScore * 0.04 + maScore * 0.03 + cycleScore * 0.04;
+    // V4权重参数化：支持自适应学习调整
+    var totalScore = wf*w.wf + mpScore*w.mpScore + mkScore*w.mkScore + zoneScore*w.zoneScore + neighborScore*w.neighborScore + oddEvenScore*w.oddEvenScore + bigSmallScore*w.bigSmallScore + lastMissScore*w.lastMissScore + tailScore*w.tailScore + stability*w.stability + consecutiveScore*w.consecutiveScore + maScore*w.maScore + cycleScore*w.cycleScore;
 
     var reasons = [];
     if (wf > 0.25) reasons.push('高频');

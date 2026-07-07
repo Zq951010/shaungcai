@@ -1352,7 +1352,7 @@ function autoReviewDLT() {
   var simScores = scoreDLTNumbers_V3(simLast, simAllFronts.map(function(f,i){ return f.concat(simAllBacks[i]); }));
   var simBackScores = scoreDLTBlueNumbers_V3(simLast, simAllFronts.map(function(f,i){ return f.concat(simAllBacks[i]); }));
 
-  // 优先使用 localStorage 保存的昨日推荐（确保回测号码与昨日实际推荐一致，避免重新计算导致差异）
+  // 优先使用 localStorage 保存的上期推荐（确保回测号码与上期实际推荐一致，避免重新计算导致差异）
   var savedRecs = null;
   try {
     var saved = localStorage.getItem('dlt_previous_recommendations');
@@ -1364,7 +1364,7 @@ function autoReviewDLT() {
 
   var simRecommendations;
   if (savedRecs && savedRecs.length >= 4) {
-    // 使用保存的昨日推荐，确保回测号码与昨日页面显示完全一致
+    // 使用保存的上期推荐，确保回测号码与上期页面显示完全一致
     simRecommendations = [];
     for (var si = 0; si < 4; si++) {
       var combo = savedRecs[si].combos[0];
@@ -1406,6 +1406,79 @@ function autoReviewDLT() {
   var fullBacks = [actualBack].concat(simAllBacks);
   var optScores = scoreDLTNumbersOptimized({ front: actualFront, back: actualBack }, fullFronts, fullBacks, optimizedWeights);
   var optBackScores = scoreDLTBackNumbersOptimized({ front: actualFront, back: actualBack }, fullBacks, optimizedWeights);
+
+  // ===== 自适应学习：分析命中/未命中号码的维度差异，调整下期权重 =====
+  (function() {
+    var hitNums = [];
+    var allPicks = [];
+    for (var set = 0; set < reviewResults.length; set++) {
+      hitNums = hitNums.concat(reviewResults[set].frontHits);
+      allPicks = allPicks.concat(reviewResults[set].front);
+    }
+    hitNums = unique(hitNums);
+    allPicks = unique(allPicks);
+    var missNums = [];
+    for (var i = 0; i < allPicks.length; i++) {
+      if (hitNums.indexOf(allPicks[i]) < 0) missNums.push(allPicks[i]);
+    }
+    if (hitNums.length === 0 || missNums.length === 0) return;
+
+    var w = getDLTAdaptiveWeights();
+    var dims = ['wf','mpScore','tailScore','oddAltScore','sizeScore','zoneScore',
+                'neighborScore','pairScore','stability','mkScore','diagonalScore',
+                'hotColdAltScore','crossLotteryScore','maScore','cycleScore'];
+
+    function getAvg(nums, dim) {
+      var sum = 0, count = 0;
+      for (var i = 0; i < nums.length; i++) {
+        for (var j = 0; j < simScores.length; j++) {
+          if (simScores[j].num === nums[i]) {
+            sum += (simScores[j][dim] || 0);
+            count++;
+            break;
+          }
+        }
+      }
+      return count > 0 ? sum / count : 0;
+    }
+
+    var adjusted = {};
+    for (var k in w) adjusted[k] = w[k];
+
+    dims.forEach(function(dim) {
+      var diff = getAvg(hitNums, dim) - getAvg(missNums, dim);
+      if (diff > 0.15) {
+        adjusted[dim] = Math.min(adjusted[dim] * 1.12, adjusted[dim] + 0.025);
+      } else if (diff > 0.05) {
+        adjusted[dim] = Math.min(adjusted[dim] * 1.06, adjusted[dim] + 0.012);
+      } else if (diff < -0.15) {
+        adjusted[dim] = Math.max(adjusted[dim] * 0.88, adjusted[dim] - 0.025);
+      } else if (diff < -0.05) {
+        adjusted[dim] = Math.max(adjusted[dim] * 0.94, adjusted[dim] - 0.012);
+      }
+    });
+
+    var hitCo = getAvg(hitNums, 'coScore');
+    var missCo = getAvg(missNums, 'coScore');
+    if (hitCo > missCo + 0.1) {
+      adjusted.coScore = Math.min(adjusted.coScore * 1.12, adjusted.coScore + 0.025);
+    } else if (hitCo < missCo - 0.1) {
+      adjusted.coScore = Math.max(adjusted.coScore * 0.88, adjusted.coScore - 0.025);
+    }
+
+    // 归一化（不含coScore）
+    var sumExCo = 0;
+    for (var k in adjusted) { if (k !== 'coScore') sumExCo += adjusted[k]; }
+    if (sumExCo > 0) {
+      var target = 1.0 - adjusted.coScore;
+      for (var k in adjusted) { if (k !== 'coScore') adjusted[k] = adjusted[k] / sumExCo * target; }
+    }
+
+    try {
+      localStorage.setItem('dlt_adaptive_weights', JSON.stringify(adjusted));
+      console.log('DLT自适应权重已更新:', adjusted);
+    } catch(e) {}
+  })();
 
   renderAutoReviewDLT(reviewResults, optimizedWeights, optScores, optBackScores, actualFront, actualBack);
 }
@@ -1662,8 +1735,8 @@ function renderAutoReviewDLT(reviewResults, weights, optScores, optBackScores, a
   html += '</div></div>';
 
   html += '<div style="margin-bottom:1.25rem">';
-  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.25rem">【历史回测验证】模拟推荐 vs 实际开奖对比</div>';
-  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">金色号码表示命中实际开奖，灰色号码表示未命中</div>';
+  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.25rem">【历史回测验证】大乐透（周一/三/六开奖）上期推荐 vs 实际开奖对比</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">金色号码表示命中实际开奖，灰色号码表示未命中。大乐透每周开奖3期，回测基于上期实际推荐号码验证。</div>';
 
   for (var set = 0; set < reviewResults.length; set++) {
     var r = reviewResults[set];
@@ -1801,12 +1874,36 @@ function autoReviewSSQ() {
   var simScores = scoreSSQNumbers(simLast, simAllReds);
   var simBackScores = scoreSSQBlueNumbers(simLast, simAllBlues);
 
-  var simRecommendations = generateSSQSimPicks(simScores, simBackScores);
+  // 优先使用 localStorage 保存的上期推荐（确保回测号码与上期实际推荐一致，避免重新计算导致差异）
+  var savedRecs = null;
+  try {
+    var saved = localStorage.getItem('ssq_previous_recommendations');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      savedRecs = parsed.recommendations;
+    }
+  } catch(e) {}
+
+  var simRecommendations;
+  if (savedRecs && savedRecs.length >= 3) {
+    // 使用保存的上期推荐，确保回测号码与上期页面显示完全一致
+    simRecommendations = [];
+    for (var si = 0; si < savedRecs.length; si++) {
+      var combo = savedRecs[si].combos[0];
+      simRecommendations.push({
+        red: combo.reds,
+        blue: combo.blue
+      });
+    }
+  } else {
+    // 无保存数据时回退到重新计算
+    simRecommendations = generateSSQSimPicks(simScores, simBackScores);
+  }
 
   var reviewResults = [];
   var bestHitRate = 0;
 
-  for (var set = 0; set < 4; set++) {
+  for (var set = 0; set < simRecommendations.length; set++) {
     var redHits = simRecommendations[set].red.filter(function(n) { return actualRed.indexOf(n) >= 0; });
     var blueHit = simRecommendations[set].blue === actualBlue;
     var hitRate = (redHits.length * 10 + (blueHit ? 15 : 0));
@@ -1827,6 +1924,77 @@ function autoReviewSSQ() {
   var fullBlues = [actualBlue].concat(simAllBlues);
   var optScores = scoreSSQNumbersOptimized({ red: actualRed, blue: actualBlue }, fullReds, optimizedWeights);
   var optBackScores = scoreSSQBlueNumbersOptimized({ red: actualRed, blue: actualBlue }, fullBlues, optimizedWeights);
+
+  // ===== 自适应学习：分析命中/未命中号码的维度差异，调整下期权重 =====
+  (function() {
+    var hitNums = [];
+    var allPicks = [];
+    for (var set = 0; set < reviewResults.length; set++) {
+      hitNums = hitNums.concat(reviewResults[set].redHits);
+      allPicks = allPicks.concat(reviewResults[set].red);
+    }
+    hitNums = unique(hitNums);
+    allPicks = unique(allPicks);
+    var missNums = [];
+    for (var i = 0; i < allPicks.length; i++) {
+      if (hitNums.indexOf(allPicks[i]) < 0) missNums.push(allPicks[i]);
+    }
+    if (hitNums.length === 0 || missNums.length === 0) return;
+
+    var w = getSSQAdaptiveWeights();
+    var dims = ['wf','mpScore','mkScore','zoneScore','tailScore','oddAltScore','sizeScore','neighborScore','pairScore','hcScore','stability','maScore','cycleScore'];
+
+    function getAvg(nums, dim) {
+      var sum = 0, count = 0;
+      for (var i = 0; i < nums.length; i++) {
+        for (var j = 0; j < simScores.length; j++) {
+          if (simScores[j].num === nums[i]) {
+            sum += (simScores[j][dim] || 0);
+            count++;
+            break;
+          }
+        }
+      }
+      return count > 0 ? sum / count : 0;
+    }
+
+    var adjusted = {};
+    for (var k in w) adjusted[k] = w[k];
+
+    dims.forEach(function(dim) {
+      var diff = getAvg(hitNums, dim) - getAvg(missNums, dim);
+      if (diff > 0.15) {
+        adjusted[dim] = Math.min(adjusted[dim] * 1.12, adjusted[dim] + 0.025);
+      } else if (diff > 0.05) {
+        adjusted[dim] = Math.min(adjusted[dim] * 1.06, adjusted[dim] + 0.012);
+      } else if (diff < -0.15) {
+        adjusted[dim] = Math.max(adjusted[dim] * 0.88, adjusted[dim] - 0.025);
+      } else if (diff < -0.05) {
+        adjusted[dim] = Math.max(adjusted[dim] * 0.94, adjusted[dim] - 0.012);
+      }
+    });
+
+    var hitCo = getAvg(hitNums, 'coScore');
+    var missCo = getAvg(missNums, 'coScore');
+    if (hitCo > missCo + 0.1) {
+      adjusted.coScore = Math.min(adjusted.coScore * 1.12, adjusted.coScore + 0.025);
+    } else if (hitCo < missCo - 0.1) {
+      adjusted.coScore = Math.max(adjusted.coScore * 0.88, adjusted.coScore - 0.025);
+    }
+
+    // 归一化（不含coScore）
+    var sumExCo = 0;
+    for (var k in adjusted) { if (k !== 'coScore') sumExCo += adjusted[k]; }
+    if (sumExCo > 0) {
+      var target = 1.0 - adjusted.coScore;
+      for (var k in adjusted) { if (k !== 'coScore') adjusted[k] = adjusted[k] / sumExCo * target; }
+    }
+
+    try {
+      localStorage.setItem('ssq_adaptive_weights', JSON.stringify(adjusted));
+      console.log('SSQ自适应权重已更新:', adjusted);
+    } catch(e) {}
+  })();
 
   renderAutoReviewSSQ(reviewResults, optimizedWeights, optScores, optBackScores, actualRed, actualBlue);
 }
@@ -2021,8 +2189,8 @@ function renderAutoReviewSSQ(reviewResults, weights, optScores, optBackScores, a
   html += '</div></div>';
 
   html += '<div style="margin-bottom:1.25rem">';
-  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.25rem">【历史回测验证】模拟推荐 vs 实际开奖对比</div>';
-  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">金色号码表示命中实际开奖，灰色号码表示未命中</div>';
+  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.25rem">【历史回测验证】双色球（周二/四/日开奖）上期推荐 vs 实际开奖对比</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">金色号码表示命中实际开奖，灰色号码表示未命中。双色球每周开奖3期，回测基于上期实际推荐号码验证。</div>';
 
   for (var set = 0; set < reviewResults.length; set++) {
     var r = reviewResults[set];
@@ -2197,6 +2365,68 @@ function autoReviewKL8() {
   var fullNums = [actualNums].concat(simAllNums);
   var optScores = scoreKL8NumbersOptimized(actualNums, fullNums, optimizedWeights);
 
+  // ===== 自适应学习：分析命中/未命中号码的维度差异，调整下期权重 =====
+  (function() {
+    var hitNums = [];
+    var allPicks = [];
+    for (var set = 0; set < reviewResults.length; set++) {
+      hitNums = hitNums.concat(reviewResults[set].hits);
+      allPicks = allPicks.concat(reviewResults[set].picks);
+    }
+    hitNums = unique(hitNums);
+    allPicks = unique(allPicks);
+    var missNums = [];
+    for (var i = 0; i < allPicks.length; i++) {
+      if (hitNums.indexOf(allPicks[i]) < 0) missNums.push(allPicks[i]);
+    }
+    if (hitNums.length === 0 || missNums.length === 0) return;
+
+    var w = getKL8AdaptiveWeights();
+    var dims = ['wf','mpScore','mkScore','zoneScore','neighborScore','oddEvenScore','bigSmallScore','lastMissScore','tailScore','stability','consecutiveScore','maScore','cycleScore'];
+
+    function getAvg(nums, dim) {
+      var sum = 0, count = 0;
+      for (var i = 0; i < nums.length; i++) {
+        for (var j = 0; j < simScores.length; j++) {
+          if (simScores[j].num === nums[i]) {
+            sum += (simScores[j][dim] || 0);
+            count++;
+            break;
+          }
+        }
+      }
+      return count > 0 ? sum / count : 0;
+    }
+
+    var adjusted = {};
+    for (var k in w) adjusted[k] = w[k];
+
+    dims.forEach(function(dim) {
+      var diff = getAvg(hitNums, dim) - getAvg(missNums, dim);
+      if (diff > 0.15) {
+        adjusted[dim] = Math.min(adjusted[dim] * 1.12, adjusted[dim] + 0.025);
+      } else if (diff > 0.05) {
+        adjusted[dim] = Math.min(adjusted[dim] * 1.06, adjusted[dim] + 0.012);
+      } else if (diff < -0.15) {
+        adjusted[dim] = Math.max(adjusted[dim] * 0.88, adjusted[dim] - 0.025);
+      } else if (diff < -0.05) {
+        adjusted[dim] = Math.max(adjusted[dim] * 0.94, adjusted[dim] - 0.012);
+      }
+    });
+
+    // 归一化
+    var sumAll = 0;
+    for (var k in adjusted) sumAll += adjusted[k];
+    if (sumAll > 0) {
+      for (var k in adjusted) adjusted[k] = adjusted[k] / sumAll;
+    }
+
+    try {
+      localStorage.setItem('kl8_adaptive_weights', JSON.stringify(adjusted));
+      console.log('KL8自适应权重已更新:', adjusted);
+    } catch(e) {}
+  })();
+
   renderAutoReviewKL8(reviewResults, optimizedWeights, optScores, actualNums, playType, allPlayTypeHits);
 }
 
@@ -2357,8 +2587,8 @@ function renderAutoReviewKL8(reviewResults, weights, optScores, actualNums, play
   html += '</div></div>';
 
   html += '<div style="margin-bottom:1.25rem">';
-  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.25rem">【历史回测验证】模拟推荐 vs 实际开奖对比</div>';
-  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">金色号码表示命中实际开奖，灰色号码表示未命中</div>';
+  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.25rem">【历史回测验证】快乐8（每日开奖）昨日推荐 vs 实际开奖对比</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">金色号码表示命中实际开奖，灰色号码表示未命中。快乐8每日开奖，回测基于昨日实际推荐号码验证。</div>';
 
   for (var set = 0; set < reviewResults.length; set++) {
     var r = reviewResults[set];
@@ -2786,8 +3016,8 @@ function renderAutoReviewPL(reviewResults, weights, optScores, actualNums, type,
   html += '</div></div>';
 
   html += '<div style="margin-bottom:1.25rem">';
-  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.25rem">【历史回测验证】模拟推荐 vs 实际开奖对比</div>';
-  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">金色号码表示命中实际开奖，灰色号码表示未命中</div>';
+  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.25rem">【历史回测验证】排列三/五（每日开奖）昨日推荐 vs 实际开奖对比</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">金色号码表示命中实际开奖，灰色号码表示未命中。排列三/五每日开奖，回测基于昨日实际推荐号码验证。</div>';
 
   for (var set = 0; set < reviewResults.length; set++) {
     var r = reviewResults[set];
