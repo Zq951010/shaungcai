@@ -3695,6 +3695,7 @@ function renderKL8AllPlayTypes_V2(last, history) {
 
   var playTypeNames = ['一','二','三','四','五','六','七','八','九','十'];
 
+  var allPlayTypeRecs = {};
   for (var pt = 5; pt <= 10; pt++) {
     var s1 = genStrategy1(pt);
     var s2 = genStrategy2(pt);
@@ -3706,6 +3707,7 @@ function renderKL8AllPlayTypes_V2(last, history) {
       {name:'周期+马尔可夫', picks:s3, q:qualityScoreKL8(s3)},
       {name:'重号优选', picks:s4, q:qualityScoreKL8(s4)}
     ];
+    allPlayTypeRecs[pt] = strategies;
 
     html += '<div class="strategy-box" style="margin:12px 0;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--bg2)">';
     html += '<h4 style="margin:0 0 6px 0;color:var(--ink)">选'+playTypeNames[pt-1]+'（'+pt+'个号码）</h4>';
@@ -3813,6 +3815,27 @@ function renderKL8AllPlayTypes_V2(last, history) {
   html += '</div>';
 
   document.getElementById('kl8-recommend').innerHTML = html;
+
+  // 保存当前推荐到 localStorage，供次日回测直接使用（避免重新计算导致号码不一致）
+  try {
+    var newLastDraw = last.join(',');
+    var currentSaved = localStorage.getItem('kl8_recommendations');
+    if (currentSaved) {
+      var currentParsed = JSON.parse(currentSaved);
+      // 只有当当前保存的不是同一期数据时，才移到"昨日"
+      if (currentParsed.lastDraw !== newLastDraw) {
+        localStorage.setItem('kl8_previous_recommendations', currentSaved);
+      }
+    }
+    var recsData = {
+      date: new Date().toISOString().split('T')[0],
+      lastDraw: newLastDraw,
+      recommendations: allPlayTypeRecs
+    };
+    localStorage.setItem('kl8_recommendations', JSON.stringify(recsData));
+  } catch(e) {
+    console.log('保存KL8推荐失败:', e.message);
+  }
 }
 
 

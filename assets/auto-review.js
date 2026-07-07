@@ -2114,10 +2114,29 @@ function autoReviewKL8() {
   var simLast = simAllNums[0];
   var simScores = scoreKL8Numbers(simLast, simAllNums);
 
+  // 优先使用 localStorage 保存的昨日推荐（确保回测号码与昨日实际推荐一致，避免重新计算导致差异）
+  var savedRecs = null;
+  try {
+    var saved = localStorage.getItem('kl8_previous_recommendations');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      savedRecs = parsed.recommendations;
+    }
+  } catch(e) {}
+
   // 使用与综合推荐完全相同的选号函数
   var playType = 10;
-  var simRecommendations = generateKL8Picks_V2(simScores, simAllNums, playType);
-  var simPicks = simRecommendations.map(function(r){ return r.picks; });
+  var simRecommendations, simPicks;
+
+  if (savedRecs && savedRecs[10] && savedRecs[10].length === 4) {
+    // 使用保存的昨日推荐，确保回测号码与昨日页面显示完全一致
+    simRecommendations = savedRecs[10];
+    simPicks = simRecommendations.map(function(r){ return r.picks; });
+  } else {
+    // 无保存数据时回退到重新计算
+    simRecommendations = generateKL8Picks_V2(simScores, simAllNums, playType);
+    simPicks = simRecommendations.map(function(r){ return r.picks; });
+  }
 
   var reviewResults = [];
   for (var set = 0; set < 4; set++) {
@@ -2136,7 +2155,12 @@ function autoReviewKL8() {
   var ptList = [5, 6, 7, 8, 9];
   for (var pi = 0; pi < ptList.length; pi++) {
     var pt = ptList[pi];
-    var ptRecs = generateKL8Picks_V2(simScores, simAllNums, pt);
+    var ptRecs;
+    if (savedRecs && savedRecs[pt] && savedRecs[pt].length === 4) {
+      ptRecs = savedRecs[pt];
+    } else {
+      ptRecs = generateKL8Picks_V2(simScores, simAllNums, pt);
+    }
     allPlayTypeHits[pt] = [];
     for (var set = 0; set < 4; set++) {
       var h = ptRecs[set].picks.filter(function(n) { return actualNums.indexOf(n) >= 0; });
