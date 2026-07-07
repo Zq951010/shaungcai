@@ -1639,7 +1639,7 @@ function renderAutoReviewDLT(reviewResults, weights, optScores, optBackScores, a
 
   html += '<div style="margin-bottom:1.25rem">';
   html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.25rem">【历史回测验证】模拟推荐 vs 实际开奖对比</div>';
-  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">用历史数据检验模型在过去的表现，号码颜色仅区分前区/后区，不表示命中与否</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">金色号码表示命中实际开奖，灰色号码表示未命中</div>';
 
   for (var set = 0; set < reviewResults.length; set++) {
     var r = reviewResults[set];
@@ -1651,11 +1651,13 @@ function renderAutoReviewDLT(reviewResults, weights, optScores, optBackScores, a
     html += '</div>';
     html += '<div class="ball-row" style="margin-bottom:0.25rem">';
     for (var i = 0; i < r.front.length; i++) {
-      html += '<div class="ball red">' + pad(r.front[i]) + '</div>';
+      var isHit = r.frontHits.indexOf(r.front[i]) >= 0;
+      html += '<div class="ball ' + (isHit ? 'gold' : 'gray') + '">' + pad(r.front[i]) + '</div>';
     }
     html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
     for (var i = 0; i < r.back.length; i++) {
-      html += '<div class="ball blue">' + pad(r.back[i]) + '</div>';
+      var isHit = r.backHits.indexOf(r.back[i]) >= 0;
+      html += '<div class="ball ' + (isHit ? 'gold' : 'gray') + '">' + pad(r.back[i]) + '</div>';
     }
     html += '</div>';
     var hitDesc = [];
@@ -1996,7 +1998,7 @@ function renderAutoReviewSSQ(reviewResults, weights, optScores, optBackScores, a
 
   html += '<div style="margin-bottom:1.25rem">';
   html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.25rem">【历史回测验证】模拟推荐 vs 实际开奖对比</div>';
-  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">用历史数据检验模型在过去的表现，号码颜色仅区分红球/蓝球，不表示命中与否</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">金色号码表示命中实际开奖，灰色号码表示未命中</div>';
 
   for (var set = 0; set < reviewResults.length; set++) {
     var r = reviewResults[set];
@@ -2008,10 +2010,11 @@ function renderAutoReviewSSQ(reviewResults, weights, optScores, optBackScores, a
     html += '</div>';
     html += '<div class="ball-row" style="margin-bottom:0.25rem">';
     for (var i = 0; i < r.red.length; i++) {
-      html += '<div class="ball red">' + pad(r.red[i]) + '</div>';
+      var isHit = r.redHits.indexOf(r.red[i]) >= 0;
+      html += '<div class="ball ' + (isHit ? 'gold' : 'gray') + '">' + pad(r.red[i]) + '</div>';
     }
     html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
-    html += '<div class="ball blue">' + pad(r.blue) + '</div>';
+    html += '<div class="ball ' + (r.blueHit ? 'gold' : 'gray') + '">' + pad(r.blue) + '</div>';
     html += '</div>';
     var hitDesc = [];
     if (r.redHits.length > 0) hitDesc.push('红球命中' + r.redHits.length + '个');
@@ -2306,7 +2309,7 @@ function renderAutoReviewKL8(reviewResults, weights, optScores, actualNums, play
 
   html += '<div style="margin-bottom:1.25rem">';
   html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.25rem">【历史回测验证】模拟推荐 vs 实际开奖对比</div>';
-  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">用历史数据检验模型在过去的表现，号码颜色统一，不表示命中与否</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">金色号码表示命中实际开奖，灰色号码表示未命中</div>';
 
   for (var set = 0; set < reviewResults.length; set++) {
     var r = reviewResults[set];
@@ -2318,7 +2321,8 @@ function renderAutoReviewKL8(reviewResults, weights, optScores, actualNums, play
     html += '</div>';
     html += '<div class="ball-row" style="margin-bottom:0.25rem">';
     for (var i = 0; i < r.picks.length; i++) {
-      html += '<div class="ball red" style="width:36px;height:36px;font-size:0.75rem">' + pad(r.picks[i]) + '</div>';
+      var isHit = r.hits.indexOf(r.picks[i]) >= 0;
+      html += '<div class="ball ' + (isHit ? 'gold' : 'gray') + '" style="width:36px;height:36px;font-size:0.75rem">' + pad(r.picks[i]) + '</div>';
     }
     html += '</div>';
     // 选五号码球
@@ -2328,7 +2332,8 @@ function renderAutoReviewKL8(reviewResults, weights, optScores, actualNums, play
     html += '<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.15rem">选五方案</div>';
     html += '<div class="ball-row">';
     for (var i = 0; i < xuan5Picks.length; i++) {
-      html += '<div class="ball red" style="width:32px;height:32px;font-size:0.7rem">' + pad(xuan5Picks[i]) + '</div>';
+      var isHit5 = r.hits.indexOf(xuan5Picks[i]) >= 0;
+      html += '<div class="ball ' + (isHit5 ? 'gold' : 'gray') + '" style="width:32px;height:32px;font-size:0.7rem">' + pad(xuan5Picks[i]) + '</div>';
     }
     html += '</div>';
     html += '<div style="font-size:0.7rem;color:var(--muted)">命中 ' + xuan5Hits.length + '/5 个</div>';
@@ -2733,7 +2738,7 @@ function renderAutoReviewPL(reviewResults, weights, optScores, actualNums, type,
 
   html += '<div style="margin-bottom:1.25rem">';
   html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.25rem">【历史回测验证】模拟推荐 vs 实际开奖对比</div>';
-  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">用历史数据检验模型在过去的表现，号码颜色统一，不表示命中与否</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">金色号码表示命中实际开奖，灰色号码表示未命中</div>';
 
   for (var set = 0; set < reviewResults.length; set++) {
     var r = reviewResults[set];
@@ -2745,7 +2750,8 @@ function renderAutoReviewPL(reviewResults, weights, optScores, actualNums, type,
     html += '</div>';
     html += '<div class="ball-row" style="margin-bottom:0.25rem">';
     for (var i = 0; i < r.picks.length; i++) {
-      html += '<div class="ball red">' + r.picks[i] + '</div>';
+      var isHit = r.picks[i] === actualNums[i];
+      html += '<div class="ball ' + (isHit ? 'gold' : 'gray') + '">' + r.picks[i] + '</div>';
     }
     html += '</div>';
     var hitDesc = [];
