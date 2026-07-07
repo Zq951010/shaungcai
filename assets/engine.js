@@ -4761,30 +4761,14 @@ function spinDLTReview() {
     html += '<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
     html += '<span style="font-weight:700;color:var(--accent);min-width:50px;font-size:0.9rem">第'+(s+1)+'注</span>';
     results[s].front.forEach(function(n){
-      var hit = actualFront.indexOf(n) >= 0;
-      html += '<div class="ball '+(hit?'red':'gray')+'" style="width:34px;height:34px;font-size:0.75rem;'+(hit?'': 'border-color:var(--rule)')+'">'+pad(n)+'</div>';
+      html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
     });
     html += '<span style="font-size:0.75rem;color:var(--muted)">+</span>';
     results[s].back.forEach(function(n){
-      var hit = actualBack.indexOf(n) >= 0;
-      html += '<div class="ball '+(hit?'blue':'gray')+'" style="width:34px;height:34px;font-size:0.75rem;'+(hit?'': 'border-color:var(--rule)')+'">'+pad(n)+'</div>';
+      html += '<div class="ball blue" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
     });
     html += '<span style="margin-left:auto;background:'+(q>=85?'var(--accent3)':(q>=70?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">质量分 '+q+'</span>';
     html += '</div>';
-    // 命中分析
-    if (frontHits.length > 0 || backHits.length > 0) {
-      html += '<div style="margin-top:0.4rem;font-size:0.75rem;color:var(--muted)">';
-      if (frontHits.length > 0) {
-        html += '前区命中：'+frontHits.map(function(n){return pad(n);}).join(', ')+' ';
-      }
-      if (backHits.length > 0) {
-        html += '后区命中：'+backHits.map(function(n){return pad(n);}).join(', ');
-      }
-      if (frontHits.length === 0 && backHits.length === 0) {
-        html += '本期未命中';
-      }
-      html += '</div>';
-    }
     // 分析理由
     html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">';
     var reasons = [];
