@@ -1334,6 +1334,99 @@ function scoreDLTBlueNumbers_V3(lastDraw, history) {
   return scores.sort(function(a,b){return b.totalScore-a.totalScore;});
 }
 
+function dltQualityScore(front, back, ctx) {
+  ctx = ctx || {};
+  var lastFront = ctx.lastFront || [];
+  var frontScoreMap = ctx.frontScoreMap || {};
+  var backScoreMap = ctx.backScoreMap || {};
+  var lastOddRatio = ctx.lastOddRatio !== undefined ? ctx.lastOddRatio : (lastFront.filter(function(x){return x%2===1;}).length / 5);
+  var lastBigRatio = ctx.lastBigRatio !== undefined ? ctx.lastBigRatio : (lastFront.filter(function(x){return x>17;}).length / 5);
+  var lastHasPair = ctx.lastHasPair !== undefined ? ctx.lastHasPair : (lastFront.length > 0 ? gapStats(lastFront.slice().sort(function(a,b){return a-b;})).pairs.length >= 1 : false);
+  var lastBackSameTail = ctx.lastBackSameTail !== undefined ? ctx.lastBackSameTail : (back.length >= 2 && (back[0] % 10) === (back[1] % 10));
+
+  var s = front.slice().sort(function(a,b){return a-b;});
+  var sum = s.reduce(function(a,b){return a+b;},0);
+  var span = s[4]-s[0];
+  var z1=s.filter(function(x){return x<=12;}).length, z2=s.filter(function(x){return x>12&&x<=23;}).length, z3=s.filter(function(x){return x>23;}).length;
+  var odd=s.filter(function(x){return x%2===1;}).length;
+  var big=s.filter(function(x){return x>17;}).length;
+  var tails = {}; s.forEach(function(n){var t=n%10; tails[t]=(tails[t]||0)+1;});
+  var maxTail = Math.max.apply(null, Object.values(tails));
+  var g = gapStats(s);
+  // V4校准：基础分30，各项分值降低避免全满分
+  var q = 30;
+  if (sum>=65 && sum<=125) q+=8; else if (sum>=55 && sum<=135) q+=4; else if (sum<45 || sum>145) q-=5;
+  if (span>=12 && span<=26) q+=8; else if (span>=8 && span<=30) q+=4; else if (span<6 || span>33) q-=3;
+  if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)&&(z3>=1&&z3<=3)) q+=10;
+  else if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)) q+=5;
+  else if (z1===0||z2===0||z3===0) q-=4;
+  if (odd>=2 && odd<=3) q+=8; else if (odd===0||odd===5) q-=5; else if (odd>=1 && odd<=4) q+=3;
+  if (big>=2 && big<=3) q+=8; else if (big===0||big===5) q-=5; else if (big>=1 && big<=4) q+=3;
+  if (maxTail<=2) q+=8; else if (maxTail<=3) q+=3; else if (maxTail>=4) q-=3;
+  if (g.pairs.length===1) q+=8; else if (g.pairs.length===2) q+=3; else if (g.pairs.length===0) q-=2;
+
+  // AC值分析
+  var acValue = 0;
+  var diffs = [];
+  for (var ai=0; ai<s.length-1; ai++) {
+    for (var aj=ai+1; aj<s.length; aj++) diffs.push(s[aj]-s[ai]);
+  }
+  var uniqueDiffs = {};
+  diffs.forEach(function(d){ uniqueDiffs[d]=true; });
+  acValue = Object.keys(uniqueDiffs).length;
+  if (acValue>=8) q+=6; else if (acValue>=6) q+=3; else if (acValue<=4) q-=3;
+
+  // 斜连号质量分
+  var diagonalCount = 0;
+  if (lastFront.length > 0) {
+    for (var di=0; di<s.length; di++) {
+      for (var dj=0; dj<lastFront.length; dj++) {
+        var diff = Math.abs(s[di]-lastFront[dj]);
+        if (diff===2 || diff===3) { diagonalCount++; break; }
+      }
+    }
+  }
+  if (diagonalCount>=2) q+=4; else if (diagonalCount>=1) q+=2;
+
+  // V4跨彩种斜连质量分
+  var crossLotteryCount = 0;
+  if (typeof ssqSampleHistory !== 'undefined' && ssqSampleHistory.length > 0) {
+    var lastSSQ = ssqSampleHistory[0].split('|')[0].split(',').map(Number);
+    for (var di=0; di<s.length; di++) {
+      for (var sj=0; sj<lastSSQ.length; sj++) {
+        var cdiff = Math.abs(s[di]-lastSSQ[sj]);
+        if (cdiff<=3) { crossLotteryCount++; break; }
+      }
+    }
+  }
+  if (crossLotteryCount>=3) q+=6; else if (crossLotteryCount>=2) q+=3; else if (crossLotteryCount>=1) q+=1;
+
+  // 动态回归调整（降权）
+  if (lastFront.length > 0) {
+    if ((lastOddRatio >= 0.8 && odd <= 2) || (lastOddRatio <= 0.2 && odd >= 3)) q += 3;
+    else if ((lastOddRatio >= 0.6 && odd <= 2) || (lastOddRatio <= 0.4 && odd >= 3)) q += 1;
+    if ((lastBigRatio >= 0.8 && big <= 2) || (lastBigRatio <= 0.2 && big >= 3)) q += 3;
+    else if ((lastBigRatio >= 0.6 && big <= 2) || (lastBigRatio <= 0.4 && big >= 3)) q += 1;
+    if (lastHasPair && g.pairs.length >= 1) q += 2;
+    if (lastBackSameTail) {
+      var backTailSame = (back[0] % 10) === (back[1] % 10);
+      if (!backTailSame) q += 3;
+    }
+    var lastZ1 = lastFront.filter(function(x){return x<=12;}).length;
+    var lastZ2 = lastFront.filter(function(x){return x>12&&x<=23;}).length;
+    var lastZ3 = lastFront.filter(function(x){return x>23;}).length;
+    if (lastZ1 >= 3 && z1 <= 2) q += 2;
+    if (lastZ2 >= 3 && z2 <= 2) q += 2;
+    if (lastZ3 >= 3 && z3 <= 2) q += 2;
+  }
+
+  // 号码模型评分（降低权重避免膨胀）
+  var fScore = s.reduce(function(sum,n){var sc=frontScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
+  var bScore = back.reduce(function(sum,n){var sc=backScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
+  q += Math.min(fScore*3, 12) + Math.min(bScore*5, 8);
+  return Math.min(100, Math.round(q));
+}
+
 function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   var last = lastDraw;
   var history = allFronts.map(function(f,i){ return f.concat(allBacks[i]); });
@@ -1356,84 +1449,13 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   var lastHasPair = gapStats(lastFront.slice().sort(function(a,b){return a-b;})).pairs.length >= 1;
   var lastBackSameTail = lastBack.length >= 2 && (lastBack[0] % 10) === (lastBack[1] % 10);
 
+  var qualityScoreCtx = {
+    lastFront: lastFront, frontScoreMap: frontScoreMap, backScoreMap: backScoreMap,
+    lastOddRatio: lastOddRatio, lastBigRatio: lastBigRatio,
+    lastHasPair: lastHasPair, lastBackSameTail: lastBackSameTail
+  };
   function qualityScore(front, back) {
-    var s = front.slice().sort(function(a,b){return a-b;});
-    var sum = s.reduce(function(a,b){return a+b;},0);
-    var span = s[4]-s[0];
-    var z1=s.filter(function(x){return x<=12;}).length, z2=s.filter(function(x){return x>12&&x<=23;}).length, z3=s.filter(function(x){return x>23;}).length;
-    var odd=s.filter(function(x){return x%2===1;}).length;
-    var big=s.filter(function(x){return x>17;}).length;
-    var tails = {}; s.forEach(function(n){var t=n%10; tails[t]=(tails[t]||0)+1;});
-    var maxTail = Math.max.apply(null, Object.values(tails));
-    var g = gapStats(s);
-    // V4校准：基础分30，各项分值降低避免全满分
-    var q = 30;
-    if (sum>=65 && sum<=125) q+=8; else if (sum>=55 && sum<=135) q+=4; else if (sum<45 || sum>145) q-=5;
-    if (span>=12 && span<=26) q+=8; else if (span>=8 && span<=30) q+=4; else if (span<6 || span>33) q-=3;
-    if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)&&(z3>=1&&z3<=3)) q+=10;
-    else if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)) q+=5;
-    else if (z1===0||z2===0||z3===0) q-=4;
-    if (odd>=2 && odd<=3) q+=8; else if (odd===0||odd===5) q-=5; else if (odd>=1 && odd<=4) q+=3;
-    if (big>=2 && big<=3) q+=8; else if (big===0||big===5) q-=5; else if (big>=1 && big<=4) q+=3;
-    if (maxTail<=2) q+=8; else if (maxTail<=3) q+=3; else if (maxTail>=4) q-=3;
-    if (g.pairs.length===1) q+=8; else if (g.pairs.length===2) q+=3; else if (g.pairs.length===0) q-=2;
-
-    // AC值分析
-    var acValue = 0;
-    var diffs = [];
-    for (var ai=0; ai<s.length-1; ai++) {
-      for (var aj=ai+1; aj<s.length; aj++) diffs.push(s[aj]-s[ai]);
-    }
-    var uniqueDiffs = {};
-    diffs.forEach(function(d){ uniqueDiffs[d]=true; });
-    acValue = Object.keys(uniqueDiffs).length;
-    if (acValue>=8) q+=6; else if (acValue>=6) q+=3; else if (acValue<=4) q-=3;
-
-    // 斜连号质量分
-    var diagonalCount = 0;
-    for (var di=0; di<s.length; di++) {
-      for (var dj=0; dj<lastFront.length; dj++) {
-        var diff = Math.abs(s[di]-lastFront[dj]);
-        if (diff===2 || diff===3) { diagonalCount++; break; }
-      }
-    }
-    if (diagonalCount>=2) q+=4; else if (diagonalCount>=1) q+=2;
-
-    // V4跨彩种斜连质量分
-    var crossLotteryCount = 0;
-    if (typeof ssqSampleHistory !== 'undefined' && ssqSampleHistory.length > 0) {
-      var lastSSQ = ssqSampleHistory[0].split('|')[0].split(',').map(Number);
-      for (var di=0; di<s.length; di++) {
-        for (var sj=0; sj<lastSSQ.length; sj++) {
-          var cdiff = Math.abs(s[di]-lastSSQ[sj]);
-          if (cdiff<=3) { crossLotteryCount++; break; }
-        }
-      }
-    }
-    if (crossLotteryCount>=3) q+=6; else if (crossLotteryCount>=2) q+=3; else if (crossLotteryCount>=1) q+=1;
-
-    // 动态回归调整（降权）
-    if ((lastOddRatio >= 0.8 && odd <= 2) || (lastOddRatio <= 0.2 && odd >= 3)) q += 3;
-    else if ((lastOddRatio >= 0.6 && odd <= 2) || (lastOddRatio <= 0.4 && odd >= 3)) q += 1;
-    if ((lastBigRatio >= 0.8 && big <= 2) || (lastBigRatio <= 0.2 && big >= 3)) q += 3;
-    else if ((lastBigRatio >= 0.6 && big <= 2) || (lastBigRatio <= 0.4 && big >= 3)) q += 1;
-    if (lastHasPair && g.pairs.length >= 1) q += 2;
-    if (lastBackSameTail) {
-      var backTailSame = (back[0] % 10) === (back[1] % 10);
-      if (!backTailSame) q += 3;
-    }
-    var lastZ1 = lastFront.filter(function(x){return x<=12;}).length;
-    var lastZ2 = lastFront.filter(function(x){return x>12&&x<=23;}).length;
-    var lastZ3 = lastFront.filter(function(x){return x>23;}).length;
-    if (lastZ1 >= 3 && z1 <= 2) q += 2;
-    if (lastZ2 >= 3 && z2 <= 2) q += 2;
-    if (lastZ3 >= 3 && z3 <= 2) q += 2;
-
-    // 号码模型评分（降低权重避免膨胀）
-    var fScore = s.reduce(function(sum,n){var sc=frontScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
-    var bScore = back.reduce(function(sum,n){var sc=backScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
-    q += Math.min(fScore*3, 12) + Math.min(bScore*5, 8);
-    return Math.min(100, Math.round(q));
+    return dltQualityScore(front, back, qualityScoreCtx);
   }
 
   function genStrategy1() {
@@ -4448,6 +4470,13 @@ function spinDLTLottery() {
     results.push({ front: frontPicks, back: backPicks });
   }
 
+  // 构建质量分所需的评分映射
+  var _frontScoreMap = {};
+  frontScores.forEach(function(s){ _frontScoreMap[s.num] = s; });
+  var _backScoreMap = {};
+  backScores.forEach(function(s){ _backScoreMap[s.num] = s; });
+  var qctx = { lastFront: last.front, frontScoreMap: _frontScoreMap, backScoreMap: _backScoreMap };
+
   var html = '<div style="padding:0.5rem">';
   html += '<div style="text-align:center;margin-bottom:1rem;font-size:0.9rem;color:var(--muted)">';
   html += '基于大模型评分加权抽选，分数越高的号码被摇中的概率越大';
@@ -4465,9 +4494,8 @@ function spinDLTLottery() {
       html += '<div class="ball blue" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
     });
     // 质量分
-    var q = 0;
-    try { q = qualityScore(results[s].front, results[s].back); } catch(e) {}
-    html += '<span style="margin-left:auto;background:var(--accent);color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">质量分 '+(q||'-')+'</span>';
+    var q = dltQualityScore(results[s].front, results[s].back, qctx);
+    html += '<span style="margin-left:auto;background:var(--accent);color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">质量分 '+q+'</span>';
     html += '</div></div>';
   }
   html += '</div>';
@@ -4580,6 +4608,12 @@ function renderDLTDual() {
     results.push({ front: picks, back: b });
   }
 
+  var _frontScoreMap2 = {};
+  frontScores.forEach(function(s){ _frontScoreMap2[s.num] = s; });
+  var _backScoreMap2 = {};
+  backScores.forEach(function(s){ _backScoreMap2[s.num] = s; });
+  var qctx2 = { lastFront: last.front, frontScoreMap: _frontScoreMap2, backScoreMap: _backScoreMap2 };
+
   var html = '<div style="padding:0.5rem">';
   html += '<div style="margin-bottom:1rem;font-size:0.8rem;color:var(--muted)">';
   html += '结合双色球最新开奖号: ';
@@ -4591,8 +4625,7 @@ function renderDLTDual() {
   html += ' 的斜连/重号规律进行推荐</div>';
 
   for (var s = 0; s < results.length; s++) {
-    var q = 0;
-    try { q = qualityScore(results[s].front, results[s].back); } catch(e) {}
+    var q = dltQualityScore(results[s].front, results[s].back, qctx2);
     html += '<div style="display:flex;align-items:center;gap:1rem;padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
     html += '<span style="font-weight:700;color:var(--accent);min-width:60px;font-size:0.9rem">第'+(s+1)+'注</span>';
     html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">';
@@ -4702,6 +4735,12 @@ function spinDLTReview() {
     results.push({ front: picks, back: b });
   }
 
+  var _frontScoreMap3 = {};
+  frontScores.forEach(function(s){ _frontScoreMap3[s.num] = s; });
+  var _backScoreMap3 = {};
+  backScores.forEach(function(s){ _backScoreMap3[s.num] = s; });
+  var qctx3 = { lastFront: last.front, frontScoreMap: _frontScoreMap3, backScoreMap: _backScoreMap3 };
+
   // 分析命中（与上期开奖对比）
   var actualFront = last.front;
   var actualBack = last.back;
@@ -4717,8 +4756,7 @@ function spinDLTReview() {
   for (var s = 0; s < results.length; s++) {
     var frontHits = results[s].front.filter(function(n){ return actualFront.indexOf(n) >= 0; });
     var backHits = results[s].back.filter(function(n){ return actualBack.indexOf(n) >= 0; });
-    var q = 0;
-    try { q = qualityScore(results[s].front, results[s].back); } catch(e) {}
+    var q = dltQualityScore(results[s].front, results[s].back, qctx3);
     html += '<div style="padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
     html += '<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
     html += '<span style="font-weight:700;color:var(--accent);min-width:50px;font-size:0.9rem">第'+(s+1)+'注</span>';
