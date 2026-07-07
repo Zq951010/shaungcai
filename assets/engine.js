@@ -1339,6 +1339,7 @@ function dltQualityScore(front, back, ctx) {
   var lastFront = ctx.lastFront || [];
   var frontScoreMap = ctx.frontScoreMap || {};
   var backScoreMap = ctx.backScoreMap || {};
+  var existingCombos = ctx.existingCombos || [];
   var lastOddRatio = ctx.lastOddRatio !== undefined ? ctx.lastOddRatio : (lastFront.filter(function(x){return x%2===1;}).length / 5);
   var lastBigRatio = ctx.lastBigRatio !== undefined ? ctx.lastBigRatio : (lastFront.filter(function(x){return x>17;}).length / 5);
   var lastHasPair = ctx.lastHasPair !== undefined ? ctx.lastHasPair : (lastFront.length > 0 ? gapStats(lastFront.slice().sort(function(a,b){return a-b;})).pairs.length >= 1 : false);
@@ -1353,30 +1354,30 @@ function dltQualityScore(front, back, ctx) {
   var tails = {}; s.forEach(function(n){var t=n%10; tails[t]=(tails[t]||0)+1;});
   var maxTail = Math.max.apply(null, Object.values(tails));
   var g = gapStats(s);
-  // V4校准：基础分30，各项分值降低避免全满分
-  var q = 30;
-  if (sum>=65 && sum<=125) q+=8; else if (sum>=55 && sum<=135) q+=4; else if (sum<45 || sum>145) q-=5;
-  if (span>=12 && span<=26) q+=8; else if (span>=8 && span<=30) q+=4; else if (span<6 || span>33) q-=3;
-  if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)&&(z3>=1&&z3<=3)) q+=10;
-  else if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)) q+=5;
-  else if (z1===0||z2===0||z3===0) q-=4;
-  if (odd>=2 && odd<=3) q+=8; else if (odd===0||odd===5) q-=5; else if (odd>=1 && odd<=4) q+=3;
-  if (big>=2 && big<=3) q+=8; else if (big===0||big===5) q-=5; else if (big>=1 && big<=4) q+=3;
-  if (maxTail<=2) q+=8; else if (maxTail<=3) q+=3; else if (maxTail>=4) q-=3;
-  if (g.pairs.length===1) q+=8; else if (g.pairs.length===2) q+=3; else if (g.pairs.length===0) q-=2;
 
-  // AC值分析
-  var acValue = 0;
+  // V5校准：基础分22，各项分值降低，增加集中度惩罚
+  var q = 22;
+  if (sum>=65 && sum<=125) q+=6; else if (sum>=55 && sum<=135) q+=3; else if (sum<45 || sum>145) q-=4;
+  if (span>=12 && span<=26) q+=6; else if (span>=8 && span<=30) q+=3; else if (span<6 || span>33) q-=2;
+  if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)&&(z3>=1&&z3<=3)) q+=7;
+  else if ((z1>=1&&z1<=3)&&(z2>=1&&z2<=3)) q+=3;
+  else if (z1===0||z2===0||z3===0) q-=3;
+  if (odd>=2 && odd<=3) q+=6; else if (odd===0||odd===5) q-=4; else if (odd>=1 && odd<=4) q+=2;
+  if (big>=2 && big<=3) q+=6; else if (big===0||big===5) q-=4; else if (big>=1 && big<=4) q+=2;
+  if (maxTail<=2) q+=6; else if (maxTail<=3) q+=2; else if (maxTail>=4) q-=3;
+  if (g.pairs.length===1) q+=5; else if (g.pairs.length===2) q+=2; else if (g.pairs.length===0) q-=1;
+
+  // AC值
   var diffs = [];
   for (var ai=0; ai<s.length-1; ai++) {
     for (var aj=ai+1; aj<s.length; aj++) diffs.push(s[aj]-s[ai]);
   }
   var uniqueDiffs = {};
   diffs.forEach(function(d){ uniqueDiffs[d]=true; });
-  acValue = Object.keys(uniqueDiffs).length;
-  if (acValue>=8) q+=6; else if (acValue>=6) q+=3; else if (acValue<=4) q-=3;
+  var acValue = Object.keys(uniqueDiffs).length;
+  if (acValue>=8) q+=4; else if (acValue>=6) q+=2; else if (acValue<=4) q-=2;
 
-  // 斜连号质量分
+  // 斜连号
   var diagonalCount = 0;
   if (lastFront.length > 0) {
     for (var di=0; di<s.length; di++) {
@@ -1386,9 +1387,9 @@ function dltQualityScore(front, back, ctx) {
       }
     }
   }
-  if (diagonalCount>=2) q+=4; else if (diagonalCount>=1) q+=2;
+  if (diagonalCount>=2) q+=3; else if (diagonalCount>=1) q+=1;
 
-  // V4跨彩种斜连质量分
+  // 跨彩种斜连
   var crossLotteryCount = 0;
   if (typeof ssqSampleHistory !== 'undefined' && ssqSampleHistory.length > 0) {
     var lastSSQ = ssqSampleHistory[0].split('|')[0].split(',').map(Number);
@@ -1399,31 +1400,48 @@ function dltQualityScore(front, back, ctx) {
       }
     }
   }
-  if (crossLotteryCount>=3) q+=6; else if (crossLotteryCount>=2) q+=3; else if (crossLotteryCount>=1) q+=1;
+  if (crossLotteryCount>=3) q+=4; else if (crossLotteryCount>=2) q+=2; else if (crossLotteryCount>=1) q+=1;
 
-  // 动态回归调整（降权）
+  // 动态回归
   if (lastFront.length > 0) {
-    if ((lastOddRatio >= 0.8 && odd <= 2) || (lastOddRatio <= 0.2 && odd >= 3)) q += 3;
+    if ((lastOddRatio >= 0.8 && odd <= 2) || (lastOddRatio <= 0.2 && odd >= 3)) q += 2;
     else if ((lastOddRatio >= 0.6 && odd <= 2) || (lastOddRatio <= 0.4 && odd >= 3)) q += 1;
-    if ((lastBigRatio >= 0.8 && big <= 2) || (lastBigRatio <= 0.2 && big >= 3)) q += 3;
+    if ((lastBigRatio >= 0.8 && big <= 2) || (lastBigRatio <= 0.2 && big >= 3)) q += 2;
     else if ((lastBigRatio >= 0.6 && big <= 2) || (lastBigRatio <= 0.4 && big >= 3)) q += 1;
-    if (lastHasPair && g.pairs.length >= 1) q += 2;
+    if (lastHasPair && g.pairs.length >= 1) q += 1;
     if (lastBackSameTail) {
       var backTailSame = (back[0] % 10) === (back[1] % 10);
-      if (!backTailSame) q += 3;
+      if (!backTailSame) q += 2;
     }
     var lastZ1 = lastFront.filter(function(x){return x<=12;}).length;
     var lastZ2 = lastFront.filter(function(x){return x>12&&x<=23;}).length;
     var lastZ3 = lastFront.filter(function(x){return x>23;}).length;
-    if (lastZ1 >= 3 && z1 <= 2) q += 2;
-    if (lastZ2 >= 3 && z2 <= 2) q += 2;
-    if (lastZ3 >= 3 && z3 <= 2) q += 2;
+    if (lastZ1 >= 3 && z1 <= 2) q += 1;
+    if (lastZ2 >= 3 && z2 <= 2) q += 1;
+    if (lastZ3 >= 3 && z3 <= 2) q += 1;
   }
 
-  // 号码模型评分（降低权重避免膨胀）
+  // 号码集中度惩罚
+  if (z1 >= 4 || z2 >= 4 || z3 >= 4) q -= 4;
+  if (maxTail >= 3) q -= 3;
+
+  // 与已有方案相似度惩罚
+  if (existingCombos.length > 0) {
+    for (var ei = 0; ei < existingCombos.length; ei++) {
+      var ex = existingCombos[ei];
+      var sameFront = 0;
+      for (var si = 0; si < s.length; si++) {
+        if (ex.front.indexOf(s[si]) >= 0) sameFront++;
+      }
+      if (sameFront >= 4) q -= 3;
+      else if (sameFront >= 3) q -= 1;
+    }
+  }
+
+  // 模型评分权重降低
   var fScore = s.reduce(function(sum,n){var sc=frontScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
   var bScore = back.reduce(function(sum,n){var sc=backScoreMap[n]; return sum+(sc?sc.totalScore:0);},0);
-  q += Math.min(fScore*3, 12) + Math.min(bScore*5, 8);
+  q += Math.min(fScore*2, 8) + Math.min(bScore*3, 5);
   return Math.min(100, Math.round(q));
 }
 
@@ -1452,15 +1470,17 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   var qualityScoreCtx = {
     lastFront: lastFront, frontScoreMap: frontScoreMap, backScoreMap: backScoreMap,
     lastOddRatio: lastOddRatio, lastBigRatio: lastBigRatio,
-    lastHasPair: lastHasPair, lastBackSameTail: lastBackSameTail
+    lastHasPair: lastHasPair, lastBackSameTail: lastBackSameTail,
+    existingCombos: []
   };
   function qualityScore(front, back) {
     return dltQualityScore(front, back, qualityScoreCtx);
   }
 
   function genStrategy1() {
-    var picks = frontScores.slice(0,12).map(function(s){return s.num;});
-    var bp = backScores.slice(0,4).map(function(s){return s.num;});
+    // 严格约束优化：从Top20遍历，硬约束更严格
+    var picks = frontScores.slice(0,20).map(function(s){return s.num;});
+    var bp = backScores.slice(0,6).map(function(s){return s.num;});
     var best = null, bestQ = -1;
     for (var a=0;a<picks.length-4;a++)
     for (var b=a+1;b<picks.length-3;b++)
@@ -1479,37 +1499,49 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   }
 
   function genStrategy2() {
-    // 强制引入至少1个冷号，与策略1形成差异
-    var hot = frontScores.slice(0,8).map(function(s){return s.num;});
-    var cold = frontScores.filter(function(s){return s.mp>0.6;}).map(function(s){return s.num;});
+    // 热号+冷号双轨：2热+2温+1冷，后区冷热交替
+    var hot = frontScores.slice(0,6).map(function(s){return s.num;});
+    var warm = frontScores.slice(6,14).map(function(s){return s.num;});
+    var cold = frontScores.filter(function(s){return s.mp>0.5;}).slice(0,8).map(function(s){return s.num;});
     var unique = [];
-    // 先取4个热号
-    for (var i=0;i<hot.length && unique.length<4;i++) {
+    // 2个热号
+    for (var i=0;i<hot.length && unique.length<2;i++) {
       if (unique.indexOf(hot[i])<0) unique.push(hot[i]);
     }
-    // 强制加入1个冷号
+    // 2个温号
+    for (var i=0;i<warm.length && unique.length<4;i++) {
+      if (unique.indexOf(warm[i])<0) unique.push(warm[i]);
+    }
+    // 1个冷号
     for (var i=0;i<cold.length && unique.length<5;i++) {
       if (unique.indexOf(cold[i])<0) unique.push(cold[i]);
     }
-    // 补足到5个
+    // 补足
     for (var i=0;i<frontScores.length && unique.length<5;i++) {
       if (unique.indexOf(frontScores[i].num)<0) unique.push(frontScores[i].num);
     }
     unique.sort(function(a,b){return a-b;});
-    var b = [backScores[0].num, backScores[Math.min(2,backScores.length-1)].num];
+    // 后区：1热+1冷交替
+    var bHot = backScores[0].num;
+    var bCold = backScores.filter(function(s){return s.currentGap>=3;}).slice(-1)[0];
+    var b = [bHot, bCold ? bCold.num : backScores[Math.min(3,backScores.length-1)].num];
+    b.sort(function(a,b){return a-b;});
     return [unique.concat(b)];
   }
 
   function genStrategy3() {
-    // V4马尔可夫转移驱动：优先选mkScore高且crossLotteryScore高的号码，与策略1形成差异化
-    var mkPool = frontScores.filter(function(s){return s.mkScore>0.4 || (s.crossLotteryScore || 0) >= 0.65;}).slice(0,14).map(function(s){return s.num;});
-    if (mkPool.length < 5) {
-      for (var i=0;i<frontScores.length && mkPool.length<14;i++) {
-        if (mkPool.indexOf(frontScores[i].num)<0) mkPool.push(frontScores[i].num);
+    // 马尔可夫转移+跨彩种：从mkScore高且跨彩种分高的池选
+    var mkPool = frontScores.filter(function(s){return s.mkScore>0.35 || (s.crossLotteryScore||0) >= 0.6;}).map(function(s){return s.num;});
+    // 补充一些中位号码增加多样性
+    var midPool = frontScores.slice(8,18).map(function(s){return s.num;});
+    var pool = [];
+    for (var i=0;i<mkPool.length;i++) if (pool.indexOf(mkPool[i])<0) pool.push(mkPool[i]);
+    for (var i=0;i<midPool.length && pool.length<20;i++) if (pool.indexOf(midPool[i])<0) pool.push(midPool[i]);
+    if (pool.length < 10) {
+      for (var i=0;i<frontScores.length && pool.length<20;i++) {
+        if (pool.indexOf(frontScores[i].num)<0) pool.push(frontScores[i].num);
       }
     }
-    var pool = mkPool.slice(0,14);
-    // 排除策略1的核心号码，强制差异化
     var s1Front = s1[0] ? s1[0].slice(0,5) : [];
     var best = null, bestQ = -1;
     for (var a=0;a<pool.length-4;a++)
@@ -1518,15 +1550,13 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     for (var d=c+1;d<pool.length-1;d++)
     for (var e=d+1;e<pool.length;e++) {
       var f=[pool[a],pool[b],pool[c],pool[d],pool[e]];
-      // 与策略1的差异度检查：至少2个不同
       var diffCount = 0;
       for (var k=0;k<f.length;k++) if (s1Front.indexOf(f[k])<0) diffCount++;
       if (diffCount < 2) continue;
-      var b2 = [backScores[1].num, backScores[Math.min(2,backScores.length-1)].num];
+      var b2 = [backScores[1].num, backScores[Math.min(4,backScores.length-1)].num];
       var q = qualityScore(f,b2);
       if (q>bestQ) {bestQ=q; best=f.concat(b2);}
     }
-    // 如果没有满足差异化的组合，放宽条件
     if (!best) {
       for (var a=0;a<pool.length-4;a++)
       for (var b=a+1;b<pool.length-3;b++)
@@ -1534,7 +1564,7 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
       for (var d=c+1;d<pool.length-1;d++)
       for (var e=d+1;e<pool.length;e++) {
         var f=[pool[a],pool[b],pool[c],pool[d],pool[e]];
-        var b2 = [backScores[1].num, backScores[Math.min(2,backScores.length-1)].num];
+        var b2 = [backScores[1].num, backScores[Math.min(4,backScores.length-1)].num];
         var q = qualityScore(f,b2);
         if (q>bestQ) {bestQ=q; best=f.concat(b2);}
       }
@@ -1543,30 +1573,44 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   }
 
   function genStrategy4() {
-    var cluster = [frontScores[0].num];
+    // 共现聚类+邻号扩展：从共现网络选，引入邻号
     var co = buildCoOccurrence(allFronts);
-    while (cluster.length<5) {
-      var bestN=-1, bestS=-1;
-      for (var n=1;n<=35;n++) {
-        if (cluster.indexOf(n)>=0) continue;
-        var s=0;
-        cluster.forEach(function(c){s+= (co[n]&&co[n][c])||0;});
-        if (s>bestS) {bestS=s; bestN=n;}
-      }
-      if (bestN>0) cluster.push(bestN); else break;
-    }
-    while (cluster.length<5) {
-      var found = false;
-      for (var i=0;i<frontScores.length;i++) {
-        if (cluster.indexOf(frontScores[i].num)<0) {
-          cluster.push(frontScores[i].num);
-          found = true;
+    var seed = frontScores[0].num;
+    var cluster = [seed];
+    var neighbors = [];
+    // 收集所有邻号候选
+    for (var n=1; n<=35; n++) {
+      for (var j=0; j<lastFront.length; j++) {
+        if (Math.abs(n - lastFront[j]) === 1) {
+          if (neighbors.indexOf(n) < 0) neighbors.push(n);
           break;
         }
       }
-      if (!found) break;
     }
-    var b = [backScores[0].num, backScores[Math.min(3,backScores.length-1)].num];
+    // 聚类扩展
+    while (cluster.length < 5) {
+      var bestN = -1, bestS = -1;
+      for (var n = 1; n <= 35; n++) {
+        if (cluster.indexOf(n) >= 0) continue;
+        var s = 0;
+        cluster.forEach(function(c) { s += (co[n] && co[n][c]) || 0; });
+        if (s > bestS) { bestS = s; bestN = n; }
+      }
+      if (bestN > 0) cluster.push(bestN); else break;
+    }
+    // 如果聚类不足5个，用邻号补充
+    for (var i = 0; i < neighbors.length && cluster.length < 5; i++) {
+      if (cluster.indexOf(neighbors[i]) < 0) cluster.push(neighbors[i]);
+    }
+    while (cluster.length < 5) {
+      for (var i = 0; i < frontScores.length; i++) {
+        if (cluster.indexOf(frontScores[i].num) < 0) {
+          cluster.push(frontScores[i].num);
+          break;
+        }
+      }
+    }
+    var b = [backScores[0].num, backScores[Math.min(5,backScores.length-1)].num];
     return [cluster.slice(0,5).concat(b)];
   }
 
@@ -1617,38 +1661,44 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     return baseCombo;
   }
 
-  // 策略5：区间偏移驱动
   function genStrategy5() {
+    // 区间偏移+尾数分散：强制区间平衡+尾数分散
     var zonePool = [[], [], []];
     for (var zi = 0; zi < frontScores.length; zi++) {
       var n = frontScores[zi].num;
       var idx = n <= 12 ? 0 : n <= 23 ? 1 : 2;
       zonePool[idx].push(n);
     }
-    // 上期区间分布
     var lastZone = [0, 0, 0];
     lastFront.forEach(function(x){ lastZone[x<=12?0:x<=23?1:2]++; });
-    // 优先从近期偏少的区间选取
+    // 优先从偏少区间多选
     var zoneOrder = [0, 1, 2].sort(function(a,b){ return lastZone[a] - lastZone[b]; });
     var picks = [];
-    // 每个区间至少选1个，优先从偏少区间多选
+    var usedTails = {};
     for (var zi = 0; zi < 3; zi++) {
       var zidx = zoneOrder[zi];
       var need = zi === 0 ? 2 : zi === 1 ? 2 : 1;
       for (var pj = 0; pj < zonePool[zidx].length && picks.length < 5; pj++) {
-        if (picks.indexOf(zonePool[zidx][pj]) < 0) {
-          picks.push(zonePool[zidx][pj]);
+        var n = zonePool[zidx][pj];
+        var tail = n % 10;
+        // 尾数分散：同一尾数不超过2个
+        if ((usedTails[tail] || 0) >= 2) continue;
+        if (picks.indexOf(n) < 0) {
+          picks.push(n);
+          usedTails[tail] = (usedTails[tail] || 0) + 1;
           need--;
           if (need <= 0) break;
         }
       }
     }
-    // 补足到5个
     for (var fi = 0; fi < frontScores.length && picks.length < 5; fi++) {
       if (picks.indexOf(frontScores[fi].num) < 0) picks.push(frontScores[fi].num);
     }
     picks.sort(function(a,b){return a-b;});
-    var b = [backScores[0].num, backScores[Math.min(2, backScores.length-1)].num];
+    // 后区选遗漏值较大的
+    var backByMiss = backScores.slice().sort(function(a,b){return b.currentGap - a.currentGap;});
+    var b = [backByMiss[0].num, backByMiss[Math.min(2, backByMiss.length-1)].num];
+    b.sort(function(a,b){return a-b;});
     return [picks.concat(b)];
   }
 
@@ -1673,15 +1723,15 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     }
   });
 
-  var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V3+ 增强模型推荐</h3>';
-  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·共现矩阵·马尔可夫转移·尾数分散·区间偏移·连号历史·邻号·奇偶回归·大小均衡·稳定性·斜连号·冷热交替·AC值 十四维评分体系（含上期特征动态回归）</p>';
+  var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V5 增强模型推荐</h3>';
+  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·共现矩阵·马尔可夫转移·尾数分散·区间偏移·连号历史·邻号·奇偶回归·大小均衡·稳定性·斜连号·冷热交替·AC值·集中度惩罚 十五维评分体系（含上期特征动态回归）</p>';
 
   var strategies = [
-    {name:'严格约束优化', desc:'在Top14热号中遍历所有组合，通过硬性约束（和值/跨度/区间/奇偶/大小/尾数/连号/AC值/斜连号）筛选最高分', combos:s1},
-    {name:'热号+遗漏双轨', desc:'前3球从Top8热号抽取，后2球从遗漏百分位>70%的冷号补充', combos:s2},
-    {name:'马尔可夫转移驱动', desc:'优先选择p(B→A) > p(A→A)的号码（冷转热概率高），辅以遗漏百分位', combos:s3},
-    {name:'共现聚类', desc:'以Top1号码为种子，迭代添加共现概率最高的号码形成聚类', combos:s4},
-    {name:'区间偏移回补', desc:'优先从近期偏少的区间选取号码，实现区间均值回归', combos:s5}
+    {name:'严格约束优化', desc:'从Top20热号中遍历所有组合，通过硬性约束（和值/跨度/区间/奇偶/大小/尾数/连号/AC值/斜连号）筛选最高分', combos:s1},
+    {name:'热号+冷号双轨', desc:'2热+2温+1冷，后区冷热交替，实现冷热均衡', combos:s2},
+    {name:'马尔可夫转移驱动', desc:'优先选mkScore高且跨彩种分高的号码，辅以中位号码增加多样性', combos:s3},
+    {name:'共现聚类+邻号扩展', desc:'以Top1为种子聚类扩展，引入上期邻号增加命中概率', combos:s4},
+    {name:'区间偏移+尾数分散', desc:'强制区间平衡+尾数分散，后区选大遗漏号码', combos:s5}
   ];
 
   strategies.forEach(function(st,i){
@@ -1690,10 +1740,25 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
     html += '<p style="margin:0 0 8px 0;color:var(--muted);font-size:12px">'+st.desc+'</p>';
     st.combos.forEach(function(c,ci){
       var q = qualityScore(c.slice(0,5), c.slice(5));
+      // 标记胆码（评分最高的2个号码）
+      var frontNums = c.slice(0,5);
+      var scoredNums = frontNums.map(function(n){
+        var sc = frontScoreMap[n];
+        return {num: n, score: sc ? sc.totalScore : 0};
+      }).sort(function(a,b){return b.score - a.score;});
+      var danNums = scoredNums.slice(0,2).map(function(x){return x.num;});
+
       html += '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;flex-wrap:wrap">';
       html += '<span style="font-weight:bold;color:var(--accent4)">方案'+(ci+1)+'：</span>';
-      html += '<span style="color:var(--ink)">前区：'+c.slice(0,5).map(function(n){return String(n).padStart(2,'0');}).join(', ')+'</span>';
-      html += '<span style="color:var(--ink)">后区：'+c.slice(5).map(function(n){return String(n).padStart(2,'0');}).join(', ')+'</span>';
+      html += '<span style="font-size:11px;color:var(--muted)">前区</span>';
+      frontNums.forEach(function(n){
+        var isDan = danNums.indexOf(n) >= 0;
+        html += '<div class="ball '+(isDan?'gold':'red')+'" style="width:32px;height:32px;font-size:12px;'+(isDan?'box-shadow:0 0 8px rgba(245,158,11,0.6);':'')+'">'+pad(n)+'</div>';
+      });
+      html += '<span style="font-size:11px;color:var(--muted);margin-left:4px">后区</span>';
+      c.slice(5).forEach(function(n){
+        html += '<div class="ball blue" style="width:32px;height:32px;font-size:12px;">'+pad(n)+'</div>';
+      });
       html += '<span style="margin-left:auto;background:'+(q>=85?'var(--accent3)':(q>=70?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:12px">质量分 '+q+'</span>';
       html += '</div>';
     });
