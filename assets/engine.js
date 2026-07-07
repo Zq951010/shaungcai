@@ -1957,6 +1957,8 @@ function analyzeSSQ() {
   try { renderSSQTail(allReds); } catch(e) { console.log('renderSSQTail error:', e.message); }
   try { renderSSQDanTuo(last, allReds, allBlues); } catch(e) { console.log('renderSSQDanTuo error:', e.message); }
   try { renderSSQRecommend(last, allReds, allBlues); } catch(e) { console.log('renderSSQRecommend error:', e.message); }
+  try { renderSSQProbAnalysis(); } catch(e) { console.log('renderSSQProbAnalysis error:', e.message); }
+  try { renderSSQDual(); } catch(e) { console.log('renderSSQDual error:', e.message); }
 
   document.getElementById('ssq-results').scrollIntoView({ behavior: 'smooth' });
 }
@@ -2375,6 +2377,18 @@ function scoreSSQNumbers(last, allReds, weights) {
       }
     }
 
+    // 跨彩种（大乐透）斜连评分
+    var crossLotteryScore = 0;
+    if (typeof dltSampleHistory !== 'undefined' && dltSampleHistory.length > 0) {
+      var lastDLT = dltSampleHistory[0].split('|')[0].split(',').map(Number);
+      for (var i = 0; i < lastDLT.length; i++) {
+        var diff = Math.abs(n - lastDLT[i]);
+        if (diff === 1) { crossLotteryScore = 0.9; break; }
+        else if (diff === 2 && crossLotteryScore < 0.7) { crossLotteryScore = 0.7; }
+        else if (diff === 3 && crossLotteryScore < 0.4) { crossLotteryScore = 0.4; }
+      }
+    }
+
     var pairScore = pairHistoryScore(n, allReds);
     // 近15期趋势强化：如果近15期连号频繁，提升连号评分权重
     if (trend15.pairFreq >= 5) {
@@ -2395,7 +2409,7 @@ function scoreSSQNumbers(last, allReds, weights) {
     var cycle = cycleAnalysis(n, allReds);
     var cycleScore = cycle.score;
 
-    var baseScore = wf*w.wf + mpScore*w.mpScore + mkScore*w.mkScore + zoneScore*w.zoneScore + tailScore*w.tailScore + oddAltScore*w.oddAltScore + sizeScore*w.sizeScore + neighborScore*w.neighborScore + pairScore*w.pairScore + hcScore*w.hcScore + stability*w.stability + maScore*w.maScore + cycleScore*w.cycleScore;
+    var baseScore = wf*w.wf + mpScore*w.mpScore + mkScore*w.mkScore + zoneScore*w.zoneScore + tailScore*w.tailScore + oddAltScore*w.oddAltScore + sizeScore*w.sizeScore + neighborScore*w.neighborScore + pairScore*w.pairScore + hcScore*w.hcScore + stability*w.stability + maScore*w.maScore + cycleScore*w.cycleScore + crossLotteryScore*0.05;
 
     var reasons = [];
     if (wf > 0.2) reasons.push('高频');
@@ -2410,7 +2424,7 @@ function scoreSSQNumbers(last, allReds, weights) {
     if (ma.trend === 'up') reasons.push('趋势升');
     if (cycleScore > 0.85) reasons.push('周期到');
 
-    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, tailScore: tailScore, oddAltScore: oddAltScore, sizeScore: sizeScore, neighborScore: neighborScore, pairScore: pairScore, hcScore: hcScore, stability: stability, maScore: maScore, cycleScore: cycleScore, baseScore: baseScore, coScore: 0, totalScore: baseScore, reasons: reasons });
+    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, tailScore: tailScore, oddAltScore: oddAltScore, sizeScore: sizeScore, neighborScore: neighborScore, pairScore: pairScore, hcScore: hcScore, stability: stability, maScore: maScore, cycleScore: cycleScore, crossLotteryScore: crossLotteryScore, baseScore: baseScore, coScore: 0, totalScore: baseScore, reasons: reasons });
   }
   var top10 = scores.slice().sort(function(a,b){return b.baseScore-a.baseScore;}).slice(0,10).map(function(s){return s.num;});
   scores.forEach(function(s){
@@ -4946,4 +4960,484 @@ function renderDLTProbAnalysis() {
   });
   dhtml += '</tbody></table></div>';
   document.getElementById('dlt-prob-diagonal').innerHTML = dhtml;
+}
+
+// ==================== 双色球新功能模块 ====================
+
+// 摇奖机模拟选号
+function spinSSQLottery() {
+  var redStr = document.getElementById('ssq-red').value;
+  var blueStr = document.getElementById('ssq-blue').value;
+  var historyStr = document.getElementById('ssq-history').value;
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var parts = lines[i].split('|');
+    var r = parseNums(parts[0]);
+    var b = parseNums(parts[1] || '');
+    if (r.length >= 6 && b.length >= 1) {
+      history.push({ red: r.slice(0,6).sort(function(a,b){return a-b}), blue: b[0] });
+    }
+  }
+  var lastRed = parseNums(redStr);
+  var lastBlue = parseNums(blueStr);
+  if (history.length === 0 && lastRed.length >= 6 && lastBlue.length >= 1) {
+    history.unshift({ red: lastRed.slice(0,6).sort(function(a,b){return a-b}), blue: lastBlue[0] });
+  }
+  if (history.length < 2) { alert('请先加载数据进行分析'); return; }
+
+  var last = history[0];
+  var allReds = history.map(function(h){ return h.red; });
+  var allBlues = history.map(function(h){ return h.blue; });
+  var redScores = scoreSSQNumbers(last, allReds);
+  var blueScores = scoreSSQBlueNumbers(last, allBlues);
+
+  function weightedPick(items, scores, count) {
+    var result = [];
+    var available = items.slice();
+    var scoreMap = {};
+    for (var i = 0; i < scores.length; i++) scoreMap[scores[i].num] = scores[i].totalScore + 0.5;
+    for (var r = 0; r < count; r++) {
+      if (available.length === 0) break;
+      var totalW = 0;
+      var weights = [];
+      for (var i = 0; i < available.length; i++) {
+        var w = scoreMap[available[i]] || 1;
+        weights.push(w);
+        totalW += w;
+      }
+      var rnd = Math.random() * totalW;
+      var cum = 0;
+      for (var i = 0; i < available.length; i++) {
+        cum += weights[i];
+        if (rnd <= cum) {
+          result.push(available[i]);
+          available.splice(i, 1);
+          break;
+        }
+      }
+    }
+    return result;
+  }
+
+  var allRedNums = [];
+  for (var n = 1; n <= 33; n++) allRedNums.push(n);
+  var allBlueNums = [];
+  for (var n = 1; n <= 16; n++) allBlueNums.push(n);
+
+  var results = [];
+  for (var set = 0; set < 5; set++) {
+    var redPicks = weightedPick(allRedNums, redScores, 6);
+    var bluePicks = weightedPick(allBlueNums, blueScores, 1);
+    redPicks.sort(function(a,b){return a-b;});
+    results.push({ red: redPicks, blue: bluePicks[0] });
+  }
+
+  var _redScoreMap = {};
+  redScores.forEach(function(s){ _redScoreMap[s.num] = s; });
+
+  var html = '<div style="padding:0.5rem">';
+  html += '<div style="text-align:center;margin-bottom:1rem;font-size:0.9rem;color:var(--muted)">基于大模型评分加权抽选，分数越高的号码被摇中的概率越大</div>';
+  for (var s = 0; s < results.length; s++) {
+    // 胆码：评分最高的2个
+    var scoredReds = results[s].red.map(function(n){
+      var sc = _redScoreMap[n];
+      return {num: n, score: sc ? sc.totalScore : 0};
+    }).sort(function(a,b){return b.score - a.score;});
+    var danNums = scoredReds.slice(0,2).map(function(x){return x.num;});
+
+    html += '<div style="display:flex;align-items:center;gap:1rem;padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<span style="font-weight:700;color:var(--accent);min-width:60px;font-size:0.9rem">第'+(s+1)+'注</span>';
+    html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">';
+    html += '<span style="font-size:0.75rem;color:var(--muted)">红球</span>';
+    results[s].red.forEach(function(n){
+      var isDan = danNums.indexOf(n) >= 0;
+      html += '<div class="ball '+(isDan?'gold':'red')+'" style="width:34px;height:34px;font-size:0.75rem;'+(isDan?'box-shadow:0 0 8px rgba(245,158,11,0.6);':'')+'">'+pad(n)+'</div>';
+    });
+    html += '<span style="font-size:0.75rem;color:var(--muted);margin-left:0.5rem">蓝球</span>';
+    html += '<div class="ball blue" style="width:34px;height:34px;font-size:0.75rem">'+pad(results[s].blue)+'</div>';
+    html += '</div></div>';
+  }
+  html += '</div>';
+
+  document.getElementById('ssq-lottery-results').innerHTML = html;
+  document.getElementById('ssq-lottery-results').style.display = 'block';
+}
+
+// 双彩结合推荐 - 结合大乐透规律
+function renderSSQDual() {
+  var redStr = document.getElementById('ssq-red').value;
+  var blueStr = document.getElementById('ssq-blue').value;
+  var historyStr = document.getElementById('ssq-history').value;
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var parts = lines[i].split('|');
+    var r = parseNums(parts[0]);
+    var b = parseNums(parts[1] || '');
+    if (r.length >= 6 && b.length >= 1) {
+      history.push({ red: r.slice(0,6).sort(function(a,b){return a-b}), blue: b[0] });
+    }
+  }
+  var lastRed = parseNums(redStr);
+  var lastBlue = parseNums(blueStr);
+  if (history.length === 0 && lastRed.length >= 6 && lastBlue.length >= 1) {
+    history.unshift({ red: lastRed.slice(0,6).sort(function(a,b){return a-b}), blue: lastBlue[0] });
+  }
+  if (history.length < 2) { return; }
+
+  var last = history[0];
+  var allReds = history.map(function(h){ return h.red; });
+  var allBlues = history.map(function(h){ return h.blue; });
+  var redScores = scoreSSQNumbers(last, allReds);
+  var blueScores = scoreSSQBlueNumbers(last, allBlues);
+
+  // 获取大乐透最新数据
+  var dltNums = [];
+  try {
+    if (typeof dltSampleHistory !== 'undefined' && dltSampleHistory.length > 0) {
+      dltNums = dltSampleHistory[0].split('|')[0].split(',').map(Number);
+    }
+  } catch(e) {}
+
+  // 大乐透连号检测
+  var dltPairs = [];
+  for (var i = 0; i < dltNums.length - 1; i++) {
+    if (dltNums[i+1] - dltNums[i] === 1) {
+      dltPairs.push([dltNums[i], dltNums[i+1]]);
+    }
+  }
+
+  function dualScore(num) {
+    var base = 0;
+    for (var i = 0; i < redScores.length; i++) {
+      if (redScores[i].num === num) {
+        base = redScores[i].totalScore * 100;
+        break;
+      }
+    }
+    // DLT斜连加分
+    var crossBonus = 0;
+    for (var j = 0; j < dltNums.length; j++) {
+      var diff = Math.abs(num - dltNums[j]);
+      if (diff === 1) crossBonus += 12;
+      else if (diff === 2) crossBonus += 8;
+      else if (diff === 3) crossBonus += 4;
+    }
+    // DLT重号加分
+    for (var j = 0; j < dltNums.length; j++) {
+      if (num === dltNums[j]) crossBonus += 18;
+    }
+    // DLT连号邻号加分（如果DLT有连号，SSQ邻号加分）
+    for (var p = 0; p < dltPairs.length; p++) {
+      var pair = dltPairs[p];
+      if (Math.abs(num - pair[0]) <= 1 || Math.abs(num - pair[1]) <= 1) {
+        crossBonus += 6;
+      }
+    }
+    return base + crossBonus;
+  }
+
+  var scored = [];
+  for (var n = 1; n <= 33; n++) scored.push({ num: n, score: dualScore(n) });
+  scored.sort(function(a,b){return b.score - a.score;});
+
+  var results = [];
+  var used = {};
+  for (var s = 0; s < 5; s++) {
+    var picks = [];
+    var zoneCount = [0,0,0];
+    var usedTails = {};
+    for (var i = 0; i < scored.length && picks.length < 6; i++) {
+      var n = scored[i].num;
+      if (used[n]) continue;
+      var z = n <= 11 ? 0 : n <= 22 ? 1 : 2;
+      var tail = n % 10;
+      if (zoneCount[z] < 3 && (usedTails[tail] || 0) < 2 && Math.random() < 0.75) {
+        picks.push(n);
+        used[n] = true;
+        zoneCount[z]++;
+        usedTails[tail] = (usedTails[tail] || 0) + 1;
+      }
+    }
+    for (var i = 0; i < scored.length && picks.length < 6; i++) {
+      var n = scored[i].num;
+      if (!used[n] && picks.indexOf(n) < 0) { picks.push(n); used[n] = true; }
+    }
+    picks.sort(function(a,b){return a-b;});
+    var b = blueScores[s % blueScores.length].num;
+    results.push({ red: picks, blue: b });
+  }
+
+  var html = '<div style="padding:0.5rem">';
+  html += '<div style="margin-bottom:1rem;font-size:0.8rem;color:var(--muted)">';
+  html += '结合大乐透最新开奖号: ';
+  if (dltNums.length > 0) {
+    html += dltNums.map(function(n){return pad(n);}).join(', ');
+  } else { html += '未加载'; }
+  if (dltPairs.length > 0) {
+    html += ' （连号: ' + dltPairs.map(function(p){return pad(p[0])+'-'+pad(p[1]);}).join(', ') + '）';
+  }
+  html += '</div>';
+
+  for (var s = 0; s < results.length; s++) {
+    html += '<div style="display:flex;align-items:center;gap:1rem;padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<span style="font-weight:700;color:var(--accent);min-width:60px;font-size:0.9rem">第'+(s+1)+'注</span>';
+    html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">';
+    results[s].red.forEach(function(n){
+      html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
+    });
+    html += '<span style="font-size:0.75rem;color:var(--muted);margin-left:0.5rem">+</span>';
+    html += '<div class="ball blue" style="width:34px;height:34px;font-size:0.75rem">'+pad(results[s].blue)+'</div>';
+    html += '</div></div>';
+  }
+  html += '</div>';
+
+  document.getElementById('ssq-dual-results').innerHTML = html;
+}
+
+// 机选复盘分析
+function spinSSQReview() {
+  var redStr = document.getElementById('ssq-red').value;
+  var blueStr = document.getElementById('ssq-blue').value;
+  var historyStr = document.getElementById('ssq-history').value;
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var parts = lines[i].split('|');
+    var r = parseNums(parts[0]);
+    var b = parseNums(parts[1] || '');
+    if (r.length >= 6 && b.length >= 1) {
+      history.push({ red: r.slice(0,6).sort(function(a,b){return a-b}), blue: b[0] });
+    }
+  }
+  var lastRed = parseNums(redStr);
+  var lastBlue = parseNums(blueStr);
+  if (history.length === 0 && lastRed.length >= 6 && lastBlue.length >= 1) {
+    history.unshift({ red: lastRed.slice(0,6).sort(function(a,b){return a-b}), blue: lastBlue[0] });
+  }
+  if (history.length < 2) { alert('请先加载数据进行分析'); return; }
+
+  var last = history[0];
+  var allReds = history.map(function(h){ return h.red; });
+  var allBlues = history.map(function(h){ return h.blue; });
+  var redScores = scoreSSQNumbers(last, allReds);
+  var blueScores = scoreSSQBlueNumbers(last, allBlues);
+
+  // DLT数据
+  var dltNums = [];
+  try {
+    if (typeof dltSampleHistory !== 'undefined' && dltSampleHistory.length > 0) {
+      dltNums = dltSampleHistory[0].split('|')[0].split(',').map(Number);
+    }
+  } catch(e) {}
+
+  function dualScore(num) {
+    var base = 0;
+    for (var i = 0; i < redScores.length; i++) {
+      if (redScores[i].num === num) { base = redScores[i].totalScore * 100; break; }
+    }
+    var crossBonus = 0;
+    for (var j = 0; j < dltNums.length; j++) {
+      var diff = Math.abs(num - dltNums[j]);
+      if (diff === 1) crossBonus += 12;
+      else if (diff === 2) crossBonus += 8;
+      else if (diff === 3) crossBonus += 4;
+    }
+    for (var j = 0; j < dltNums.length; j++) {
+      if (num === dltNums[j]) crossBonus += 18;
+    }
+    return base + crossBonus;
+  }
+
+  var scored = [];
+  for (var n = 1; n <= 33; n++) scored.push({ num: n, score: dualScore(n) });
+  scored.sort(function(a,b){return b.score - a.score;});
+
+  var results = [];
+  var used = {};
+  for (var s = 0; s < 5; s++) {
+    var picks = [];
+    var zoneCount = [0,0,0];
+    for (var i = 0; i < scored.length && picks.length < 6; i++) {
+      var n = scored[i].num;
+      if (used[n]) continue;
+      var z = n <= 11 ? 0 : n <= 22 ? 1 : 2;
+      if (zoneCount[z] < 3 && Math.random() < 0.75) {
+        picks.push(n); used[n] = true; zoneCount[z]++;
+      }
+    }
+    for (var i = 0; i < scored.length && picks.length < 6; i++) {
+      var n = scored[i].num;
+      if (!used[n] && picks.indexOf(n) < 0) { picks.push(n); used[n] = true; }
+    }
+    picks.sort(function(a,b){return a-b;});
+    var b = blueScores[s % blueScores.length].num;
+    results.push({ red: picks, blue: b });
+  }
+
+  var html = '<div style="padding:0.5rem">';
+  for (var s = 0; s < results.length; s++) {
+    html += '<div style="padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
+    html += '<span style="font-weight:700;color:var(--accent);min-width:50px;font-size:0.9rem">第'+(s+1)+'注</span>';
+    results[s].red.forEach(function(n){
+      html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
+    });
+    html += '<span style="font-size:0.75rem;color:var(--muted)">+</span>';
+    html += '<div class="ball blue" style="width:34px;height:34px;font-size:0.75rem">'+pad(results[s].blue)+'</div>';
+    html += '</div>';
+    // 分析理由
+    html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">';
+    var reasons = [];
+    results[s].red.forEach(function(n){
+      for (var i = 0; i < redScores.length; i++) {
+        if (redScores[i].num === n) {
+          var r = [];
+          if (redScores[i].wf > 0.2) r.push('高频');
+          if (redScores[i].mp > 0.8) r.push('深冷回补');
+          if (redScores[i].mkScore > 0.8) r.push('冷转热');
+          if (redScores[i].neighborScore > 0.7) r.push('邻号');
+          if (redScores[i].pairScore > 0.5) r.push('连号');
+          if (dltNums.indexOf(n) >= 0) r.push('DLT重号');
+          for (var j = 0; j < dltNums.length; j++) {
+            if (Math.abs(n - dltNums[j]) === 1) { r.push('DLT斜连'+pad(dltNums[j])); break; }
+          }
+          if (r.length > 0) reasons.push(pad(n)+'('+r.join('·')+')');
+          break;
+        }
+      }
+    });
+    if (reasons.length > 0) html += '分析：'+reasons.join('，');
+    html += '</div></div>';
+  }
+  html += '</div>';
+
+  document.getElementById('ssq-review-analysis').innerHTML = html;
+}
+
+// 大模型统计概率分析
+function renderSSQProbAnalysis() {
+  var redStr = document.getElementById('ssq-red').value;
+  var blueStr = document.getElementById('ssq-blue').value;
+  var historyStr = document.getElementById('ssq-history').value;
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var parts = lines[i].split('|');
+    var r = parseNums(parts[0]);
+    var b = parseNums(parts[1] || '');
+    if (r.length >= 6 && b.length >= 1) {
+      history.push({ red: r.slice(0,6).sort(function(a,b){return a-b}), blue: b[0] });
+    }
+  }
+  var lastRed = parseNums(redStr);
+  var lastBlue = parseNums(blueStr);
+  if (history.length === 0 && lastRed.length >= 6 && lastBlue.length >= 1) {
+    history.unshift({ red: lastRed.slice(0,6).sort(function(a,b){return a-b}), blue: lastBlue[0] });
+  }
+  if (history.length < 2) return;
+
+  var last = history[0];
+  var allReds = history.map(function(h){ return h.red; });
+  var allBlues = history.map(function(h){ return h.blue; });
+  var redScores = scoreSSQNumbers(last, allReds);
+  var blueScores = scoreSSQBlueNumbers(last, allBlues);
+
+  // DLT数据
+  var dltNums = [];
+  try {
+    if (typeof dltSampleHistory !== 'undefined' && dltSampleHistory.length > 0) {
+      dltNums = dltSampleHistory[0].split('|')[0].split(',').map(Number);
+    }
+  } catch(e) {}
+
+  // Tab2: 红球Top15评分表
+  var top15 = redScores.slice(0, 15);
+  var html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
+  html += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">号码</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">频率</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏%位</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">马尔可夫</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">邻号</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">连号</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">总评分</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">理由</th></tr></thead><tbody>';
+  top15.forEach(function(s){
+    var reason = [];
+    if (s.wf > 0.2) reason.push('高频');
+    if (s.mp > 0.8) reason.push('深冷');
+    if (s.mkScore > 0.8) reason.push('冷转热');
+    if (s.neighborScore > 0.7) reason.push('邻号');
+    if (s.pairScore > 0.5) reason.push('连号');
+    html += '<tr><td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--accent4)">'+pad(s.num)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.wf*100).toFixed(1)+'%</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+s.currentGap+'期</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.mp*100).toFixed(0)+'%</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.mkScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.neighborScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.pairScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--accent)">'+(s.totalScore*100).toFixed(1)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(reason.join('·')||'-')+'</td></tr>';
+  });
+  html += '</tbody></table></div>';
+  document.getElementById('ssq-prob-red').innerHTML = html;
+
+  // Tab2: 蓝球Top6
+  var top6 = blueScores.slice(0, 6);
+  html = '<div style="display:flex;gap:0.6rem;flex-wrap:wrap">';
+  top6.forEach(function(s){
+    html += '<div style="padding:0.6rem 1rem;border:1px solid var(--rule);border-radius:6px;background:var(--bg2);text-align:center;min-width:80px">';
+    html += '<div style="font-weight:bold;color:var(--accent2);font-size:1.1rem">'+pad(s.num)+'</div>';
+    html += '<div style="color:var(--muted);font-size:0.7rem">'+(s.totalScore*100).toFixed(1)+'分</div>';
+    html += '<div style="color:var(--muted);font-size:0.65rem">遗漏'+s.currentGap+'期</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  document.getElementById('ssq-prob-blue').innerHTML = html;
+
+  // Tab2: 重号分析
+  try { renderSSQRepeat(last, history); } catch(e) {}
+  var repeatHtml = document.getElementById('ssq-repeat').innerHTML;
+  if (repeatHtml) document.getElementById('ssq-prob-repeat').innerHTML = repeatHtml;
+
+  // Tab2: 斜连分析
+  var dhtml = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
+  dhtml += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">号码</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">邻号分</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">跨彩种斜连</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">说明</th></tr></thead><tbody>';
+  var diagonalTop = redScores.slice().sort(function(a,b){return (b.neighborScore||0) - (a.neighborScore||0);}).slice(0, 10);
+  diagonalTop.forEach(function(s){
+    if ((s.neighborScore||0) < 0.5) return;
+    var crossNote = '';
+    for (var j = 0; j < dltNums.length; j++) {
+      var diff = Math.abs(s.num - dltNums[j]);
+      if (diff <= 2) { crossNote = 'DLT斜连'+pad(dltNums[j])+'('+diff+')'; break; }
+    }
+    dhtml += '<tr><td style="padding:4px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--ink)">'+pad(s.num)+'</td>';
+    dhtml += '<td style="padding:4px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.neighborScore*100).toFixed(0)+'</td>';
+    dhtml += '<td style="padding:4px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(crossNote||'-')+'</td>';
+    dhtml += '<td style="padding:4px;border:1px solid var(--rule);color:var(--muted);font-size:0.7rem">'+(s.neighborScore>0.7?'强邻号':'中邻号')+'</td></tr>';
+  });
+  dhtml += '</tbody></table></div>';
+  document.getElementById('ssq-prob-diagonal').innerHTML = dhtml;
+
+  // Tab2: DLT连号映射
+  var phtml = '<div style="font-size:0.8rem;color:var(--muted)">';
+  if (dltNums.length > 0) {
+    phtml += '大乐透最新前区: ' + dltNums.map(function(n){return pad(n);}).join(', ') + '<br>';
+    var dltPairList = [];
+    for (var i = 0; i < dltNums.length - 1; i++) {
+      if (dltNums[i+1] - dltNums[i] === 1) dltPairList.push([dltNums[i], dltNums[i+1]]);
+    }
+    if (dltPairList.length > 0) {
+      phtml += ' detected 连号: ' + dltPairList.map(function(p){return pad(p[0])+'-'+pad(p[1]);}).join(', ') + '<br>';
+      phtml += '<div style="margin-top:0.5rem">对应双色球邻号关注: ';
+      var watchNums = [];
+      dltPairList.forEach(function(p){
+        [p[0]-1, p[0], p[0]+1, p[1]-1, p[1], p[1]+1].forEach(function(n){
+          if (n >= 1 && n <= 33 && watchNums.indexOf(n) < 0) watchNums.push(n);
+        });
+      });
+      watchNums.sort(function(a,b){return a-b;});
+      phtml += watchNums.map(function(n){return pad(n);}).join(', ');
+      phtml += '</div>';
+    } else {
+      phtml += '大乐透本期无连号</div>';
+    }
+  } else {
+    phtml += '未加载大乐透数据</div>';
+  }
+  document.getElementById('ssq-prob-dlt-pair').innerHTML = phtml;
 }

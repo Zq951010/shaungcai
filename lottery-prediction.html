@@ -890,115 +890,132 @@ tr:hover td { background: var(--bg3); }
   </div>
 
   <div id="ssq-results" style="display:none">
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128200;</span> 基本统计指标</div>
-      <div class="stat-grid" id="ssq-stats"></div>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128260;</span> 上期重号分析</div>
-      <div id="ssq-repeat"></div>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128202;</span> 区间比分析</div>
-      <div id="ssq-zone"></div>
-      <figure class="chart-figure">
-        <figcaption>红球区间比分布趋势</figcaption>
-        <div id="chart-ssq-zone" style="width:100%;min-height:350px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128736;</span> 和值分析</div>
-      <div id="ssq-sum"></div>
-      <figure class="chart-figure">
-        <figcaption>红球和值走势</figcaption>
-        <div id="chart-ssq-sum" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#129504;</span> 跨度分析</div>
-      <div id="ssq-span"></div>
-      <figure class="chart-figure">
-        <figcaption>红球跨度走势</figcaption>
-        <div id="chart-ssq-span" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#127777;&#10052;&#65039;</span> 冷热号分析</div>
-      <div id="ssq-hotcold"></div>
-      <figure class="chart-figure">
-        <figcaption>红球号码出现频率</figcaption>
-        <div id="chart-ssq-freq" style="width:100%;min-height:400px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128256;</span> 蓝球走势分析</div>
-      <div id="ssq-blue-trend"></div>
-      <figure class="chart-figure">
-        <figcaption>蓝球走势</figcaption>
-        <div id="chart-ssq-blue" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128204;</span> 奇偶比 / 连号分析</div>
-      <div id="ssq-odd-even"></div>
-      <figure class="chart-figure">
-        <figcaption>奇偶比走势</figcaption>
-        <div id="chart-ssq-oddeven" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128256;</span> 蓝球遗漏分析</div>
-      <div id="ssq-blue-miss"></div>
-      <figure class="chart-figure">
-        <figcaption>蓝球遗漏期数</figcaption>
-        <div id="chart-ssq-bluemiss" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128291;</span> 红球尾数分布分析</div>
-      <div id="ssq-tail"></div>
-      <figure class="chart-figure">
-        <figcaption>红球尾数出现频率</figcaption>
-        <div id="chart-ssq-tail" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#11088;</span> 胆码 / 拖码推荐</div>
-      <div id="ssq-dantuo"></div>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#127919;</span> 综合推荐号码</div>
-      <div id="ssq-recommend"></div>
-    </div>
-
-    <!-- 智能预测推荐（AI模型） -->
-    <div class="card" id="ssq-smart-card">
-      <div class="card-title"><span class="icon">&#129302;</span> 智能预测推荐（AI模型）</div>
-      <div id="ssq-smart-recommend"></div>
-    </div>
-
-    <!-- 上期选号复盘 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128260;</span> 上期选号复盘</div>
-      <div class="input-row" style="margin-bottom:0.75rem">
-        <label>您上期的选号：</label>
-        <input type="text" id="ssq-review-numbers" placeholder="红球如: 03,11,12,21,22,28" style="width:220px">
-        <input type="text" id="ssq-review-blue" placeholder="蓝球如: 06" style="width:120px">
-        <button class="btn btn-secondary" onclick="reviewSSQ()" style="margin-left:0.5rem">复盘对比</button>
+    <div class="dlt-layout">
+      <div class="dlt-sidebar" id="ssq-sidebar">
+        <button class="dlt-sidebar-btn active" onclick="switchSSQTab('ssq-tab1', this)">
+          <span class="badge-sm" style="background:var(--accent4);color:#fff">1</span>常规冷热号分析
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchSSQTab('ssq-tab2', this)">
+          <span class="badge-sm" style="background:var(--accent2);color:#fff">2</span>大模型统计概率
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchSSQTab('ssq-tab3', this)">
+          <span class="badge-sm" style="background:var(--accent3);color:#fff">3</span>AI模型推测方案
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchSSQTab('ssq-tab4', this)">
+          <span class="badge-sm" style="background:var(--accent5);color:#fff">4</span>摇奖机模拟选号
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchSSQTab('ssq-tab5', this)">
+          <span class="badge-sm" style="background:var(--gold);color:#000">5</span>双彩结合推荐
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchSSQTab('ssq-tab6', this)">
+          <span class="badge-sm" style="background:var(--accent);color:#000">6</span>模型复盘与推荐
+        </button>
       </div>
-      <div id="ssq-review-result"></div>
-    </div>
 
-    <!-- 模型自动复盘与优化 -->
-    <div class="card" id="ssq-auto-review-card" style="display:none">
-      <div class="card-title"><span class="icon">&#128736;</span> 模型自动复盘与优化</div>
-      <div id="ssq-auto-review"></div>
+      <div class="dlt-content">
+        <!-- Tab 1 -->
+        <div class="dlt-tab active" id="ssq-tab1">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#127777;&#10052;&#65039;</span> 1. 常规冷热号分析</div>
+            <div id="ssq-hotcold"></div>
+            <div id="chart-ssq-freq" style="width:100%;min-height:400px"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128256;</span> 蓝球走势分析</div>
+            <div id="ssq-blue-trend"></div>
+            <div id="chart-ssq-blue" style="width:100%;min-height:300px"></div>
+          </div>
+        </div>
+
+        <!-- Tab 2 -->
+        <div class="dlt-tab" id="ssq-tab2">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128202;</span> 2. 大模型统计概率分析（结合大乐透规律）</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              基于加权频率、遗漏百分位、马尔可夫转移、邻号、区间、奇偶、大小、尾数、共现、连号、跨彩种（大乐透斜连/重号）等多维评分模型。
+            </div>
+            <h4 style="margin-bottom:0.5rem;color:var(--ink)">红球号码评分 Top 15</h4>
+            <div id="ssq-prob-red"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">蓝球号码评分 Top 6</h4>
+            <div id="ssq-prob-blue"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">上期重号分析</h4>
+            <div id="ssq-prob-repeat"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">斜连号分析（含大乐透跨彩种斜连）</h4>
+            <div id="ssq-prob-diagonal"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">大乐透连号映射分析</h4>
+            <div id="ssq-prob-dlt-pair"></div>
+          </div>
+        </div>
+
+        <!-- Tab 3 -->
+        <div class="dlt-tab" id="ssq-tab3">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#129302;</span> 3. AI模型推测方案</div>
+            <div id="ssq-recommend"></div>
+          </div>
+        </div>
+
+        <!-- Tab 4 -->
+        <div class="dlt-tab" id="ssq-tab4">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#127922;</span> 4. 摇奖机模拟选号</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              基于大模型评分加权随机抽取红球01-33、蓝球01-16，机选5注号码。
+            </div>
+            <div style="text-align:center;margin:1.5rem 0">
+              <button class="btn btn-primary" onclick="spinSSQLottery()" style="font-size:1.1rem;padding:0.8rem 2.5rem;border-radius:50px">&#127922; 开始摇奖</button>
+            </div>
+            <div id="ssq-lottery-results" style="display:none"></div>
+          </div>
+        </div>
+
+        <!-- Tab 5 -->
+        <div class="dlt-tab" id="ssq-tab5">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128258;</span> 5. 双彩结合推荐（大乐透→双色球）</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              结合大乐透最新开奖号的左右侧斜连、重号、连号规律，与双色球自身评分模型融合推荐。
+            </div>
+            <div id="ssq-dual-results"></div>
+          </div>
+        </div>
+
+        <!-- Tab 6 -->
+        <div class="dlt-tab" id="ssq-tab6">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128736;</span> 6. 模型自动复盘与推荐</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              结合大乐透冷热号、左右侧斜连、重号、连号规律，推荐5注号码。支持自主机选并对机选号码进行分析。
+            </div>
+            <div id="ssq-auto-review"></div>
+            <div style="text-align:center;margin:1rem 0">
+              <button class="btn btn-primary" onclick="spinSSQReview()" style="font-size:1rem;padding:0.6rem 2rem;border-radius:50px">&#127922; 机选号码并分析</button>
+            </div>
+            <div id="ssq-review-analysis"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
   <div id="ssq-empty" class="empty-state">
     <div class="icon">&#128203;</div>
     <p>请输入上期开奖号码或历史数据，点击"开始分析"查看预测结果</p>
+  </div>
+
+  <!-- Backward compatibility hidden containers -->
+  <div style="display:none">
+    <div id="ssq-stats"></div>
+    <div id="ssq-repeat"></div>
+    <div id="ssq-zone"></div>
+    <div id="ssq-sum"></div>
+    <div id="ssq-span"></div>
+    <div id="ssq-odd-even"></div>
+    <div id="ssq-blue-miss"></div>
+    <div id="ssq-tail"></div>
+    <div id="ssq-dantuo"></div>
+    <div id="ssq-review-result"></div>
+    <div id="ssq-smart-recommend"></div>
   </div>
 </div>
 
@@ -1430,10 +1447,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026070709"></script>
+<script src="assets/engine.js?v=2026070710"></script>
 <script src="assets/pl-data.js?v=202607062300"></script>
 <script src="assets/pl-engine.js?v=202607062300"></script>
-<script src="assets/auto-review.js?v=2026070708"></script>
+<script src="assets/auto-review.js?v=2026070710"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data and analyze on page load (analysis runs in background)
@@ -1468,6 +1485,16 @@ window.addEventListener('DOMContentLoaded', function() {
 function switchDLTTab(tabId, btn) {
   document.querySelectorAll('#dlt-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
   document.querySelectorAll('.dlt-tab').forEach(function(t){ t.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  var tab = document.getElementById(tabId);
+  if (tab) tab.classList.add('active');
+}
+</script>
+
+<script>
+function switchSSQTab(tabId, btn) {
+  document.querySelectorAll('#ssq-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('#ssq-tab1, #ssq-tab2, #ssq-tab3, #ssq-tab4, #ssq-tab5, #ssq-tab6').forEach(function(t){ t.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   var tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');
