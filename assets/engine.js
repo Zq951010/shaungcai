@@ -4903,9 +4903,23 @@ function spinDLTReview() {
   }
   var lastFront = parseNums(frontStr);
   var lastBack = parseNums(backStr);
-  if (history.length === 0 && lastFront.length >= 5 && lastBack.length >= 2) {
+  var hasInputLast = lastFront.length >= 5 && lastBack.length >= 2;
+  if (history.length === 0 && hasInputLast) {
     history.unshift({ front: lastFront.slice(0,5).sort(function(a,b){return a-b}), back: lastBack.slice(0,2).sort(function(a,b){return a-b}) });
   }
+
+  // 当期开奖号码（用于命中对比）
+  var actualFront, actualBack;
+  if (hasInputLast) {
+    actualFront = lastFront.slice(0,5).sort(function(a,b){return a-b});
+    actualBack = lastBack.slice(0,2).sort(function(a,b){return a-b});
+  } else if (history.length > 0) {
+    actualFront = history[0].front;
+    actualBack = history[0].back;
+  } else {
+    alert('请先输入当期开奖号码或历史数据'); return;
+  }
+
   if (history.length < 2) { alert('请先加载数据进行分析'); return; }
 
   var last = history[0];
@@ -5389,9 +5403,23 @@ function spinSSQReview() {
   }
   var lastRed = parseNums(redStr);
   var lastBlue = parseNums(blueStr);
-  if (history.length === 0 && lastRed.length >= 6 && lastBlue.length >= 1) {
+  var hasInputLast = lastRed.length >= 6 && lastBlue.length >= 1;
+  if (history.length === 0 && hasInputLast) {
     history.unshift({ red: lastRed.slice(0,6).sort(function(a,b){return a-b}), blue: lastBlue[0] });
   }
+
+  // 当期开奖号码（用于命中对比）
+  var actualRed, actualBlue;
+  if (hasInputLast) {
+    actualRed = lastRed.slice(0,6).sort(function(a,b){return a-b});
+    actualBlue = lastBlue[0];
+  } else if (history.length > 0) {
+    actualRed = history[0].red;
+    actualBlue = history[0].blue;
+  } else {
+    alert('请先输入当期开奖号码或历史数据'); return;
+  }
+
   if (history.length < 2) { alert('请先加载数据进行分析'); return; }
 
   var last = history[0];
