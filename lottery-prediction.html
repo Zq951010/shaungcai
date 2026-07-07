@@ -450,24 +450,7 @@ tr:hover td { background: var(--bg3); }
 }
 .rule-box strong { color: var(--ink); }
 
-/* Methodology Cards */
-.method-card {
-  background: var(--bg3);
-  border: 1px solid var(--rule);
-  border-radius: 8px;
-  padding: 1rem;
-  margin-bottom: 0.75rem;
-}
-.method-card h4 {
-  font-size: 0.9rem;
-  color: var(--accent);
-  margin-bottom: 0.5rem;
-}
-.method-card p {
-  font-size: 0.82rem;
-  color: var(--muted);
-  line-height: 1.7;
-}
+
 
 /* Disclaimer */
 .disclaimer {
@@ -512,7 +495,7 @@ tr:hover td { background: var(--bg3); }
 @media print {
   .header { position: relative; }
   body { background: #fff; color: #000; }
-  .card, .input-section, .method-card { border: 1px solid #ccc; background: #fff; }
+  .card, .input-section { border: 1px solid #ccc; background: #fff; }
 }
 
 /* Tooltip */
@@ -648,11 +631,6 @@ tr:hover td { background: var(--bg3); }
       <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#8b5cf6,#a78bfa);display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;font-weight:700;color:#fff;font-size:1.1rem">PL5</div>
       <h3 style="margin:0 0 0.25rem;color:var(--ink)">排列五</h3>
       <p style="margin:0;color:var(--muted);font-size:0.85rem">0-9五位数字组合</p>
-    </div>
-    <div class="game-card" data-game="method" style="background:var(--bg2);border:1px solid var(--rule);border-radius:12px;padding:1.5rem;cursor:pointer;transition:all 0.25s;text-align:center">
-      <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#6b7280,#9ca3af);display:flex;align-items:center;justify-content:center;margin:0 auto 0.75rem;font-weight:700;color:#fff;font-size:1.1rem">DOC</div>
-      <h3 style="margin:0 0 0.25rem;color:var(--ink)">分析方法论</h3>
-      <p style="margin:0;color:var(--muted);font-size:0.85rem">算法模型说明文档</p>
     </div>
   </div>
 </div>
@@ -1375,95 +1353,16 @@ tr:hover td { background: var(--bg3); }
   </div>
 </div>
 
-<!-- ==================== 分析方法论面板 ==================== -->
-<div class="lottery-panel" id="panel-method">
-  <div style="margin-bottom:1rem"><button class="back-to-home" style="padding:0.4rem 1rem;border:1px solid var(--rule);border-radius:6px;background:var(--bg3);color:var(--ink);cursor:pointer;font-size:0.85rem">← 返回首页</button></div>
-  <div class="card">
-    <div class="card-title"><span class="icon">&#128218;</span> 预测分析方法论</div>
-
-    <div class="method-card">
-      <h4>一、上期重号规律分析</h4>
-      <p>重号是指与上期开奖号码相同的号码。通过对历史数据的统计，可以发现：</p>
-      <p><strong>1. 重号出现概率：</strong>大乐透前区平均每期出现 1-2 个重号，双色球红球平均每期出现 1-3 个重号，快乐8因开出20个号码，重号数量通常在 5-10 个之间。</p>
-      <p><strong>2. 重号位置偏好：</strong>某些位置的号码更容易成为重号，例如大乐透前区第3、第4位（中间位置）的重号概率较高。</p>
-      <p><strong>3. 连续重号：</strong>如果某号码连续2-3期出现，则下一期再次出现的概率会降低（均值回归效应）。</p>
-    </div>
-
-    <div class="method-card">
-      <h4>二、区间比规律分析</h4>
-      <p>将号码池划分为若干区间，分析每期各区间出号数量的比例关系：</p>
-      <p><strong>1. 大乐透前区（三区间）：</strong>01-12 / 13-23 / 24-35。最常见的区间比为 2:2:1 或 2:1:2，极端比（如 5:0:0 或 0:0:5）极少出现。</p>
-      <p><strong>2. 双色球红球（三区间）：</strong>01-11 / 12-22 / 23-33。常见区间比为 2:2:2、3:2:1 或 2:3:1。</p>
-      <p><strong>3. 快乐8（四区间）：</strong>01-20 / 21-40 / 41-60 / 61-80。20个开奖号码在各区间的分布通常为 4-6 个。</p>
-      <p><strong>4. 偏移修正：</strong>当某区间连续多期出号偏少时，后续有回补趋势；反之亦然。</p>
-    </div>
-
-    <div class="method-card">
-      <h4>三、和值规律分析</h4>
-      <p>和值是所有开奖号码之和，反映号码的整体大小分布：</p>
-      <p><strong>1. 大乐透前区和值：</strong>理论均值约 90（5个号码均值18），常见范围 70-110。</p>
-      <p><strong>2. 双色球红球和值：</strong>理论均值约 102（6个号码均值17），常见范围 80-125。</p>
-      <p><strong>3. 快乐8和值：</strong>20个号码的理论均值约 810，常见范围 750-870。</p>
-      <p><strong>4. 和值振荡：</strong>和值围绕均值上下波动，连续偏高或偏低后会出现反向修正。</p>
-    </div>
-
-    <div class="method-card">
-      <h4>四、跨度规律分析</h4>
-      <p>跨度 = 最大号码 - 最小号码，反映号码的离散程度：</p>
-      <p><strong>1. 大乐透前区跨度：</strong>理论均值约 28，常见范围 22-33。</p>
-      <p><strong>2. 双色球红球跨度：</strong>理论均值约 27，常见范围 20-32。</p>
-      <p><strong>3. 快乐8跨度：</strong>因从80个号码中选20个，跨度通常在 70-79 之间。</p>
-      <p><strong>4. 跨度与和值联动：</strong>大跨度通常伴随大和值，小跨度伴随小和值，但并非绝对。</p>
-    </div>
-
-    <div class="method-card">
-      <h4>五、胆码选取依据</h4>
-      <p>胆码是"必须出现"的号码，选取依据包括：</p>
-      <p><strong>1. 高频热号：</strong>近30期内出现频率显著高于理论期望值的号码。</p>
-      <p><strong>2. 遗漏回补号：</strong>连续多期未出现（遗漏值偏高）且历史上有周期性回补规律的号码。</p>
-      <p><strong>3. 重号候选：</strong>上期开出且历史上重号概率较高的号码。</p>
-      <p><strong>4. 区间核心号：</strong>所在区间近期出号偏少，该号码作为区间代表有回补需求。</p>
-      <p><strong>5. 连号关联号：</strong>与上期某号码相邻（如上期出15，则14或16为关联号）。</p>
-    </div>
-
-    <div class="method-card">
-      <h4>六、拖码选取依据</h4>
-      <p>拖码是"可能出现"的号码，覆盖面更广，选取依据包括：</p>
-      <p><strong>1. 温号：</strong>出现频率处于中等水平的号码，稳定性好。</p>
-      <p><strong>2. 奇偶均衡：</strong>根据历史奇偶比，补充奇偶平衡的号码。</p>
-      <p><strong>3. 大小均衡：</strong>根据历史大小比，补充大小分布合理的号码。</p>
-      <p><strong>4. 尾数分布：</strong>确保0-9各尾数有合理覆盖。</p>
-      <p><strong>5. 低频回补号：</strong>遗漏值开始下降（即将回补）的号码。</p>
-    </div>
-
-    <div class="method-card">
-      <h4>七、综合评分模型</h4>
-      <p>每个号码的推荐权重由以下因子加权计算：</p>
-      <p><strong>频率得分（25%）：</strong>近N期出现次数与理论期望的比值。</p>
-      <p><strong>遗漏得分（20%）：</strong>当前遗漏期数与历史平均遗漏的比值（适度遗漏加分，极端遗漏减分）。</p>
-      <p><strong>重号得分（15%）：</strong>是否为上期开奖号码，以及该位置的历史重号概率。</p>
-      <p><strong>区间得分（15%）：</strong>所在区间的出号缺口程度。</p>
-      <p><strong>连号得分（10%）：</strong>与上期号码的相邻关系。</p>
-      <p><strong>奇偶/大小得分（10%）：</strong>对整体奇偶比和大小比的贡献。</p>
-      <p><strong>尾数得分（5%）：</strong>尾数在近期的覆盖情况。</p>
-    </div>
-  </div>
-
-  <div class="disclaimer">
-    <strong>重要声明：</strong>本平台所有分析结果基于历史数据的统计规律，仅供参考和娱乐用途。彩票开奖为完全随机事件，任何基于历史数据的预测方法都无法保证未来结果。请理性购彩，量力而行，切勿沉迷。
-  </div>
-</div>
-
 </div><!-- end container -->
 
 <!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026070705"></script>
+<script src="assets/engine.js?v=2026070706"></script>
 <script src="assets/pl-data.js?v=202607062300"></script>
 <script src="assets/pl-engine.js?v=202607062300"></script>
-<script src="assets/auto-review.js?v=2026070705"></script>
+<script src="assets/auto-review.js?v=2026070706"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data and analyze on page load (analysis runs in background)
