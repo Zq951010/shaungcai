@@ -243,7 +243,7 @@ function analyzeDLT() {
   var lastBack = parseNums(backStr);
 
   if (lastFront.length < 5 || lastBack.length < 2) {
-    if (!historyStr.trim()) { alert('请至少输入上期开奖号码'); return; }
+    if (!historyStr.trim()) { alert('请至少输入当期开奖号码'); return; }
   }
 
   // Parse history
@@ -301,8 +301,8 @@ function renderDLTStats(last, history) {
   var spans = history.map(function(h) { return span(h.front); });
 
   var html = '<div class="stat-grid">';
-  html += '<div class="stat-item"><div class="stat-value">' + frontSum + '</div><div class="stat-label">上期前区和值</div></div>';
-  html += '<div class="stat-item"><div class="stat-value">' + frontSpan + '</div><div class="stat-label">上期前区跨度</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + frontSum + '</div><div class="stat-label">当期前区和值</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + frontSpan + '</div><div class="stat-label">当期前区跨度</div></div>';
   html += '<div class="stat-item"><div class="stat-value">' + oddCount + ':' + (5 - oddCount) + '</div><div class="stat-label">奇偶比</div></div>';
   html += '<div class="stat-item"><div class="stat-value">' + bigCount + ':' + (5 - bigCount) + '</div><div class="stat-label">大小比</div></div>';
   html += '<div class="stat-item"><div class="stat-value">' + history.length + '</div><div class="stat-label">分析期数</div></div>';
@@ -311,7 +311,7 @@ function renderDLTStats(last, history) {
 
   // Show last draw balls
   html += '<div style="margin-top:1rem">';
-  html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">上期开奖号码</div>';
+  html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">当期开奖号码</div>';
   html += '<div class="ball-row">';
   for (var i = 0; i < last.front.length; i++) {
     html += '<div class="ball red">' + pad(last.front[i]) + '</div>';
@@ -372,7 +372,7 @@ function renderDLTRepeat(last, history) {
 
   candidates.sort(function(a, b) { return b.freq - a.freq; });
 
-  html += '<div style="margin-top:1rem;color:var(--muted);font-size:0.85rem">上期号码重号可能性评估</div>';
+  html += '<div style="margin-top:1rem;color:var(--muted);font-size:0.85rem">当期号码重号可能性评估</div>';
   html += '<div class="table-wrap"><table>';
   html += '<tr><th>号码</th><th>历史重号次数</th><th>连续出现期数</th><th>评估</th><th>依据</th></tr>';
   for (var i = 0; i < candidates.length; i++) {
@@ -415,7 +415,7 @@ function renderDLTZone(allFronts) {
 
   // Last period zone ratio
   var lastZone = zoneCounts[0];
-  html += '<div class="result-row"><span class="result-label">上期区间比</span><span class="result-value">' + lastZone.join(' : ') + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期区间比</span><span class="result-value">' + lastZone.join(' : ') + '</span></div>';
 
   // Zone deficit analysis
   html += '<div style="margin-top:1rem;color:var(--muted);font-size:0.85rem">区间偏移分析（近5期）</div>';
@@ -449,7 +449,7 @@ function renderDLTSum(allFronts) {
   var avgSum = Math.round(avg(sums));
 
   var html = '<div class="result-section">';
-  html += '<div class="result-row"><span class="result-label">上期和值</span><span class="result-value">' + lastSum + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期和值</span><span class="result-value">' + lastSum + '</span></div>';
   html += '<div class="result-row"><span class="result-label">历史均和值</span><span class="result-value">' + avgSum + '</span></div>';
   html += '<div class="result-row"><span class="result-label">和值范围</span><span class="result-value">' + min(sums) + ' ~ ' + max(sums) + '</span></div>';
 
@@ -473,7 +473,7 @@ function renderDLTSpan(allFronts) {
   var avgSp = Math.round(avg(spans));
 
   var html = '<div class="result-section">';
-  html += '<div class="result-row"><span class="result-label">上期跨度</span><span class="result-value">' + lastSp + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期跨度</span><span class="result-value">' + lastSp + '</span></div>';
   html += '<div class="result-row"><span class="result-label">历史均跨度</span><span class="result-value">' + avgSp + '</span></div>';
   html += '<div class="result-row"><span class="result-label">跨度范围</span><span class="result-value">' + min(spans) + ' ~ ' + max(spans) + '</span></div>';
 
@@ -1975,8 +1975,8 @@ function renderSSQStats(last, history) {
   var sums = history.map(function(h) { return sum(h.red); });
 
   var html = '<div class="stat-grid">';
-  html += '<div class="stat-item"><div class="stat-value">' + redSum + '</div><div class="stat-label">上期红球和值</div></div>';
-  html += '<div class="stat-item"><div class="stat-value">' + redSpan + '</div><div class="stat-label">上期红球跨度</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + redSum + '</div><div class="stat-label">当期红球和值</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + redSpan + '</div><div class="stat-label">当期红球跨度</div></div>';
   html += '<div class="stat-item"><div class="stat-value">' + oddCount + ':' + (6 - oddCount) + '</div><div class="stat-label">奇偶比</div></div>';
   html += '<div class="stat-item"><div class="stat-value">' + bigCount + ':' + (6 - bigCount) + '</div><div class="stat-label">大小比</div></div>';
   html += '<div class="stat-item"><div class="stat-value">' + history.length + '</div><div class="stat-label">分析期数</div></div>';
@@ -1984,7 +1984,7 @@ function renderSSQStats(last, history) {
   html += '</div>';
 
   html += '<div style="margin-top:1rem">';
-  html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">上期开奖号码</div>';
+  html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">当期开奖号码</div>';
   html += '<div class="ball-row">';
   for (var i = 0; i < last.red.length; i++) {
     html += '<div class="ball red">' + pad(last.red[i]) + '</div>';
@@ -2032,7 +2032,7 @@ function renderSSQRepeat(last, history) {
   }
   candidates.sort(function(a, b) { return b.freq - a.freq; });
 
-  html += '<div style="margin-top:1rem;color:var(--muted);font-size:0.85rem">上期号码重号可能性评估</div>';
+  html += '<div style="margin-top:1rem;color:var(--muted);font-size:0.85rem">当期号码重号可能性评估</div>';
   html += '<div class="table-wrap"><table>';
   html += '<tr><th>号码</th><th>历史重号次数</th><th>连续出现期数</th><th>评估</th><th>依据</th></tr>';
   for (var i = 0; i < candidates.length; i++) {
@@ -2071,7 +2071,7 @@ function renderSSQZone(allReds) {
 
   html += '<div class="result-section">';
   html += '<div class="result-row"><span class="result-label">平均区间比</span><span class="result-value">' + avgCounts.join(' : ') + '</span></div>';
-  html += '<div class="result-row"><span class="result-label">上期区间比</span><span class="result-value">' + zoneCounts[0].join(' : ') + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期区间比</span><span class="result-value">' + zoneCounts[0].join(' : ') + '</span></div>';
 
   var recentAvg = [0, 0, 0];
   var recentN = Math.min(5, zoneCounts.length);
@@ -2102,7 +2102,7 @@ function renderSSQSum(allReds) {
   var avgSum = Math.round(avg(sums));
 
   var html = '<div class="result-section">';
-  html += '<div class="result-row"><span class="result-label">上期和值</span><span class="result-value">' + lastSum + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期和值</span><span class="result-value">' + lastSum + '</span></div>';
   html += '<div class="result-row"><span class="result-label">历史均和值</span><span class="result-value">' + avgSum + '</span></div>';
   html += '<div class="result-row"><span class="result-label">和值范围</span><span class="result-value">' + min(sums) + ' ~ ' + max(sums) + '</span></div>';
   var diff = lastSum - avgSum;
@@ -2123,7 +2123,7 @@ function renderSSQSpan(allReds) {
   var avgSp = Math.round(avg(spans));
 
   var html = '<div class="result-section">';
-  html += '<div class="result-row"><span class="result-label">上期跨度</span><span class="result-value">' + lastSp + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期跨度</span><span class="result-value">' + lastSp + '</span></div>';
   html += '<div class="result-row"><span class="result-label">历史均跨度</span><span class="result-value">' + avgSp + '</span></div>';
   html += '<div class="result-row"><span class="result-label">跨度范围</span><span class="result-value">' + min(spans) + ' ~ ' + max(spans) + '</span></div>';
   var diff = lastSp - avgSp;
@@ -2744,7 +2744,7 @@ function renderSSQBlueTrend(allBlues) {
   hotBlue.sort(function(a,b){return b.freq-a.freq;});
   coldBlue.sort(function(a,b){return a.freq-b.freq;});
 
-  html += '<div class="result-row"><span class="result-label">上期蓝球</span><span class="result-value hl-blue">' + pad(allBlues[0]) + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期蓝球</span><span class="result-value hl-blue">' + pad(allBlues[0]) + '</span></div>';
   html += '<div class="result-row"><span class="result-label">蓝球遗漏</span><span class="result-value">';
   var miss = 0;
   for (var i = 0; i < allBlues.length; i++) {
@@ -2789,7 +2789,7 @@ function renderSSQOddEven(allReds, allBlues) {
   }
   var avgOdd = (oddEvenRatios.reduce(function(s,r){return s+r.odd},0) / oddEvenRatios.length).toFixed(1);
 
-  html += '<div class="result-row"><span class="result-label">上期奇偶比</span><span class="result-value">' + oddEvenRatios[0].odd + ':' + oddEvenRatios[0].even + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期奇偶比</span><span class="result-value">' + oddEvenRatios[0].odd + ':' + oddEvenRatios[0].even + '</span></div>';
   html += '<div class="result-row"><span class="result-label">历史均奇数</span><span class="result-value">' + avgOdd + ' 个</span></div>';
 
   // Consecutive numbers analysis
@@ -2804,7 +2804,7 @@ function renderSSQOddEven(allReds, allBlues) {
   }
   var avgConsec = (consecCounts.reduce(function(s,c){return s+c},0) / consecCounts.length).toFixed(1);
 
-  html += '<div class="result-row"><span class="result-label">上期连号对数</span><span class="result-value">' + consecCounts[0] + ' 对</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期连号对数</span><span class="result-value">' + consecCounts[0] + ' 对</span></div>';
   html += '<div class="result-row"><span class="result-label">历史均连号</span><span class="result-value">' + avgConsec + ' 对</span></div>';
 
   // Find consecutive pairs in last draw
@@ -2815,7 +2815,7 @@ function renderSSQOddEven(allReds, allBlues) {
       pairs.push(pad(lastSorted[j-1]) + '-' + pad(lastSorted[j]));
     }
   }
-  html += '<div class="result-row"><span class="result-label">上期连号</span><span class="result-value">' + (pairs.length > 0 ? pairs.join(', ') : '无') + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期连号</span><span class="result-value">' + (pairs.length > 0 ? pairs.join(', ') : '无') + '</span></div>';
 
   // Suggestion
   var oddDiff = oddEvenRatios[0].odd - avgOdd;
@@ -2951,7 +2951,7 @@ function renderSSQTail(allReds) {
   }
 
   html += '<div class="result-row"><span class="result-label">期望频率</span><span class="result-value">' + expected.toFixed(1) + ' 次/尾</span></div>';
-  html += '<div class="result-row"><span class="result-label">上期尾数</span><span class="result-value">';
+  html += '<div class="result-row"><span class="result-label">当期尾数</span><span class="result-value">';
   for (var i = 0; i < uniqueLastTails.length; i++) {
     html += '<span class="hl-red" style="margin-right:0.3rem">尾' + uniqueLastTails[i] + '</span>';
   }
@@ -3124,14 +3124,14 @@ function renderKL8Stats(last, history) {
   var sums = history.map(function(h) { return sum(h); });
 
   var html = '<div class="stat-grid">';
-  html += '<div class="stat-item"><div class="stat-value">' + s + '</div><div class="stat-label">上期和值</div></div>';
-  html += '<div class="stat-item"><div class="stat-value">' + sp + '</div><div class="stat-label">上期跨度</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + s + '</div><div class="stat-label">当期和值</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + sp + '</div><div class="stat-label">当期跨度</div></div>';
   html += '<div class="stat-item"><div class="stat-value">' + history.length + '</div><div class="stat-label">分析期数</div></div>';
   html += '<div class="stat-item"><div class="stat-value">' + Math.round(avg(sums)) + '</div><div class="stat-label">历史均和值</div></div>';
   html += '</div>';
 
   html += '<div style="margin-top:1rem">';
-  html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">上期开奖号码</div>';
+  html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">当期开奖号码</div>';
   html += '<div class="ball-row">';
   for (var i = 0; i < last.length; i++) {
     html += '<div class="ball gold" style="width:36px;height:36px;font-size:0.75rem">' + pad(last[i]) + '</div>';
@@ -3209,7 +3209,7 @@ function renderKL8Zone(history) {
 
   html += '<div class="result-section">';
   html += '<div class="result-row"><span class="result-label">平均区间分布</span><span class="result-value">' + avgCounts.join(' : ') + '</span></div>';
-  html += '<div class="result-row"><span class="result-label">上期区间分布</span><span class="result-value">' + zoneCounts[0].join(' : ') + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期区间分布</span><span class="result-value">' + zoneCounts[0].join(' : ') + '</span></div>';
 
   var recentAvg = [0, 0, 0, 0];
   var recentN = Math.min(5, zoneCounts.length);
@@ -3240,7 +3240,7 @@ function renderKL8Sum(history) {
   var avgSum = Math.round(avg(sums));
 
   var html = '<div class="result-section">';
-  html += '<div class="result-row"><span class="result-label">上期和值</span><span class="result-value">' + lastSum + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期和值</span><span class="result-value">' + lastSum + '</span></div>';
   html += '<div class="result-row"><span class="result-label">历史均和值</span><span class="result-value">' + avgSum + '</span></div>';
   html += '<div class="result-row"><span class="result-label">和值范围</span><span class="result-value">' + min(sums) + ' ~ ' + max(sums) + '</span></div>';
   var diff = lastSum - avgSum;
@@ -3258,7 +3258,7 @@ function renderKL8Span(history) {
   var avgSp = Math.round(avg(spans));
 
   var html = '<div class="result-section">';
-  html += '<div class="result-row"><span class="result-label">上期跨度</span><span class="result-value">' + lastSp + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期跨度</span><span class="result-value">' + lastSp + '</span></div>';
   html += '<div class="result-row"><span class="result-label">历史均跨度</span><span class="result-value">' + avgSp + '</span></div>';
   html += '<div class="result-row"><span class="result-label">跨度范围</span><span class="result-value">' + min(spans) + ' ~ ' + max(spans) + '</span></div>';
   html += '</div>';
@@ -3309,11 +3309,40 @@ function renderKL8DanTuo(last, history, playType, targetId) {
   var scores = scoreKL8Numbers(last, history);
   scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 
+  // 过滤超出1-80范围的号码
+  scores = scores.filter(function(s){ return s.num >= 1 && s.num <= 80; });
+
   var danCount = Math.min(3, Math.floor(playType / 2));
   var tuoCount = Math.min(10, playType + 5);
 
-  var danCandidates = scores.slice(0, danCount);
-  var tuoCandidates = scores.slice(danCount, danCount + tuoCount);
+  // 限制重号总数不超过5个，且胆码最多2个重号：优先选非重号高分号码
+  var lastSet = {};
+  last.forEach(function(n){ lastSet[n] = true; });
+  var repeatCount = 0;
+  var maxRepeat = 5;
+  var maxDanRepeat = 2;
+  var danCandidates = [];
+  var tuoCandidates = [];
+
+  // 先尝试选danCount个胆码，控制重号（胆码最多2个重号）
+  for (var i = 0; i < scores.length && danCandidates.length < danCount; i++) {
+    var n = scores[i].num;
+    var isRepeat = lastSet[n];
+    if (isRepeat && (repeatCount >= maxRepeat || danCandidates.filter(function(c){ return lastSet[c.num]; }).length >= maxDanRepeat)) continue;
+    danCandidates.push(scores[i]);
+    if (isRepeat) repeatCount++;
+  }
+
+  // 再选拖码，继续控制重号总数（整体不超过5个）
+  for (var i = 0; i < scores.length && tuoCandidates.length < tuoCount; i++) {
+    var n = scores[i].num;
+    var isDan = danCandidates.some(function(c){ return c.num === n; });
+    if (isDan) continue;
+    var isRepeat = lastSet[n];
+    if (isRepeat && repeatCount >= maxRepeat) continue;
+    tuoCandidates.push(scores[i]);
+    if (isRepeat) repeatCount++;
+  }
 
   var html = '<div class="dantuo-section"><div class="dantuo-grid">';
 
@@ -3616,10 +3645,12 @@ function runKL8AutoReview(history) {
         if (!tailUsed[t3] || s3.length >= pt - 2) { s3.push(n3); tailUsed[t3] = true; }
       }
 
-      // 方案4：重号优选
-      var s4 = scores.filter(function(s){ return lastTrain.indexOf(s.num) >= 0; }).slice(0, pt).map(function(s){ return s.num; });
+      // 方案4：重号优选（仅选真正的重号，最多5个，剩余排除重号）
+      var maxRepeat4 = Math.min(3, Math.floor(pt * 0.25));
+      var s4 = scores.filter(function(s){ return lastTrain.indexOf(s.num) >= 0; }).slice(0, maxRepeat4).map(function(s){ return s.num; });
       for (var i4 = 0; i4 < scores.length && s4.length < pt; i4++) {
-        if (s4.indexOf(scores[i4].num) < 0) s4.push(scores[i4].num);
+        var n4 = scores[i4].num;
+        if (s4.indexOf(n4) < 0 && lastTrain.indexOf(n4) < 0) s4.push(n4);
       }
 
       ptResults[pt] = {
@@ -3784,12 +3815,42 @@ function generateKL8Picks_V2(scores, history, playType) {
   }
 
   function genStrategy4(pt) {
-    var neighborSorted = scores.slice().sort(function(a,b){return b.neighborScore - a.neighborScore || b.totalScore - a.totalScore;});
+    // V4重号优选策略：仅选真正的重号（在当期开奖中），最多3个，剩余全部排除重号
+    var maxRepeat = Math.min(3, Math.floor(pt * 0.25));
     var picks = [];
     var used = {};
-    for (var i = 0; i < neighborSorted.length && picks.length < pt; i++) {
-      var n = neighborSorted[i].num;
+    // 第一步：仅选真正的重号，最多5个
+    var repeatSorted = scores.slice().filter(function(s){ return last.indexOf(s.num) >= 0; }).sort(function(a,b){return b.totalScore - a.totalScore;});
+    for (var i = 0; i < repeatSorted.length && picks.length < maxRepeat; i++) {
+      var n = repeatSorted[i].num;
       if (!used[n]) {
+        picks.push(n);
+        used[n] = true;
+      }
+    }
+    // 第二步：剩余名额明确排除所有重号，结合冷热+遗漏+区间均衡补充
+    var zoneCounts = [0,0,0,0];
+    picks.forEach(function(n){ var z=n<=20?0:n<=40?1:n<=60?2:3; zoneCounts[z]++; });
+    var hybridSorted = scores.slice().filter(function(s){ return last.indexOf(s.num) < 0; }).sort(function(a,b){
+      var aHybrid = a.wf*0.30 + a.mp*0.25 + a.zoneScore*0.20 + a.mkScore*0.15 + (a.stability||0)*0.10;
+      var bHybrid = b.wf*0.30 + b.mp*0.25 + b.zoneScore*0.20 + b.mkScore*0.15 + (b.stability||0)*0.10;
+      return bHybrid - aHybrid;
+    });
+    for (var i = 0; i < hybridSorted.length && picks.length < pt; i++) {
+      var n = hybridSorted[i].num;
+      if (!used[n]) {
+        var z = n<=20?0:n<=40?1:n<=60?2:3;
+        if (zoneCounts[z] < Math.ceil(pt/2)) {
+          picks.push(n);
+          used[n] = true;
+          zoneCounts[z]++;
+        }
+      }
+    }
+    // 兜底：从非重号中按总分补
+    for (var i = 0; i < scores.length && picks.length < pt; i++) {
+      var n = scores[i].num;
+      if (!used[n] && last.indexOf(n) < 0) {
         picks.push(n);
         used[n] = true;
       }
@@ -3893,13 +3954,43 @@ function renderKL8AllPlayTypes_V2(last, history) {
   }
 
   function genStrategy4(playType) {
-    // V4重号优选策略：优先选取neighborScore高的号码（重号/邻号）
-    var neighborSorted = scores.slice().sort(function(a,b){return b.neighborScore - a.neighborScore || b.totalScore - a.totalScore;});
+    // V4重号优选策略：仅选真正的重号（在当期开奖中），最多3个，剩余全部排除重号
+    var maxRepeat = Math.min(3, Math.floor(playType * 0.25));
     var picks = [];
     var used = {};
-    for (var i = 0; i < neighborSorted.length && picks.length < playType; i++) {
-      var n = neighborSorted[i].num;
+    // 第一步：仅选真正的重号（neighborScore === 0.9 即 last.indexOf(n) >= 0），最多5个
+    var repeatSorted = scores.slice().filter(function(s){ return last.indexOf(s.num) >= 0; }).sort(function(a,b){return b.totalScore - a.totalScore;});
+    for (var i = 0; i < repeatSorted.length && picks.length < maxRepeat; i++) {
+      var n = repeatSorted[i].num;
       if (!used[n]) {
+        picks.push(n);
+        used[n] = true;
+      }
+    }
+    // 第二步：剩余名额明确排除所有重号，结合冷热+遗漏+区间均衡补充
+    var zoneCounts = [0,0,0,0];
+    picks.forEach(function(n){ var z=n<=20?0:n<=40?1:n<=60?2:3; zoneCounts[z]++; });
+    var hybridSorted = scores.slice().filter(function(s){ return last.indexOf(s.num) < 0; }).sort(function(a,b){
+      // 综合评分：频率30% + 遗漏回补25% + 区间评分20% + 马尔可夫15% + 稳定性10%
+      var aHybrid = a.wf*0.30 + a.mp*0.25 + a.zoneScore*0.20 + a.mkScore*0.15 + (a.stability||0)*0.10;
+      var bHybrid = b.wf*0.30 + b.mp*0.25 + b.zoneScore*0.20 + b.mkScore*0.15 + (b.stability||0)*0.10;
+      return bHybrid - aHybrid;
+    });
+    for (var i = 0; i < hybridSorted.length && picks.length < playType; i++) {
+      var n = hybridSorted[i].num;
+      if (!used[n]) {
+        var z = n<=20?0:n<=40?1:n<=60?2:3;
+        if (zoneCounts[z] < Math.ceil(playType/2)) {
+          picks.push(n);
+          used[n] = true;
+          zoneCounts[z]++;
+        }
+      }
+    }
+    // 兜底：如果还不够，从非重号中按总分补
+    for (var i = 0; i < scores.length && picks.length < playType; i++) {
+      var n = scores[i].num;
+      if (!used[n] && last.indexOf(n) < 0) {
         picks.push(n);
         used[n] = true;
       }
@@ -4120,7 +4211,7 @@ function renderKL8OddEven(history) {
   }
   var avgOdd = (oddEvenRatios.reduce(function(s,r){return s+r.odd},0) / oddEvenRatios.length).toFixed(1);
 
-  html += '<div class="result-row"><span class="result-label">上期奇偶比</span><span class="result-value">' + oddEvenRatios[0].odd + ':' + oddEvenRatios[0].even + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期奇偶比</span><span class="result-value">' + oddEvenRatios[0].odd + ':' + oddEvenRatios[0].even + '</span></div>';
   html += '<div class="result-row"><span class="result-label">历史均奇数</span><span class="result-value">' + avgOdd + ' 个</span></div>';
 
   // Big/small ratio
@@ -4131,7 +4222,7 @@ function renderKL8OddEven(history) {
   }
   var avgBig = (bigSmallRatios.reduce(function(s,r){return s+r.big},0) / bigSmallRatios.length).toFixed(1);
 
-  html += '<div class="result-row"><span class="result-label">上期大小比</span><span class="result-value">' + bigSmallRatios[0].big + ':' + bigSmallRatios[0].small + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期大小比</span><span class="result-value">' + bigSmallRatios[0].big + ':' + bigSmallRatios[0].small + '</span></div>';
   html += '<div class="result-row"><span class="result-label">历史均大号</span><span class="result-value">' + avgBig + ' 个</span></div>';
 
   // Consecutive numbers
@@ -4145,7 +4236,7 @@ function renderKL8OddEven(history) {
     consecCounts.push(consec);
   }
   var avgConsec = (consecCounts.reduce(function(s,c){return s+c},0) / consecCounts.length).toFixed(1);
-  html += '<div class="result-row"><span class="result-label">上期连号对数</span><span class="result-value">' + consecCounts[0] + ' 对</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期连号对数</span><span class="result-value">' + consecCounts[0] + ' 对</span></div>';
   html += '<div class="result-row"><span class="result-label">历史均连号</span><span class="result-value">' + avgConsec + ' 对</span></div>';
 
   var oddDiff = oddEvenRatios[0].odd - avgOdd;
@@ -4209,7 +4300,7 @@ function renderKL8Tail(history) {
     lastTails[history[0][j] % 10] = true;
   }
   var coveredCount = Object.keys(lastTails).length;
-  html += '<div class="result-row" style="margin-top:0.75rem"><span class="result-label">上期尾数覆盖</span><span class="result-value">' + coveredCount + '/10</span></div>';
+  html += '<div class="result-row" style="margin-top:0.75rem"><span class="result-label">当期尾数覆盖</span><span class="result-value">' + coveredCount + '/10</span></div>';
 
   var missingTails = [];
   for (var t = 0; t <= 9; t++) {
@@ -4264,14 +4355,14 @@ function renderKL8Consecutive(history) {
   var maxConsec = Math.max.apply(null, consecutiveCounts);
   var minConsec = Math.min.apply(null, consecutiveCounts);
 
-  html += '<div class="result-row"><span class="result-label">上期连号组数</span><span class="result-value">' + consecutiveCounts[0] + ' 组</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期连号组数</span><span class="result-value">' + consecutiveCounts[0] + ' 组</span></div>';
   html += '<div class="result-row"><span class="result-label">历史平均连号</span><span class="result-value">' + avgConsec + ' 组</span></div>';
   html += '<div class="result-row"><span class="result-label">历史最大连号</span><span class="result-value">' + maxConsec + ' 组</span></div>';
   html += '<div class="result-row"><span class="result-label">历史最小连号</span><span class="result-value">' + minConsec + ' 组</span></div>';
 
   // Show last period consecutive details
   if (consecutiveDetails[0].length > 0) {
-    html += '<div style="margin-top:1rem;color:var(--muted);font-size:0.85rem">上期连号详情</div>';
+    html += '<div style="margin-top:1rem;color:var(--muted);font-size:0.85rem">当期连号详情</div>';
     html += '<div class="ball-row">';
     for (var i = 0; i < consecutiveDetails[0].length; i++) {
       var group = consecutiveDetails[0][i];
@@ -4280,7 +4371,7 @@ function renderKL8Consecutive(history) {
     }
     html += '</div>';
   } else {
-    html += '<div style="margin-top:1rem;color:var(--muted);font-size:0.85rem">上期无连号</div>';
+    html += '<div style="margin-top:1rem;color:var(--muted);font-size:0.85rem">当期无连号</div>';
   }
 
   // Trend analysis
@@ -4341,7 +4432,7 @@ function renderKL8AC(history) {
   var maxAC = Math.max.apply(null, acValues);
   var minAC = Math.min.apply(null, acValues);
 
-  html += '<div class="result-row"><span class="result-label">上期AC值</span><span class="result-value">' + acValues[0] + '</span></div>';
+  html += '<div class="result-row"><span class="result-label">当期AC值</span><span class="result-value">' + acValues[0] + '</span></div>';
   html += '<div class="result-row"><span class="result-label">历史平均AC值</span><span class="result-value">' + avgAC + '</span></div>';
   html += '<div class="result-row"><span class="result-label">历史最大AC值</span><span class="result-value">' + maxAC + '</span></div>';
   html += '<div class="result-row"><span class="result-label">历史最小AC值</span><span class="result-value">' + minAC + '</span></div>';
@@ -4379,11 +4470,11 @@ function renderKL8AC(history) {
   // AC value interpretation
   var interpretation = '';
   if (acValues[0] >= maxAC * 0.9) {
-    interpretation = '上期号码分布非常离散，差值种类丰富';
+    interpretation = '当期号码分布非常离散，差值种类丰富';
   } else if (acValues[0] <= minAC * 1.1) {
-    interpretation = '上期号码分布较集中，差值种类较少';
+    interpretation = '当期号码分布较集中，差值种类较少';
   } else {
-    interpretation = '上期号码分布适中，差值种类正常';
+    interpretation = '当期号码分布适中，差值种类正常';
   }
   html += '<div class="result-row"><span class="result-label">分布解读</span><span class="result-value">' + interpretation + '</span></div>';
 
@@ -4392,7 +4483,7 @@ function renderKL8AC(history) {
   renderKL8ACChart(acValues);
 }
 
-// ==================== 上期选号复盘函数 ====================
+// ==================== 当期选号复盘函数 ====================
 
 function reviewDLT() {
   var userFront = parseNums(document.getElementById('dlt-review-numbers').value);
@@ -4406,7 +4497,7 @@ function reviewDLT() {
   var hitFront = userFront.filter(function(n){ return lastFront.indexOf(n) >= 0; });
   var hitBack = userBack.filter(function(n){ return lastBack.indexOf(n) >= 0; });
 
-  var html = '<div style="margin-bottom:0.5rem"><strong>上期开奖：</strong>前区 ' + lastFront.map(function(n){return pad(n);}).join(',') + ' + 后区 ' + lastBack.map(function(n){return pad(n);}).join(',') + '</div>';
+  var html = '<div style="margin-bottom:0.5rem"><strong>当期开奖：</strong>前区 ' + lastFront.map(function(n){return pad(n);}).join(',') + ' + 后区 ' + lastBack.map(function(n){return pad(n);}).join(',') + '</div>';
   html += '<div style="margin-bottom:0.5rem"><strong>您的选号：</strong>前区 ' + userFront.map(function(n){return pad(n);}).join(',') + ' + 后区 ' + userBack.map(function(n){return pad(n);}).join(',') + '</div>';
   html += '<div class="stat-grid" style="margin:0.75rem 0">';
   html += '<div class="stat-item"><div class="stat-value">' + hitFront.length + '/5</div><div class="stat-label">前区命中</div></div>';
@@ -4455,7 +4546,7 @@ function reviewSSQ() {
   var hitRed = userRed.filter(function(n){ return lastRed.indexOf(n) >= 0; });
   var hitBlue = userBlue.filter(function(n){ return lastBlue.indexOf(n) >= 0; });
 
-  var html = '<div style="margin-bottom:0.5rem"><strong>上期开奖：</strong>红球 ' + lastRed.map(function(n){return pad(n);}).join(',') + ' + 蓝球 ' + lastBlue.map(function(n){return pad(n);}).join(',') + '</div>';
+  var html = '<div style="margin-bottom:0.5rem"><strong>当期开奖：</strong>红球 ' + lastRed.map(function(n){return pad(n);}).join(',') + ' + 蓝球 ' + lastBlue.map(function(n){return pad(n);}).join(',') + '</div>';
   html += '<div style="margin-bottom:0.5rem"><strong>您的选号：</strong>红球 ' + userRed.map(function(n){return pad(n);}).join(',') + ' + 蓝球 ' + userBlue.map(function(n){return pad(n);}).join(',') + '</div>';
   html += '<div class="stat-grid" style="margin:0.75rem 0">';
   html += '<div class="stat-item"><div class="stat-value">' + hitRed.length + '/6</div><div class="stat-label">红球命中</div></div>';
@@ -4499,7 +4590,7 @@ function reviewKL8() {
   var lastNums = parseNums(kl8SampleHistory[0]);
   var hitNums = userNums.filter(function(n){ return lastNums.indexOf(n) >= 0; });
 
-  var html = '<div style="margin-bottom:0.5rem"><strong>上期开奖（20个）：</strong>' + lastNums.map(function(n){return pad(n);}).join(',') + '</div>';
+  var html = '<div style="margin-bottom:0.5rem"><strong>当期开奖（20个）：</strong>' + lastNums.map(function(n){return pad(n);}).join(',') + '</div>';
   html += '<div style="margin-bottom:0.5rem"><strong>您的选号（' + userNums.length + '个）：</strong>' + userNums.map(function(n){return pad(n);}).join(',') + '</div>';
   html += '<div class="stat-grid" style="margin:0.75rem 0">';
   html += '<div class="stat-item"><div class="stat-value">' + hitNums.length + '</div><div class="stat-label">命中个数</div></div>';
@@ -4549,14 +4640,30 @@ function spinDLTLottery() {
   }
   var lastFront = parseNums(frontStr);
   var lastBack = parseNums(backStr);
-  if (history.length === 0 && lastFront.length >= 5 && lastBack.length >= 2) {
+  var hasInputLast = lastFront.length >= 5 && lastBack.length >= 2;
+  if (history.length === 0 && hasInputLast) {
     history.unshift({ front: lastFront.slice(0,5).sort(function(a,b){return a-b}), back: lastBack.slice(0,2).sort(function(a,b){return a-b}) });
   }
-  if (history.length < 2) { alert('请先加载数据进行分析'); return; }
 
-  var last = history[0];
-  var allFronts = history.map(function(h){ return h.front; });
-  var allBacks = history.map(function(h){ return h.back; });
+  // 当期开奖号码（用于命中对比）
+  var actualFront, actualBack;
+  if (hasInputLast) {
+    actualFront = lastFront.slice(0,5).sort(function(a,b){return a-b});
+    actualBack = lastBack.slice(0,2).sort(function(a,b){return a-b});
+  } else if (history.length > 0) {
+    actualFront = history[0].front;
+    actualBack = history[0].back;
+  } else {
+    alert('请先输入当期开奖号码或历史数据'); return;
+  }
+
+  // 用于生成推荐的历史数据（排除当期开奖号码本身，避免信息泄露）
+  var genHistory = hasInputLast ? history : history.slice(1);
+  if (genHistory.length < 1) { alert('请至少提供1期历史数据用于生成推荐'); return; }
+
+  var last = genHistory[0];
+  var allFronts = genHistory.map(function(h){ return h.front; });
+  var allBacks = genHistory.map(function(h){ return h.back; });
   var lastDraw = last.front.concat(last.back);
   var hist = allFronts.map(function(f,i){ return f.concat(allBacks[i]); });
   var frontScores = scoreDLTNumbers_V3(lastDraw, hist);
@@ -4876,13 +4983,10 @@ function spinDLTReview() {
   backScores.forEach(function(s){ _backScoreMap3[s.num] = s; });
   var qctx3 = { lastFront: last.front, frontScoreMap: _frontScoreMap3, backScoreMap: _backScoreMap3 };
 
-  // 分析命中（与上期开奖对比）
-  var actualFront = last.front;
-  var actualBack = last.back;
-
+  // 分析命中（与当期开奖号码对比）
   var html = '<div style="padding:0.5rem">';
   html += '<div style="margin-bottom:1rem;font-size:0.8rem;color:var(--muted)">';
-  html += '上期开奖：前区 ';
+  html += '当期开奖：前区 ';
   actualFront.forEach(function(n){ html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;border-radius:50%;background:var(--accent4);color:#fff;text-align:center;font-size:0.7rem;margin:0 2px">'+pad(n)+'</span>'; });
   html += ' 后区 ';
   actualBack.forEach(function(n){ html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;border-radius:50%;background:var(--accent2);color:#fff;text-align:center;font-size:0.7rem;margin:0 2px">'+pad(n)+'</span>'; });
@@ -5037,14 +5141,30 @@ function spinSSQLottery() {
   }
   var lastRed = parseNums(redStr);
   var lastBlue = parseNums(blueStr);
-  if (history.length === 0 && lastRed.length >= 6 && lastBlue.length >= 1) {
+  var hasInputLast = lastRed.length >= 6 && lastBlue.length >= 1;
+  if (history.length === 0 && hasInputLast) {
     history.unshift({ red: lastRed.slice(0,6).sort(function(a,b){return a-b}), blue: lastBlue[0] });
   }
-  if (history.length < 2) { alert('请先加载数据进行分析'); return; }
 
-  var last = history[0];
-  var allReds = history.map(function(h){ return h.red; });
-  var allBlues = history.map(function(h){ return h.blue; });
+  // 当期开奖号码（用于命中对比）
+  var actualRed, actualBlue;
+  if (hasInputLast) {
+    actualRed = lastRed.slice(0,6).sort(function(a,b){return a-b});
+    actualBlue = lastBlue[0];
+  } else if (history.length > 0) {
+    actualRed = history[0].red;
+    actualBlue = history[0].blue;
+  } else {
+    alert('请先输入当期开奖号码或历史数据'); return;
+  }
+
+  // 用于生成推荐的历史数据（排除当期开奖号码本身，避免信息泄露）
+  var genHistory = hasInputLast ? history : history.slice(1);
+  if (genHistory.length < 1) { alert('请至少提供1期历史数据用于生成推荐'); return; }
+
+  var last = genHistory[0];
+  var allReds = genHistory.map(function(h){ return h.red; });
+  var allBlues = genHistory.map(function(h){ return h.blue; });
   var redScores = scoreSSQNumbers(last, allReds);
   var blueScores = scoreSSQBlueNumbers(last, allBlues);
 
@@ -5333,16 +5453,31 @@ function spinSSQReview() {
   }
 
   var html = '<div style="padding:0.5rem">';
+  html += '<div style="margin-bottom:1rem;font-size:0.8rem;color:var(--muted)">';
+  html += '当期开奖：红球 ';
+  actualRed.forEach(function(n){ html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;border-radius:50%;background:var(--accent4);color:#fff;text-align:center;font-size:0.7rem;margin:0 2px">'+pad(n)+'</span>'; });
+  html += ' 蓝球 ';
+  html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;border-radius:50%;background:var(--accent2);color:#fff;text-align:center;font-size:0.7rem;margin:0 2px">'+pad(actualBlue)+'</span>';
+  html += '</div>';
+
   for (var s = 0; s < results.length; s++) {
+    var redHits = results[s].red.filter(function(n){ return actualRed.indexOf(n) >= 0; });
+    var blueHit = actualBlue === results[s].blue ? 1 : 0;
     html += '<div style="padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
     html += '<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
     html += '<span style="font-weight:700;color:var(--accent);min-width:50px;font-size:0.9rem">第'+(s+1)+'注</span>';
     results[s].red.forEach(function(n){
-      html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
+      var isHit = actualRed.indexOf(n) >= 0;
+      html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem;'+(isHit?'box-shadow:0 0 0 2px var(--accent3);':'')+'">'+pad(n)+'</div>';
     });
     html += '<span style="font-size:0.75rem;color:var(--muted)">+</span>';
-    html += '<div class="ball blue" style="width:34px;height:34px;font-size:0.75rem">'+pad(results[s].blue)+'</div>';
+    var bHit = actualBlue === results[s].blue;
+    html += '<div class="ball blue" style="width:34px;height:34px;font-size:0.75rem;'+(bHit?'box-shadow:0 0 0 2px var(--accent3);':'')+'">'+pad(results[s].blue)+'</div>';
+    html += '<span style="margin-left:auto;background:'+(redHits.length+blueHit>=4?'var(--accent3)':(redHits.length+blueHit>=2?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">红球'+redHits.length+'+蓝球'+blueHit+'</span>';
     html += '</div>';
+    if (redHits.length > 0 || blueHit > 0) {
+      html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">命中：'+redHits.map(function(n){return pad(n);}).join(', ')+(blueHit ? ' + '+pad(actualBlue) : '')+'</div>';
+    }
     // 分析理由
     html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">';
     var reasons = [];
@@ -5649,13 +5784,27 @@ function spinKL8Review() {
     var nums = parseNums(lines[i]);
     if (nums.length >= 10) history.push(nums.slice(0,20).sort(function(a,b){return a-b;}));
   }
-  if (history.length === 0 && lastNums.length >= 10) {
+  var hasInputLast = lastNums.length >= 10;
+  if (history.length === 0 && hasInputLast) {
     history.unshift(lastNums.slice(0,20).sort(function(a,b){return a-b;}));
   }
-  if (history.length < 2) { alert('请先加载数据进行分析'); return; }
 
-  var last = history[0];
-  var scores = scoreKL8Numbers(last, history);
+  // 当期开奖号码（用于命中对比）
+  var actualNums;
+  if (hasInputLast) {
+    actualNums = lastNums.slice(0,20).sort(function(a,b){return a-b;});
+  } else if (history.length > 0) {
+    actualNums = history[0];
+  } else {
+    alert('请先输入当期开奖号码或历史数据'); return;
+  }
+
+  // 用于生成推荐的历史数据（排除当期开奖号码本身，避免信息泄露）
+  var genHistory = hasInputLast ? history : history.slice(1);
+  if (genHistory.length < 1) { alert('请至少提供1期历史数据用于生成推荐'); return; }
+
+  var last = genHistory[0];
+  var scores = scoreKL8Numbers(last, genHistory);
 
   var results = [];
   var used = {};
@@ -5678,9 +5827,8 @@ function spinKL8Review() {
     results.push(picks);
   }
 
-  var actualNums = last;
   var html = '<div style="padding:0.5rem">';
-  html += '<div style="margin-bottom:1rem;font-size:0.8rem;color:var(--muted)">上期开奖：' + actualNums.map(function(n){return pad(n);}).join(', ') + '</div>';
+  html += '<div style="margin-bottom:1rem;font-size:0.8rem;color:var(--muted)">当期开奖：' + actualNums.map(function(n){return pad(n);}).join(', ') + '</div>';
 
   for (var s = 0; s < results.length; s++) {
     var hits = results[s].filter(function(n){ return actualNums.indexOf(n) >= 0; });
@@ -5716,4 +5864,422 @@ function spinKL8Review() {
   html += '</div>';
 
   document.getElementById('kl8-review-analysis').innerHTML = html;
+}
+
+// ==================== 往期回溯验证模块 ====================
+
+// DLT多期回溯验证
+function runDLTBacktest() {
+  var historyStr = document.getElementById('dlt-history').value;
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var parts = lines[i].split('|');
+    var f = parseNums(parts[0]);
+    var b = parseNums(parts[1] || '');
+    if (f.length >= 5 && b.length >= 2) {
+      history.push({ front: f.slice(0,5).sort(function(a,b){return a-b}), back: b.slice(0,2).sort(function(a,b){return a-b}) });
+    }
+  }
+  if (history.length < 15) { alert('请至少输入15期历史数据进行回溯验证'); return; }
+
+  var periods = Math.min(10, history.length - 5);
+  var results = [];
+  var dimensionHits = { wf:0, mpScore:0, mkScore:0, zoneScore:0, neighborScore:0, diagonalScore:0, pairScore:0, hotColdAltScore:0, crossLotteryScore:0, coScore:0 };
+  var dimensionTotal = { wf:0, mpScore:0, mkScore:0, zoneScore:0, neighborScore:0, diagonalScore:0, pairScore:0, hotColdAltScore:0, crossLotteryScore:0, coScore:0 };
+
+  for (var p = 0; p < periods; p++) {
+    var actual = history[p];
+    var simHistory = history.slice(p+1, p+6);
+    var lastDraw = simHistory[0].front.concat(simHistory[0].back);
+    var hist = simHistory.slice(1).map(function(h){ return h.front.concat(h.back); });
+    var scores = scoreDLTNumbers_V3(lastDraw, hist);
+    var backScores = scoreDLTBlueNumbers_V3(lastDraw, hist);
+
+    var topFronts = scores.slice(0,10).map(function(s){return s.num;});
+    var topBacks = backScores.slice(0,3).map(function(s){return s.num;});
+
+    var frontHits = topFronts.filter(function(n){ return actual.front.indexOf(n) >= 0; });
+    var backHits = topBacks.filter(function(n){ return actual.back.indexOf(n) >= 0; });
+
+    results.push({
+      period: p + 1,
+      actualFront: actual.front,
+      actualBack: actual.back,
+      predictedFront: topFronts,
+      predictedBack: topBacks,
+      frontHits: frontHits,
+      backHits: backHits,
+      frontHitCount: frontHits.length,
+      backHitCount: backHits.length
+    });
+
+    // 统计命中号码的维度特征
+    frontHits.forEach(function(n){
+      for (var i = 0; i < scores.length; i++) {
+        if (scores[i].num === n) {
+          for (var dim in dimensionHits) {
+            if (scores[i][dim] !== undefined) {
+              dimensionHits[dim] += scores[i][dim];
+              dimensionTotal[dim]++;
+            }
+          }
+          break;
+        }
+      }
+    });
+  }
+
+  // 计算各维度平均命中得分
+  var dimAnalysis = {};
+  for (var dim in dimensionHits) {
+    dimAnalysis[dim] = dimensionTotal[dim] > 0 ? dimensionHits[dim] / dimensionTotal[dim] : 0;
+  }
+
+  // 生成HTML报告
+  var html = '<div style="padding:0.5rem">';
+
+  // 汇总统计
+  var totalFrontHits = results.reduce(function(s,r){return s+r.frontHitCount;},0);
+  var totalBackHits = results.reduce(function(s,r){return s+r.backHitCount;},0);
+  var avgFrontHit = (totalFrontHits / periods).toFixed(2);
+  var avgBackHit = (totalBackHits / periods).toFixed(2);
+
+  html += '<div style="margin-bottom:1rem;padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">回溯验证汇总（最近'+periods+'期）</div>';
+  html += '<div style="display:flex;gap:1rem;flex-wrap:wrap">';
+  html += '<div style="padding:0.5rem 1rem;background:var(--accent);color:#000;border-radius:6px;font-weight:bold">前区平均命中: '+avgFrontHit+'/5</div>';
+  html += '<div style="padding:0.5rem 1rem;background:var(--accent2);color:#fff;border-radius:6px;font-weight:bold">后区平均命中: '+avgBackHit+'/2</div>';
+  html += '<div style="padding:0.5rem 1rem;background:var(--accent3);color:#000;border-radius:6px;font-weight:bold">总命中率: '+((totalFrontHits+totalBackHits)/periods/7*100).toFixed(1)+'%</div>';
+  html += '</div></div>';
+
+  // 维度分析
+  html += '<div style="margin-bottom:1rem">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">命中号码维度特征分析</div>';
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
+  html += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule)">维度</th><th style="padding:6px;border:1px solid var(--rule)">命中平均得分</th><th style="padding:6px;border:1px solid var(--rule)">有效性</th></tr></thead><tbody>';
+  var dimNames = { wf:'频率', mpScore:'遗漏回补', mkScore:'马尔可夫', zoneScore:'区间', neighborScore:'邻号', diagonalScore:'斜连', pairScore:'连号', hotColdAltScore:'冷热交替', crossLotteryScore:'跨彩种', coScore:'共现' };
+  var sortedDims = Object.keys(dimAnalysis).sort(function(a,b){return dimAnalysis[b]-dimAnalysis[a];});
+  sortedDims.forEach(function(dim){
+    var val = dimAnalysis[dim];
+    var effective = val > 0.6 ? '高' : val > 0.4 ? '中' : '低';
+    var color = val > 0.6 ? 'var(--accent3)' : val > 0.4 ? 'var(--accent)' : 'var(--muted)';
+    html += '<tr><td style="padding:6px;border:1px solid var(--rule)">'+(dimNames[dim]||dim)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center">'+(val*100).toFixed(1)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:'+color+';font-weight:bold">'+effective+'</td></tr>';
+  });
+  html += '</tbody></table></div></div>';
+
+  // 每期详情
+  html += '<div style="margin-bottom:1rem">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">每期回测详情</div>';
+  results.forEach(function(r){
+    html += '<div style="margin-bottom:0.5rem;padding:0.6rem;background:var(--bg3);border-radius:6px;border:1px solid var(--rule);font-size:0.8rem">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    html += '<span>第'+r.period+'期</span>';
+    html += '<span style="color:var(--accent);font-weight:bold">前区命中'+r.frontHitCount+' 后区命中'+r.backHitCount+'</span>';
+    html += '</div>';
+    html += '<div style="margin-top:0.3rem;color:var(--muted)">实际: '+r.actualFront.map(function(n){return pad(n);}).join(',')+' | '+r.actualBack.map(function(n){return pad(n);}).join(',')+'</div>';
+    html += '<div style="color:var(--muted)">预测: '+r.predictedFront.map(function(n){return pad(n);}).join(',')+' | '+r.predictedBack.map(function(n){return pad(n);}).join(',')+'</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // 优化建议
+  html += '<div style="padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">下期推荐优化建议</div>';
+  var topDims = sortedDims.slice(0,3);
+  html += '<div style="font-size:0.8rem;color:var(--muted)">根据回溯验证，以下维度命中率最高，下期推荐将自动提升这些维度的权重：</div>';
+  html += '<div style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-wrap:wrap">';
+  topDims.forEach(function(dim){
+    html += '<span style="padding:0.3rem 0.6rem;background:var(--accent);color:#000;border-radius:4px;font-size:0.75rem;font-weight:bold">'+(dimNames[dim]||dim)+'</span>';
+  });
+  html += '</div></div>';
+
+  html += '</div>';
+
+  document.getElementById('dlt-backtest-results').innerHTML = html;
+
+  // 保存优化后的权重到localStorage
+  var w = getDLTAdaptiveWeights();
+  var adjusted = {};
+  for (var k in w) adjusted[k] = w[k];
+  sortedDims.forEach(function(dim, idx){
+    if (idx < 3) {
+      adjusted[dim] = Math.min(adjusted[dim] * 1.15, adjusted[dim] + 0.03);
+    } else if (dimAnalysis[dim] < 0.3) {
+      adjusted[dim] = Math.max(adjusted[dim] * 0.9, adjusted[dim] - 0.02);
+    }
+  });
+  var sumExCo = 0;
+  for (var k in adjusted) { if (k !== 'coScore') sumExCo += adjusted[k]; }
+  if (sumExCo > 0) {
+    var target = 1.0 - adjusted.coScore;
+    for (var k in adjusted) { if (k !== 'coScore') adjusted[k] = adjusted[k] / sumExCo * target; }
+  }
+  try {
+    localStorage.setItem('dlt_adaptive_weights', JSON.stringify(adjusted));
+    console.log('DLT回溯验证权重已优化:', adjusted);
+  } catch(e) {}
+}
+
+// SSQ多期回溯验证
+function runSSQBacktest() {
+  var historyStr = document.getElementById('ssq-history').value;
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var parts = lines[i].split('|');
+    var r = parseNums(parts[0]);
+    var b = parseNums(parts[1] || '');
+    if (r.length >= 6 && b.length >= 1) {
+      history.push({ red: r.slice(0,6).sort(function(a,b){return a-b}), blue: b[0] });
+    }
+  }
+  if (history.length < 15) { alert('请至少输入15期历史数据进行回溯验证'); return; }
+
+  var periods = Math.min(10, history.length - 5);
+  var results = [];
+  var dimensionHits = { wf:0, mpScore:0, mkScore:0, zoneScore:0, neighborScore:0, pairScore:0, hcScore:0, coScore:0 };
+  var dimensionTotal = { wf:0, mpScore:0, mkScore:0, zoneScore:0, neighborScore:0, pairScore:0, hcScore:0, coScore:0 };
+
+  for (var p = 0; p < periods; p++) {
+    var actual = history[p];
+    var simHistory = history.slice(p+1, p+6);
+    var lastDraw = simHistory[0].red.concat([simHistory[0].blue]);
+    var simReds = simHistory.slice(1).map(function(h){ return h.red; });
+    var scores = scoreSSQNumbers(lastDraw, simReds);
+
+    var topReds = scores.slice(0,10).map(function(s){return s.num;});
+    var redHits = topReds.filter(function(n){ return actual.red.indexOf(n) >= 0; });
+
+    results.push({
+      period: p + 1,
+      actualRed: actual.red,
+      actualBlue: actual.blue,
+      predictedRed: topReds,
+      redHits: redHits,
+      redHitCount: redHits.length
+    });
+
+    redHits.forEach(function(n){
+      for (var i = 0; i < scores.length; i++) {
+        if (scores[i].num === n) {
+          for (var dim in dimensionHits) {
+            if (scores[i][dim] !== undefined) {
+              dimensionHits[dim] += scores[i][dim];
+              dimensionTotal[dim]++;
+            }
+          }
+          break;
+        }
+      }
+    });
+  }
+
+  var dimAnalysis = {};
+  for (var dim in dimensionHits) {
+    dimAnalysis[dim] = dimensionTotal[dim] > 0 ? dimensionHits[dim] / dimensionTotal[dim] : 0;
+  }
+
+  var html = '<div style="padding:0.5rem">';
+  var totalRedHits = results.reduce(function(s,r){return s+r.redHitCount;},0);
+  var avgRedHit = (totalRedHits / periods).toFixed(2);
+
+  html += '<div style="margin-bottom:1rem;padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">回溯验证汇总（最近'+periods+'期）</div>';
+  html += '<div style="display:flex;gap:1rem;flex-wrap:wrap">';
+  html += '<div style="padding:0.5rem 1rem;background:var(--accent);color:#000;border-radius:6px;font-weight:bold">红球平均命中: '+avgRedHit+'/6</div>';
+  html += '<div style="padding:0.5rem 1rem;background:var(--accent3);color:#000;border-radius:6px;font-weight:bold">命中率: '+(totalRedHits/periods/6*100).toFixed(1)+'%</div>';
+  html += '</div></div>';
+
+  html += '<div style="margin-bottom:1rem">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">命中号码维度特征分析</div>';
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
+  html += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule)">维度</th><th style="padding:6px;border:1px solid var(--rule)">命中平均得分</th><th style="padding:6px;border:1px solid var(--rule)">有效性</th></tr></thead><tbody>';
+  var dimNames = { wf:'频率', mpScore:'遗漏回补', mkScore:'马尔可夫', zoneScore:'区间', neighborScore:'邻号', pairScore:'连号', hcScore:'冷热', coScore:'共现' };
+  var sortedDims = Object.keys(dimAnalysis).sort(function(a,b){return dimAnalysis[b]-dimAnalysis[a];});
+  sortedDims.forEach(function(dim){
+    var val = dimAnalysis[dim];
+    var effective = val > 0.6 ? '高' : val > 0.4 ? '中' : '低';
+    var color = val > 0.6 ? 'var(--accent3)' : val > 0.4 ? 'var(--accent)' : 'var(--muted)';
+    html += '<tr><td style="padding:6px;border:1px solid var(--rule)">'+(dimNames[dim]||dim)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center">'+(val*100).toFixed(1)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:'+color+';font-weight:bold">'+effective+'</td></tr>';
+  });
+  html += '</tbody></table></div></div>';
+
+  html += '<div style="margin-bottom:1rem">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">每期回测详情</div>';
+  results.forEach(function(r){
+    html += '<div style="margin-bottom:0.5rem;padding:0.6rem;background:var(--bg3);border-radius:6px;border:1px solid var(--rule);font-size:0.8rem">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    html += '<span>第'+r.period+'期</span>';
+    html += '<span style="color:var(--accent);font-weight:bold">红球命中'+r.redHitCount+'</span>';
+    html += '</div>';
+    html += '<div style="margin-top:0.3rem;color:var(--muted)">实际: '+r.actualRed.map(function(n){return pad(n);}).join(',')+' + '+pad(r.actualBlue)+'</div>';
+    html += '<div style="color:var(--muted)">预测: '+r.predictedRed.map(function(n){return pad(n);}).join(',')+'</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  html += '<div style="padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">下期推荐优化建议</div>';
+  var topDims = sortedDims.slice(0,3);
+  html += '<div style="font-size:0.8rem;color:var(--muted)">根据回溯验证，以下维度命中率最高，下期推荐将自动提升这些维度的权重：</div>';
+  html += '<div style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-wrap:wrap">';
+  topDims.forEach(function(dim){
+    html += '<span style="padding:0.3rem 0.6rem;background:var(--accent);color:#000;border-radius:4px;font-size:0.75rem;font-weight:bold">'+(dimNames[dim]||dim)+'</span>';
+  });
+  html += '</div></div>';
+
+  html += '</div>';
+  document.getElementById('ssq-backtest-results').innerHTML = html;
+
+  var w = getSSQAdaptiveWeights();
+  var adjusted = {};
+  for (var k in w) adjusted[k] = w[k];
+  sortedDims.forEach(function(dim, idx){
+    if (idx < 3) {
+      adjusted[dim] = Math.min(adjusted[dim] * 1.15, adjusted[dim] + 0.03);
+    } else if (dimAnalysis[dim] < 0.3) {
+      adjusted[dim] = Math.max(adjusted[dim] * 0.9, adjusted[dim] - 0.02);
+    }
+  });
+  var sumExCo = 0;
+  for (var k in adjusted) { if (k !== 'coScore') sumExCo += adjusted[k]; }
+  if (sumExCo > 0) {
+    var target = 1.0 - adjusted.coScore;
+    for (var k in adjusted) { if (k !== 'coScore') adjusted[k] = adjusted[k] / sumExCo * target; }
+  }
+  try {
+    localStorage.setItem('ssq_adaptive_weights', JSON.stringify(adjusted));
+    console.log('SSQ回溯验证权重已优化:', adjusted);
+  } catch(e) {}
+}
+
+// KL8多期回溯验证
+function runKL8Backtest() {
+  var historyStr = document.getElementById('kl8-history').value;
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var nums = parseNums(lines[i]);
+    if (nums.length >= 10) history.push(nums.slice(0,20).sort(function(a,b){return a-b;}));
+  }
+  if (history.length < 15) { alert('请至少输入15期历史数据进行回溯验证'); return; }
+
+  var periods = Math.min(10, history.length - 5);
+  var results = [];
+  var dimensionHits = { wf:0, mpScore:0, mkScore:0, zoneScore:0, neighborScore:0, oddEvenScore:0, bigSmallScore:0, lastMissScore:0 };
+  var dimensionTotal = { wf:0, mpScore:0, mkScore:0, zoneScore:0, neighborScore:0, oddEvenScore:0, bigSmallScore:0, lastMissScore:0 };
+
+  for (var p = 0; p < periods; p++) {
+    var actual = history[p];
+    var simHistory = history.slice(p+1, p+6);
+    var last = simHistory[0];
+    var scores = scoreKL8Numbers(last, simHistory.slice(1));
+    var topNums = scores.slice(0,20).map(function(s){return s.num;});
+    var hits = topNums.filter(function(n){ return actual.indexOf(n) >= 0; });
+
+    results.push({
+      period: p + 1,
+      actual: actual,
+      predicted: topNums,
+      hits: hits,
+      hitCount: hits.length
+    });
+
+    hits.forEach(function(n){
+      for (var i = 0; i < scores.length; i++) {
+        if (scores[i].num === n) {
+          for (var dim in dimensionHits) {
+            if (scores[i][dim] !== undefined) {
+              dimensionHits[dim] += scores[i][dim];
+              dimensionTotal[dim]++;
+            }
+          }
+          break;
+        }
+      }
+    });
+  }
+
+  var dimAnalysis = {};
+  for (var dim in dimensionHits) {
+    dimAnalysis[dim] = dimensionTotal[dim] > 0 ? dimensionHits[dim] / dimensionTotal[dim] : 0;
+  }
+
+  var html = '<div style="padding:0.5rem">';
+  var totalHits = results.reduce(function(s,r){return s+r.hitCount;},0);
+  var avgHit = (totalHits / periods).toFixed(2);
+
+  html += '<div style="margin-bottom:1rem;padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">回溯验证汇总（最近'+periods+'期）</div>';
+  html += '<div style="display:flex;gap:1rem;flex-wrap:wrap">';
+  html += '<div style="padding:0.5rem 1rem;background:var(--accent);color:#000;border-radius:6px;font-weight:bold">平均命中: '+avgHit+'/20</div>';
+  html += '<div style="padding:0.5rem 1rem;background:var(--accent3);color:#000;border-radius:6px;font-weight:bold">命中率: '+(totalHits/periods/20*100).toFixed(1)+'%</div>';
+  html += '</div></div>';
+
+  html += '<div style="margin-bottom:1rem">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">命中号码维度特征分析</div>';
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
+  html += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule)">维度</th><th style="padding:6px;border:1px solid var(--rule)">命中平均得分</th><th style="padding:6px;border:1px solid var(--rule)">有效性</th></tr></thead><tbody>';
+  var dimNames = { wf:'频率', mpScore:'遗漏回补', mkScore:'马尔可夫', zoneScore:'区间', neighborScore:'邻号', oddEvenScore:'奇偶', bigSmallScore:'大小', lastMissScore:'遗漏' };
+  var sortedDims = Object.keys(dimAnalysis).sort(function(a,b){return dimAnalysis[b]-dimAnalysis[a];});
+  sortedDims.forEach(function(dim){
+    var val = dimAnalysis[dim];
+    var effective = val > 0.6 ? '高' : val > 0.4 ? '中' : '低';
+    var color = val > 0.6 ? 'var(--accent3)' : val > 0.4 ? 'var(--accent)' : 'var(--muted)';
+    html += '<tr><td style="padding:6px;border:1px solid var(--rule)">'+(dimNames[dim]||dim)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center">'+(val*100).toFixed(1)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:'+color+';font-weight:bold">'+effective+'</td></tr>';
+  });
+  html += '</tbody></table></div></div>';
+
+  html += '<div style="margin-bottom:1rem">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">每期回测详情</div>';
+  results.forEach(function(r){
+    html += '<div style="margin-bottom:0.5rem;padding:0.6rem;background:var(--bg3);border-radius:6px;border:1px solid var(--rule);font-size:0.8rem">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    html += '<span>第'+r.period+'期</span>';
+    html += '<span style="color:var(--accent);font-weight:bold">命中'+r.hitCount+'/20</span>';
+    html += '</div>';
+    html += '<div style="margin-top:0.3rem;color:var(--muted)">命中: '+r.hits.map(function(n){return pad(n);}).join(',')+'</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  html += '<div style="padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">下期推荐优化建议</div>';
+  var topDims = sortedDims.slice(0,3);
+  html += '<div style="font-size:0.8rem;color:var(--muted)">根据回溯验证，以下维度命中率最高，下期推荐将自动提升这些维度的权重：</div>';
+  html += '<div style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-wrap:wrap">';
+  topDims.forEach(function(dim){
+    html += '<span style="padding:0.3rem 0.6rem;background:var(--accent);color:#000;border-radius:4px;font-size:0.75rem;font-weight:bold">'+(dimNames[dim]||dim)+'</span>';
+  });
+  html += '</div></div>';
+
+  html += '</div>';
+  document.getElementById('kl8-backtest-results').innerHTML = html;
+
+  var w = getKL8AdaptiveWeights();
+  var adjusted = {};
+  for (var k in w) adjusted[k] = w[k];
+  sortedDims.forEach(function(dim, idx){
+    if (idx < 3) {
+      adjusted[dim] = Math.min(adjusted[dim] * 1.15, adjusted[dim] + 0.03);
+    } else if (dimAnalysis[dim] < 0.3) {
+      adjusted[dim] = Math.max(adjusted[dim] * 0.9, adjusted[dim] - 0.02);
+    }
+  });
+  var sumAll = 0;
+  for (var k in adjusted) sumAll += adjusted[k];
+  if (sumAll > 0) {
+    for (var k in adjusted) adjusted[k] = adjusted[k] / sumAll;
+  }
+  try {
+    localStorage.setItem('kl8_adaptive_weights', JSON.stringify(adjusted));
+    console.log('KL8回溯验证权重已优化:', adjusted);
+  } catch(e) {}
 }

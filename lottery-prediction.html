@@ -740,6 +740,9 @@ tr:hover td { background: var(--bg3); }
     <div class="dlt-layout">
       <!-- 左侧导航 -->
       <div class="dlt-sidebar" id="dlt-sidebar">
+        <button class="dlt-sidebar-btn" onclick="switchDLTTab('dlt-tab0', this)">
+          <span class="badge-sm" style="background:var(--accent4);color:#fff">0</span>往期回溯验证
+        </button>
         <button class="dlt-sidebar-btn active" onclick="switchDLTTab('tab1', this)">
           <span class="badge-sm" style="background:var(--accent4);color:#fff">1</span>常规冷热号分析
         </button>
@@ -762,6 +765,20 @@ tr:hover td { background: var(--bg3); }
 
       <!-- 右侧内容 -->
       <div class="dlt-content">
+        <!-- Tab 0: 往期回溯验证 -->
+        <div class="dlt-tab" id="dlt-tab0">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128200;</span> 往期开奖回溯验证</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              使用历史数据对最近10期进行模拟回测，验证各策略的命中表现，并基于回测结果优化下期推荐权重。
+            </div>
+            <div style="text-align:center;margin:1rem 0">
+              <button class="btn btn-primary" onclick="runDLTBacktest()">开始回溯验证</button>
+            </div>
+            <div id="dlt-backtest-results"></div>
+          </div>
+        </div>
+
         <!-- Tab 1: 常规冷热号分析 -->
         <div class="dlt-tab active" id="tab1">
           <div class="card">
@@ -892,6 +909,9 @@ tr:hover td { background: var(--bg3); }
   <div id="ssq-results" style="display:none">
     <div class="dlt-layout">
       <div class="dlt-sidebar" id="ssq-sidebar">
+        <button class="dlt-sidebar-btn" onclick="switchSSQTab('ssq-tab0', this)">
+          <span class="badge-sm" style="background:var(--accent4);color:#fff">0</span>往期回溯验证
+        </button>
         <button class="dlt-sidebar-btn active" onclick="switchSSQTab('ssq-tab1', this)">
           <span class="badge-sm" style="background:var(--accent4);color:#fff">1</span>常规冷热号分析
         </button>
@@ -913,6 +933,20 @@ tr:hover td { background: var(--bg3); }
       </div>
 
       <div class="dlt-content">
+        <!-- Tab 0: 往期回溯验证 -->
+        <div class="dlt-tab" id="ssq-tab0">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128200;</span> 往期开奖回溯验证</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              使用历史数据对最近10期进行模拟回测，验证各策略的命中表现，并基于回测结果优化下期推荐权重。
+            </div>
+            <div style="text-align:center;margin:1rem 0">
+              <button class="btn btn-primary" onclick="runSSQBacktest()">开始回溯验证</button>
+            </div>
+            <div id="ssq-backtest-results"></div>
+          </div>
+        </div>
+
         <!-- Tab 1 -->
         <div class="dlt-tab active" id="ssq-tab1">
           <div class="card">
@@ -1052,6 +1086,9 @@ tr:hover td { background: var(--bg3); }
   <div id="kl8-results" style="display:none">
     <div class="dlt-layout">
       <div class="dlt-sidebar" id="kl8-sidebar">
+        <button class="dlt-sidebar-btn" onclick="switchKL8Tab('kl8-tab0', this)">
+          <span class="badge-sm" style="background:var(--accent4);color:#fff">0</span>往期回溯验证
+        </button>
         <button class="dlt-sidebar-btn active" onclick="switchKL8Tab('kl8-tab1', this)">
           <span class="badge-sm" style="background:var(--accent4);color:#fff">1</span>常规冷热号分析
         </button>
@@ -1073,6 +1110,20 @@ tr:hover td { background: var(--bg3); }
       </div>
 
       <div class="dlt-content">
+        <!-- Tab 0: 往期回溯验证 -->
+        <div class="dlt-tab" id="kl8-tab0">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128200;</span> 往期开奖回溯验证</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              使用历史数据对最近10期进行模拟回测，验证各策略的命中表现，并基于回测结果优化下期推荐权重。
+            </div>
+            <div style="text-align:center;margin:1rem 0">
+              <button class="btn btn-primary" onclick="runKL8Backtest()">开始回溯验证</button>
+            </div>
+            <div id="kl8-backtest-results"></div>
+          </div>
+        </div>
+
         <!-- Tab 1: 常规冷热号分析 -->
         <div class="dlt-tab active" id="kl8-tab1">
           <div class="card">
@@ -1228,6 +1279,9 @@ tr:hover td { background: var(--bg3); }
   <div id="pl3-results" style="display:none">
     <div class="dlt-layout">
       <div class="dlt-sidebar" id="pl3-sidebar">
+        <button class="dlt-sidebar-btn" onclick="switchPL3Tab('pl3-tab0', this)">
+          <span class="badge-sm" style="background:var(--accent4);color:#fff">0</span>往期回溯验证
+        </button>
         <button class="dlt-sidebar-btn active" onclick="switchPL3Tab('pl3-tab1', this)">
           <span class="badge-sm" style="background:var(--accent4);color:#fff">1</span>常规冷热号分析
         </button>
@@ -1246,6 +1300,20 @@ tr:hover td { background: var(--bg3); }
       </div>
 
       <div class="dlt-content">
+        <!-- Tab 0: 往期回溯验证 -->
+        <div class="dlt-tab" id="pl3-tab0">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128200;</span> 往期开奖回溯验证</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              使用历史数据对最近10期进行模拟回测，验证各策略的命中表现，并基于回测结果优化下期推荐权重。
+            </div>
+            <div style="text-align:center;margin:1rem 0">
+              <button class="btn btn-primary" onclick="runPL3Backtest()">开始回溯验证</button>
+            </div>
+            <div id="pl3-backtest-results"></div>
+          </div>
+        </div>
+
         <!-- Tab 1 -->
         <div class="dlt-tab active" id="pl3-tab1">
           <div class="card">
@@ -1388,6 +1456,9 @@ tr:hover td { background: var(--bg3); }
   <div id="pl5-results" style="display:none">
     <div class="dlt-layout">
       <div class="dlt-sidebar" id="pl5-sidebar">
+        <button class="dlt-sidebar-btn" onclick="switchPL5Tab('pl5-tab0', this)">
+          <span class="badge-sm" style="background:var(--accent4);color:#fff">0</span>往期回溯验证
+        </button>
         <button class="dlt-sidebar-btn active" onclick="switchPL5Tab('pl5-tab1', this)">
           <span class="badge-sm" style="background:var(--accent4);color:#fff">1</span>常规冷热号分析
         </button>
@@ -1406,6 +1477,20 @@ tr:hover td { background: var(--bg3); }
       </div>
 
       <div class="dlt-content">
+        <!-- Tab 0: 往期回溯验证 -->
+        <div class="dlt-tab" id="pl5-tab0">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128200;</span> 往期开奖回溯验证</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              使用历史数据对最近10期进行模拟回测，验证各策略的命中表现，并基于回测结果优化下期推荐权重。
+            </div>
+            <div style="text-align:center;margin:1rem 0">
+              <button class="btn btn-primary" onclick="runPL5Backtest()">开始回溯验证</button>
+            </div>
+            <div id="pl5-backtest-results"></div>
+          </div>
+        </div>
+
         <!-- Tab 1 -->
         <div class="dlt-tab active" id="pl5-tab1">
           <div class="card">
@@ -1524,10 +1609,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026070713"></script>
-<script src="assets/pl-data.js?v=2026070713"></script>
-<script src="assets/pl-engine.js?v=2026070714"></script>
-<script src="assets/auto-review.js?v=2026070713"></script>
+<script src="assets/engine.js?v=2026070723"></script>
+<script src="assets/pl-data.js?v=2026070723"></script>
+<script src="assets/pl-engine.js?v=2026070723"></script>
+<script src="assets/auto-review.js?v=2026070723"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)
@@ -1544,7 +1629,7 @@ window.addEventListener('DOMContentLoaded', function() {
 <script>
 function switchDLTTab(tabId, btn) {
   document.querySelectorAll('#dlt-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('.dlt-tab').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('#dlt-tab0, #tab1, #tab2, #tab3, #tab4, #tab5, #tab6').forEach(function(t){ t.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   var tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');
@@ -1554,7 +1639,7 @@ function switchDLTTab(tabId, btn) {
 <script>
 function switchSSQTab(tabId, btn) {
   document.querySelectorAll('#ssq-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('#ssq-tab1, #ssq-tab2, #ssq-tab3, #ssq-tab4, #ssq-tab5, #ssq-tab6').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('#ssq-tab0, #ssq-tab1, #ssq-tab2, #ssq-tab3, #ssq-tab4, #ssq-tab5, #ssq-tab6').forEach(function(t){ t.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   var tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');
@@ -1562,21 +1647,21 @@ function switchSSQTab(tabId, btn) {
 
 function switchKL8Tab(tabId, btn) {
   document.querySelectorAll('#kl8-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('#kl8-tab1, #kl8-tab2, #kl8-tab3, #kl8-tab4, #kl8-tab5, #kl8-tab6').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('#kl8-tab0, #kl8-tab1, #kl8-tab2, #kl8-tab3, #kl8-tab4, #kl8-tab5, #kl8-tab6').forEach(function(t){ t.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   var tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');
 }
 function switchPL3Tab(tabId, btn) {
   document.querySelectorAll('#pl3-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('#pl3-tab1, #pl3-tab2, #pl3-tab3, #pl3-tab4, #pl3-tab5').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('#pl3-tab0, #pl3-tab1, #pl3-tab2, #pl3-tab3, #pl3-tab4, #pl3-tab5').forEach(function(t){ t.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   var tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');
 }
 function switchPL5Tab(tabId, btn) {
   document.querySelectorAll('#pl5-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('#pl5-tab1, #pl5-tab2, #pl5-tab3, #pl5-tab4, #pl5-tab5').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('#pl5-tab0, #pl5-tab1, #pl5-tab2, #pl5-tab3, #pl5-tab4, #pl5-tab5').forEach(function(t){ t.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   var tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');

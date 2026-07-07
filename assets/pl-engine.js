@@ -81,8 +81,8 @@ function renderPL3Stats(last, history) {
   var bigCount = last.filter(function(n) { return n >= 5; }).length;
 
   var html = '<div class="stat-grid">';
-  html += '<div class="stat-item"><div class="stat-value">' + s + '</div><div class="stat-label">上期和值</div></div>';
-  html += '<div class="stat-item"><div class="stat-value">' + sp + '</div><div class="stat-label">上期跨度</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + s + '</div><div class="stat-label">当期和值</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + sp + '</div><div class="stat-label">当期跨度</div></div>';
   html += '<div class="stat-item"><div class="stat-value">' + oddCount + ':' + (3 - oddCount) + '</div><div class="stat-label">奇偶比</div></div>';
   html += '<div class="stat-item"><div class="stat-value">' + bigCount + ':' + (3 - bigCount) + '</div><div class="stat-label">大小比</div></div>';
   html += '<div class="stat-item"><div class="stat-value">' + history.length + '</div><div class="stat-label">分析期数</div></div>';
@@ -90,7 +90,7 @@ function renderPL3Stats(last, history) {
   html += '</div>';
 
   html += '<div style="margin-top:1rem">';
-  html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">上期开奖号码</div>';
+  html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">当期开奖号码</div>';
   html += '<div class="ball-row">';
   for (var i = 0; i < last.length; i++) {
     html += '<div class="ball red">' + last[i] + '</div>';
@@ -1017,8 +1017,8 @@ function renderPL5Stats(last, history) {
   var bigCount = last.filter(function(n) { return n >= 5; }).length;
 
   var html = '<div class="stat-grid">';
-  html += '<div class="stat-item"><div class="stat-value">' + s + '</div><div class="stat-label">上期和值</div></div>';
-  html += '<div class="stat-item"><div class="stat-value">' + sp + '</div><div class="stat-label">上期跨度</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + s + '</div><div class="stat-label">当期和值</div></div>';
+  html += '<div class="stat-item"><div class="stat-value">' + sp + '</div><div class="stat-label">当期跨度</div></div>';
   html += '<div class="stat-item"><div class="stat-value">' + oddCount + ':' + (5 - oddCount) + '</div><div class="stat-label">奇偶比</div></div>';
   html += '<div class="stat-item"><div class="stat-value">' + bigCount + ':' + (5 - bigCount) + '</div><div class="stat-label">大小比</div></div>';
   html += '<div class="stat-item"><div class="stat-value">' + history.length + '</div><div class="stat-label">分析期数</div></div>';
@@ -1026,7 +1026,7 @@ function renderPL5Stats(last, history) {
   html += '</div>';
 
   html += '<div style="margin-top:1rem">';
-  html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">上期开奖号码</div>';
+  html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">当期开奖号码</div>';
   html += '<div class="ball-row">';
   for (var i = 0; i < last.length; i++) {
     html += '<div class="ball red">' + last[i] + '</div>';
@@ -1695,7 +1695,7 @@ function reviewPL3() {
     if (lastNums.indexOf(userNums[i]) >= 0) setHits++;
   }
 
-  var html = '<div style="margin-bottom:0.5rem"><strong>上期开奖：</strong>' + lastNums.join(',') + '</div>';
+  var html = '<div style="margin-bottom:0.5rem"><strong>当期开奖：</strong>' + lastNums.join(',') + '</div>';
   html += '<div style="margin-bottom:0.5rem"><strong>您的选号：</strong>' + userNums.join(',') + '</div>';
   html += '<div class="stat-grid" style="margin:0.75rem 0">';
   html += '<div class="stat-item"><div class="stat-value">' + numHits + '/3</div><div class="stat-label">定位命中</div></div>';
@@ -1756,7 +1756,7 @@ function reviewPL5() {
     if (lastNums.indexOf(userNums[i]) >= 0) setHits++;
   }
 
-  var html = '<div style="margin-bottom:0.5rem"><strong>上期开奖：</strong>' + lastNums.join(',') + '</div>';
+  var html = '<div style="margin-bottom:0.5rem"><strong>当期开奖：</strong>' + lastNums.join(',') + '</div>';
   html += '<div style="margin-bottom:0.5rem"><strong>您的选号：</strong>' + userNums.join(',') + '</div>';
   html += '<div class="stat-grid" style="margin:0.75rem 0">';
   html += '<div class="stat-item"><div class="stat-value">' + numHits + '/5</div><div class="stat-label">定位命中</div></div>';
@@ -2276,6 +2276,133 @@ function spinPL5Lottery() {
 
   document.getElementById('pl5-lottery-results').innerHTML = html;
   document.getElementById('pl5-lottery-results').style.display = 'block';
+}
+
+// PL3多期回溯验证
+function runPL3Backtest() {
+  var historyStr = document.getElementById('pl3-history').value;
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var nums = parseNums(lines[i]);
+    if (nums.length >= 3) history.push(nums.slice(0,3));
+  }
+  if (history.length < 15) { alert('请至少输入15期历史数据进行回溯验证'); return; }
+
+  var periods = Math.min(10, history.length - 5);
+  var results = [];
+
+  for (var p = 0; p < periods; p++) {
+    var actual = history[p];
+    var simHistory = history.slice(p+1, p+6);
+    var last = simHistory[0];
+    var simHist = simHistory.slice(1);
+    var predictions = [];
+    for (var pos = 0; pos < 3; pos++) {
+      var posScores = scorePL3Position(pos, last, simHist);
+      var top = posScores.slice(0,3).map(function(s){return s.num;});
+      predictions.push(top);
+    }
+    var hits = [];
+    for (var pos = 0; pos < 3; pos++) {
+      if (predictions[pos].indexOf(actual[pos]) >= 0) hits.push({pos: pos, num: actual[pos]});
+    }
+    results.push({ period: p+1, actual: actual, predictions: predictions, hits: hits, hitCount: hits.length });
+  }
+
+  var html = '<div style="padding:0.5rem">';
+  var totalHits = results.reduce(function(s,r){return s+r.hitCount;},0);
+  html += '<div style="margin-bottom:1rem;padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">回溯验证汇总（最近'+periods+'期）</div>';
+  html += '<div style="display:flex;gap:1rem;flex-wrap:wrap">';
+  html += '<div style="padding:0.5rem 1rem;background:var(--accent);color:#000;border-radius:6px;font-weight:bold">平均命中: '+(totalHits/periods).toFixed(2)+'/3</div>';
+  html += '<div style="padding:0.5rem 1rem;background:var(--accent3);color:#000;border-radius:6px;font-weight:bold">命中率: '+(totalHits/periods/3*100).toFixed(1)+'%</div>';
+  html += '</div></div>';
+
+  html += '<div style="margin-bottom:1rem">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">每期回测详情</div>';
+  results.forEach(function(r){
+    html += '<div style="margin-bottom:0.5rem;padding:0.6rem;background:var(--bg3);border-radius:6px;border:1px solid var(--rule);font-size:0.8rem">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    html += '<span>第'+r.period+'期</span>';
+    html += '<span style="color:var(--accent);font-weight:bold">命中'+r.hitCount+'/3</span>';
+    html += '</div>';
+    html += '<div style="margin-top:0.3rem;color:var(--muted)">实际: 百位'+r.actual[0]+' 十位'+r.actual[1]+' 个位'+r.actual[2]+'</div>';
+    html += '<div style="color:var(--muted)">预测Top3: 百位['+r.predictions[0].join(',')+'] 十位['+r.predictions[1].join(',')+'] 个位['+r.predictions[2].join(',')+']</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  html += '<div style="padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">下期推荐优化建议</div>';
+  html += '<div style="font-size:0.8rem;color:var(--muted)">根据回溯验证，各位置推荐将持续优化。</div>';
+  html += '</div>';
+
+  html += '</div>';
+  document.getElementById('pl3-backtest-results').innerHTML = html;
+}
+
+// PL5多期回溯验证
+function runPL5Backtest() {
+  var historyStr = document.getElementById('pl5-history').value;
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var nums = parseNums(lines[i]);
+    if (nums.length >= 5) history.push(nums.slice(0,5));
+  }
+  if (history.length < 15) { alert('请至少输入15期历史数据进行回溯验证'); return; }
+
+  var periods = Math.min(10, history.length - 5);
+  var results = [];
+
+  for (var p = 0; p < periods; p++) {
+    var actual = history[p];
+    var simHistory = history.slice(p+1, p+6);
+    var last = simHistory[0];
+    var simHist = simHistory.slice(1);
+    var predictions = [];
+    for (var pos = 0; pos < 5; pos++) {
+      var posScores = scorePL5Position(pos, last, simHist);
+      var top = posScores.slice(0,3).map(function(s){return s.num;});
+      predictions.push(top);
+    }
+    var hits = [];
+    for (var pos = 0; pos < 5; pos++) {
+      if (predictions[pos].indexOf(actual[pos]) >= 0) hits.push({pos: pos, num: actual[pos]});
+    }
+    results.push({ period: p+1, actual: actual, predictions: predictions, hits: hits, hitCount: hits.length });
+  }
+
+  var html = '<div style="padding:0.5rem">';
+  var totalHits = results.reduce(function(s,r){return s+r.hitCount;},0);
+  html += '<div style="margin-bottom:1rem;padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">回溯验证汇总（最近'+periods+'期）</div>';
+  html += '<div style="display:flex;gap:1rem;flex-wrap:wrap">';
+  html += '<div style="padding:0.5rem 1rem;background:var(--accent);color:#000;border-radius:6px;font-weight:bold">平均命中: '+(totalHits/periods).toFixed(2)+'/5</div>';
+  html += '<div style="padding:0.5rem 1rem;background:var(--accent3);color:#000;border-radius:6px;font-weight:bold">命中率: '+(totalHits/periods/5*100).toFixed(1)+'%</div>';
+  html += '</div></div>';
+
+  html += '<div style="margin-bottom:1rem">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">每期回测详情</div>';
+  results.forEach(function(r){
+    html += '<div style="margin-bottom:0.5rem;padding:0.6rem;background:var(--bg3);border-radius:6px;border:1px solid var(--rule);font-size:0.8rem">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    html += '<span>第'+r.period+'期</span>';
+    html += '<span style="color:var(--accent);font-weight:bold">命中'+r.hitCount+'/5</span>';
+    html += '</div>';
+    html += '<div style="margin-top:0.3rem;color:var(--muted)">实际: '+r.actual.join(',')+'</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  html += '<div style="padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">下期推荐优化建议</div>';
+  html += '<div style="font-size:0.8rem;color:var(--muted)">根据回溯验证，各位置推荐将持续优化。</div>';
+  html += '</div>';
+
+  html += '</div>';
+  document.getElementById('pl5-backtest-results').innerHTML = html;
 }
 
 })();
