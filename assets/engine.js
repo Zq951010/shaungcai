@@ -3510,6 +3510,84 @@ function runKL8AutoReview(history) {
 }
 
 
+function generateKL8Picks_V2(scores, history, playType) {
+  // V2全玩法推荐策略（与综合推荐完全一致的选号逻辑）
+  function genStrategy1(pt) {
+    var picks = [];
+    var used = {};
+    var zoneLimits = [Math.ceil(pt/2), Math.ceil(pt/2), Math.ceil(pt/2), Math.ceil(pt/2)];
+    var zoneCounts = [0,0,0,0];
+    for (var i=0;i<scores.length && picks.length<pt;i++) {
+      var n = scores[i].num;
+      var z = n<=20?0:n<=40?1:n<=60?2:3;
+      if (zoneCounts[z] < zoneLimits[z]) {
+        picks.push(n);
+        used[n] = true;
+        zoneCounts[z]++;
+      }
+    }
+    for (var i=0;i<scores.length && picks.length<pt;i++) {
+      if (!used[scores[i].num]) {
+        picks.push(scores[i].num);
+        used[scores[i].num] = true;
+      }
+    }
+    picks.sort(function(a,b){return a-b;});
+    return picks;
+  }
+
+  function genStrategy2(pt) {
+    var cold = scores.slice().sort(function(a,b){
+      var aCold = a.lastMissScore * 0.6 + a.mp * 0.4;
+      var bCold = b.lastMissScore * 0.6 + b.mp * 0.4;
+      return bCold - aCold;
+    }).slice(0, 12).map(function(s){return s.num;});
+    var hot = scores.slice(0, 6).map(function(s){return s.num;});
+    var hotCount = Math.ceil(pt * 0.3);
+    var picks = cold.slice(0, pt - hotCount).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0, hotCount));
+    var unique = [];
+    for (var i=0;i<picks.length && unique.length<pt;i++) if (unique.indexOf(picks[i])<0) unique.push(picks[i]);
+    for (var i=0;i<scores.length && unique.length<pt;i++) {
+      if (unique.indexOf(scores[i].num)<0) unique.push(scores[i].num);
+    }
+    unique.sort(function(a,b){return a-b;});
+    return unique;
+  }
+
+  function genStrategy3(pt) {
+    var cycleSorted = scores.slice().sort(function(a,b){
+      var ca = cycleAnalysis(a.num, history);
+      var cb = cycleAnalysis(b.num, history);
+      return cb.score - ca.score || b.mkScore - a.mkScore;
+    });
+    var picks = cycleSorted.slice(0, pt).map(function(s){return s.num;});
+    picks.sort(function(a,b){return a-b;});
+    return picks;
+  }
+
+  function genStrategy4(pt) {
+    var neighborSorted = scores.slice().sort(function(a,b){return b.neighborScore - a.neighborScore || b.totalScore - a.totalScore;});
+    var picks = [];
+    var used = {};
+    for (var i = 0; i < neighborSorted.length && picks.length < pt; i++) {
+      var n = neighborSorted[i].num;
+      if (!used[n]) {
+        picks.push(n);
+        used[n] = true;
+      }
+    }
+    picks.sort(function(a,b){return a-b;});
+    return picks;
+  }
+
+  return [
+    {name:'区间均衡+热号', picks:genStrategy1(playType)},
+    {name:'冷号优先+遗漏', picks:genStrategy2(playType)},
+    {name:'周期+马尔可夫', picks:genStrategy3(playType)},
+    {name:'重号优选', picks:genStrategy4(playType)}
+  ];
+}
+
 function renderKL8AllPlayTypes_V2(last, history) {
   var scores = scoreKL8Numbers(last, history);
   var topScores = scores.slice(0,15);

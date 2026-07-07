@@ -2104,6 +2104,7 @@ function autoReviewKL8() {
   var actualDraw = kl8SampleHistory[0];
   var actualNums = actualDraw.split(',').map(Number).sort(function(a, b) { return a - b; });
 
+  // 用上期数据训练模型（与综合推荐使用相同的函数），预测本期开奖
   var simHistory = kl8SampleHistory.slice(1);
   var simAllNums = [];
   for (var i = 0; i < simHistory.length; i++) {
@@ -2111,20 +2112,20 @@ function autoReviewKL8() {
   }
 
   var simLast = simAllNums[0];
-
   var simScores = scoreKL8Numbers(simLast, simAllNums);
 
+  // 使用与综合推荐完全相同的选号函数
   var playType = 10;
-
-  var simRecommendations = generateKL8SimPicks(simScores, playType);
+  var simRecommendations = generateKL8Picks_V2(simScores, simAllNums, playType);
+  var simPicks = simRecommendations.map(function(r){ return r.picks; });
 
   var reviewResults = [];
   for (var set = 0; set < 4; set++) {
-    var hits = simRecommendations[set].filter(function(n) { return actualNums.indexOf(n) >= 0; });
+    var hits = simPicks[set].filter(function(n) { return actualNums.indexOf(n) >= 0; });
     var hitRate = hits.length * 10;
     reviewResults.push({
       set: set + 1,
-      picks: simRecommendations[set],
+      picks: simPicks[set],
       hits: hits,
       hitRate: hitRate
     });
@@ -2135,10 +2136,10 @@ function autoReviewKL8() {
   var ptList = [5, 6, 7, 8, 9];
   for (var pi = 0; pi < ptList.length; pi++) {
     var pt = ptList[pi];
-    var ptRecs = generateKL8SimPicks(simScores, pt);
+    var ptRecs = generateKL8Picks_V2(simScores, simAllNums, pt);
     allPlayTypeHits[pt] = [];
     for (var set = 0; set < 4; set++) {
-      var h = ptRecs[set].filter(function(n) { return actualNums.indexOf(n) >= 0; });
+      var h = ptRecs[set].picks.filter(function(n) { return actualNums.indexOf(n) >= 0; });
       allPlayTypeHits[pt].push({ hits: h, hitRate: h.length * 10 });
     }
   }
