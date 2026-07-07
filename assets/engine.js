@@ -5985,9 +5985,97 @@ function spinKL8Review() {
     results.push(picks);
   }
 
+  // ==================== 选五/选十 策略推荐复盘 ====================
+  function genStrategy1(pt) {
+    var picks = [];
+    var used = {};
+    var zoneLimits = [Math.ceil(pt/2), Math.ceil(pt/2), Math.ceil(pt/2), Math.ceil(pt/2)];
+    var zoneCounts = [0,0,0,0];
+    for (var i=0;i<scores.length && picks.length<pt;i++) {
+      var n = scores[i].num;
+      var z = n<=20?0:n<=40?1:n<=60?2:3;
+      if (zoneCounts[z] < zoneLimits[z]) {
+        picks.push(n); used[n] = true; zoneCounts[z]++;
+      }
+    }
+    for (var i=0;i<scores.length && picks.length<pt;i++) {
+      if (!used[scores[i].num]) { picks.push(scores[i].num); used[scores[i].num] = true; }
+    }
+    picks.sort(function(a,b){return a-b;});
+    return picks;
+  }
+  function genStrategy2(pt) {
+    var cold = scores.slice().sort(function(a,b){
+      var aCold = a.lastMissScore * 0.6 + a.mp * 0.4;
+      var bCold = b.lastMissScore * 0.6 + b.mp * 0.4;
+      return bCold - aCold;
+    }).slice(0, 12).map(function(s){return s.num;});
+    var hot = scores.slice(0, 6).map(function(s){return s.num;});
+    var hotCount = Math.ceil(pt * 0.3);
+    var picks = cold.slice(0, pt - hotCount).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0, hotCount));
+    var unique = [];
+    for (var i=0;i<picks.length && unique.length<pt;i++) if (unique.indexOf(picks[i])<0) unique.push(picks[i]);
+    for (var i=0;i<scores.length && unique.length<pt;i++) {
+      if (unique.indexOf(scores[i].num)<0) unique.push(scores[i].num);
+    }
+    unique.sort(function(a,b){return a-b;});
+    return unique;
+  }
+  function genStrategy3(pt) {
+    var cycleSorted = scores.slice().sort(function(a,b){
+      var ca = cycleAnalysis(a.num, genHistory);
+      var cb = cycleAnalysis(b.num, genHistory);
+      return cb.score - ca.score || b.mkScore - a.mkScore;
+    });
+    var picks = cycleSorted.slice(0, pt).map(function(s){return s.num;});
+    picks.sort(function(a,b){return a-b;});
+    return picks;
+  }
+  function genStrategy4(pt) {
+    var maxRepeat = Math.min(3, Math.floor(pt * 0.25));
+    var picks = [];
+    var used = {};
+    var repeatSorted = scores.slice().filter(function(s){ return last.indexOf(s.num) >= 0; }).sort(function(a,b){return b.totalScore - a.totalScore;});
+    for (var i = 0; i < repeatSorted.length && picks.length < maxRepeat; i++) {
+      var n = repeatSorted[i].num;
+      if (!used[n]) { picks.push(n); used[n] = true; }
+    }
+    var zoneCounts = [0,0,0,0];
+    picks.forEach(function(n){ var z=n<=20?0:n<=40?1:n<=60?2:3; zoneCounts[z]++; });
+    var hybridSorted = scores.slice().filter(function(s){ return last.indexOf(s.num) < 0; }).sort(function(a,b){
+      var aHybrid = a.wf*0.30 + a.mp*0.25 + a.zoneScore*0.20 + a.mkScore*0.15 + (a.stability||0)*0.10;
+      var bHybrid = b.wf*0.30 + b.mp*0.25 + b.zoneScore*0.20 + b.mkScore*0.15 + (b.stability||0)*0.10;
+      return bHybrid - aHybrid;
+    });
+    for (var i = 0; i < hybridSorted.length && picks.length < pt; i++) {
+      var n = hybridSorted[i].num;
+      if (!used[n]) {
+        var z = n<=20?0:n<=40?1:n<=60?2:3;
+        if (zoneCounts[z] < Math.ceil(pt/2)) { picks.push(n); used[n] = true; zoneCounts[z]++; }
+      }
+    }
+    for (var i = 0; i < scores.length && picks.length < pt; i++) {
+      var n = scores[i].num;
+      if (!used[n] && last.indexOf(n) < 0) { picks.push(n); used[n] = true; }
+    }
+    picks.sort(function(a,b){return a-b;});
+    return picks;
+  }
+
+  function hitCount(picks, actual) {
+    return picks.filter(function(n){ return actual.indexOf(n) >= 0; }).length;
+  }
+
+  // 生成选五和选十的推荐并计算命中
+  var playTypes = [5, 10];
+  var playTypeNames = {5:'选五', 10:'选十'};
+  var strategyNames = ['区间均衡+热号', '冷号优先+遗漏', '周期+马尔可夫', '重号优选'];
+
   var html = '<div style="padding:0.5rem">';
   html += '<div style="margin-bottom:1rem;font-size:0.8rem;color:var(--muted)">当期开奖：' + actualNums.map(function(n){return pad(n);}).join(', ') + '</div>';
 
+  // 机选号码复盘
+  html += '<div style="margin-bottom:1rem;font-weight:700;color:var(--ink);font-size:0.95rem">&#127922; 机选号码复盘</div>';
   for (var s = 0; s < results.length; s++) {
     var hits = results[s].filter(function(n){ return actualNums.indexOf(n) >= 0; });
     html += '<div style="padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
@@ -6001,24 +6089,42 @@ function spinKL8Review() {
     if (hits.length > 0) {
       html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">命中：'+hits.map(function(n){return pad(n);}).join(', ')+'</div>';
     }
-    html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">';
-    var reasons = [];
-    results[s].forEach(function(n){
-      for (var i = 0; i < scores.length; i++) {
-        if (scores[i].num === n) {
-          var r = [];
-          if (scores[i].wf > 0.15) r.push('高频');
-          if (scores[i].mp > 0.8) r.push('深冷回补');
-          if (scores[i].neighborScore > 0.7) r.push('邻号');
-          if (scores[i].mkScore > 0.7) r.push('冷转热');
-          if (r.length > 0) reasons.push(pad(n)+'('+r.join('·')+')');
-          break;
-        }
-      }
-    });
-    if (reasons.length > 0) html += '分析：'+reasons.join('，');
-    html += '</div></div>';
+    html += '</div>';
   }
+
+  // 策略推荐复盘
+  for (var pi = 0; pi < playTypes.length; pi++) {
+    var pt = playTypes[pi];
+    var s1 = genStrategy1(pt);
+    var s2 = genStrategy2(pt);
+    var s3 = genStrategy3(pt);
+    var s4 = genStrategy4(pt);
+    var strategies = [s1, s2, s3, s4];
+
+    html += '<div style="margin-top:1.5rem;margin-bottom:0.5rem;font-weight:700;color:var(--ink);font-size:0.95rem">&#127919; ' + playTypeNames[pt] + '玩法策略推荐复盘</div>';
+    for (var si = 0; si < strategies.length; si++) {
+      var picks = strategies[si];
+      var hits = hitCount(picks, actualNums);
+      html += '<div style="padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+      html += '<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
+      html += '<span style="font-weight:700;color:var(--accent);min-width:80px;font-size:0.85rem">策略'+(si+1)+'</span>';
+      html += '<span style="font-size:0.75rem;color:var(--muted)">'+strategyNames[si]+'</span>';
+      html += '<span style="margin-left:auto;background:'+(hits>=Math.ceil(pt*0.4)?'var(--accent3)':(hits>=Math.ceil(pt*0.2)?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">命中 '+hits+'/'+pt+'</span>';
+      html += '</div>';
+      html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-top:0.4rem">';
+      picks.forEach(function(n){
+        var isHit = actualNums.indexOf(n) >= 0;
+        html += '<div class="ball '+(isHit?'gold':'red')+'" style="width:28px;height:28px;font-size:0.65rem;'+(isHit?'box-shadow:0 0 0 2px var(--accent3);':'')+'">'+pad(n)+'</div>';
+      });
+      html += '</div>';
+      if (hits > 0) {
+        var hitNums = picks.filter(function(n){ return actualNums.indexOf(n) >= 0; });
+        html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">命中：'+hitNums.map(function(n){return pad(n);}).join(', ')+'</div>';
+      }
+      html += '</div>';
+    }
+  }
+
   html += '</div>';
 
   document.getElementById('kl8-review-analysis').innerHTML = html;
