@@ -4098,6 +4098,12 @@ function renderKL8AllPlayTypes_V2(last, history) {
     }
   }
 
+  // 自动保存预测记录到localStorage
+  saveKL8AllPredictions(last, allPlayTypeRecs);
+
+  // 如果当天已有开奖号码，自动验证之前的预测
+  verifyKL8Predictions(last);
+
   html += '<h4 style="margin-top:16px;color:var(--ink)">📊 Top15 号码评分详情</h4>';
   html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--bg3)">';
   html += '<th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">号码</th>';
@@ -6128,6 +6134,177 @@ function spinKL8Review() {
   html += '</div>';
 
   document.getElementById('kl8-review-analysis').innerHTML = html;
+}
+
+// ==================== KL8往期预测记录模块 ====================
+
+var KL8_PREDICTION_STORAGE_KEY = 'kl8_prediction_history';
+var KL8_MAX_PREDICTIONS = 50;
+
+// 保存预测记录
+function saveKL8Prediction(lastDraw, playType, strategies) {
+  var history = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
+  // 基于当天日期+playType生成唯一key，同一天同玩法只保存最新一次
+  var today = new Date().toISOString().slice(0,10);
+  var key = today + '_' + playType;
+  var rec = {
+    key: key,
+    date: today,
+    period: '', // 如果有期号会填充
+    lastDraw: lastDraw.slice().sort(function(a,b){return a-b;}),
+    playType: playType,
+    playTypeName: '选' + playType,
+    actualDraw: null, // 开奖后填充
+    verified: false,
+    strategies: strategies, // [{name, picks}]
+    savedAt: new Date().toISOString()
+  };
+  // 去重：同日期同玩法覆盖
+  var idx = -1;
+  for (var i = 0; i < history.length; i++) {
+    if (history[i].key === key) { idx = i; break; }
+  }
+  if (idx >= 0) {
+    history[idx] = rec;
+  } else {
+    history.unshift(rec);
+  }
+  // 限制最多50条
+  if (history.length > KL8_MAX_PREDICTIONS) history = history.slice(0, KL8_MAX_PREDICTIONS);
+  localStorage.setItem(KL8_PREDICTION_STORAGE_KEY, JSON.stringify(history));
+}
+
+// 批量保存选五+选十推荐
+function saveKL8AllPredictions(lastDraw, allRecs) {
+  for (var pt = 5; pt <= 10; pt++) {
+    if (allRecs[pt]) {
+      var strategies = allRecs[pt].map(function(s){ return {name: s.name, picks: s.picks}; });
+      saveKL8Prediction(lastDraw, pt, strategies);
+    }
+  }
+}
+
+// 根据实际开奖号码验证预测
+function verifyKL8Predictions(actualDraw) {
+  var history = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
+  var today = new Date().toISOString().slice(0,10);
+  var updated = false;
+  for (var i = 0; i < history.length; i++) {
+    var rec = history[i];
+    // 同一天预测、当天开奖才验证
+    if (rec.date === today && !rec.verified) {
+      rec.actualDraw = actualDraw.slice().sort(function(a,b){return a-b;});
+      rec.verified = true;
+      // 计算每个策略的命中数
+      for (var j = 0; j < rec.strategies.length; j++) {
+        var picks = rec.strategies[j].picks;
+        rec.strategies[j].hits = picks.filter(function(n){ return actualDraw.indexOf(n) >= 0; }).length;
+        rec.strategies[j].hitNums = picks.filter(function(n){ return actualDraw.indexOf(n) >= 0; });
+      }
+      updated = true;
+    }
+  }
+  if (updated) {
+    localStorage.setItem(KL8_PREDICTION_STORAGE_KEY, JSON.stringify(history));
+  }
+  return updated;
+}
+
+// 清除预测历史
+function clearKL8PredictionHistory() {
+  if (!confirm('确定要清除所有往期预测记录吗？')) return;
+  localStorage.removeItem(KL8_PREDICTION_STORAGE_KEY);
+  document.getElementById('kl8-prediction-history').innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem">已清除全部记录</div>';
+}
+
+// 渲染预测历史
+function renderKL8PredictionHistory() {
+  var history = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
+  var container = document.getElementById('kl8-prediction-history');
+
+  if (history.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem">暂无预测记录，请先在"选五/选十推荐"中生成推荐号码</div>';
+    return;
+  }
+
+  var html = '';
+  // 按日期分组
+  var grouped = {};
+  for (var i = 0; i < history.length; i++) {
+    var d = history[i].date;
+    if (!grouped[d]) grouped[d] = [];
+    grouped[d].push(history[i]);
+  }
+  var dates = Object.keys(grouped).sort().reverse();
+
+  for (var di = 0; di < dates.length; di++) {
+    var date = dates[di];
+    var recs = grouped[date];
+    html += '<div style="margin-bottom:1.5rem">';
+    html += '<div style="font-weight:700;color:var(--ink);font-size:0.95rem;margin-bottom:0.5rem;padding-bottom:0.3rem;border-bottom:1px solid var(--rule)">'+date+' 预测推荐</div>';
+
+    for (var ri = 0; ri < recs.length; ri++) {
+      var rec = recs[ri];
+      var hasVerified = rec.verified && rec.actualDraw;
+      html += '<div style="padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+
+      // 标题行
+      html += '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">';
+      html += '<span style="font-weight:700;color:var(--accent);font-size:0.85rem">'+rec.playTypeName+'</span>';
+      if (hasVerified) {
+        html += '<span style="background:var(--accent3);color:#000;padding:1px 6px;border-radius:4px;font-size:0.7rem;font-weight:600">已验证</span>';
+      } else {
+        html += '<span style="background:var(--muted);color:#fff;padding:1px 6px;border-radius:4px;font-size:0.7rem">待开奖</span>';
+      }
+      html += '</div>';
+
+      // 参考的开奖号码（预测时用的当期数据）
+      html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">参考数据（预测基准）：';
+      html += rec.lastDraw.map(function(n){return pad(n);}).join(', ');
+      html += '</div>';
+
+      // 如果已验证，显示开奖号码
+      if (hasVerified) {
+        html += '<div style="margin-top:0.2rem;font-size:0.7rem;color:var(--accent3);font-weight:600">开奖号码：';
+        html += rec.actualDraw.map(function(n){return pad(n);}).join(', ');
+        html += '</div>';
+      }
+
+      // 各策略推荐及命中
+      for (var si = 0; si < rec.strategies.length; si++) {
+        var st = rec.strategies[si];
+        var hits = st.hits || 0;
+        var hitNums = st.hitNums || [];
+        var pt = rec.playType;
+        html += '<div style="margin-top:0.4rem;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">';
+        html += '<span style="font-size:0.75rem;color:var(--muted);min-width:60px">'+st.name+'</span>';
+        html += '<div style="display:flex;gap:3px;flex-wrap:wrap">';
+        for (var ni = 0; ni < st.picks.length; ni++) {
+          var n = st.picks[ni];
+          var isHit = hitNums.indexOf(n) >= 0;
+          if (hasVerified) {
+            html += '<span style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;font-size:0.65rem;'+(isHit?'background:var(--accent3);color:#000;font-weight:700;box-shadow:0 0 0 2px var(--accent3);':'background:var(--accent4);color:#fff;')+'">'+pad(n)+'</span>';
+          } else {
+            html += '<span style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;font-size:0.65rem;background:var(--accent4);color:#fff;">'+pad(n)+'</span>';
+          }
+        }
+        html += '</div>';
+        if (hasVerified) {
+          var hitPct = Math.round(hits / pt * 100);
+          html += '<span style="margin-left:auto;background:'+(hitPct>=40?'var(--accent3)':(hitPct>=20?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:600">'+hits+'/'+pt+'</span>';
+        }
+        html += '</div>';
+        if (hasVerified && hitNums.length > 0) {
+          html += '<div style="margin-top:0.1rem;font-size:0.65rem;color:var(--accent3)">命中：'+hitNums.map(function(n){return pad(n);}).join(', ')+'</div>';
+        }
+      }
+
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  document.getElementById('kl8-prediction-history').innerHTML = html;
 }
 
 // ==================== 往期回溯验证模块 ====================

@@ -1107,6 +1107,9 @@ tr:hover td { background: var(--bg3); }
         <button class="dlt-sidebar-btn" onclick="switchKL8Tab('kl8-tab6', this)">
           <span class="badge-sm" style="background:var(--accent);color:#000">6</span>模型复盘与推荐
         </button>
+        <button class="dlt-sidebar-btn" onclick="switchKL8Tab('kl8-tab7', this)">
+          <span class="badge-sm" style="background:var(--accent4);color:#fff">7</span>往期预测记录
+        </button>
       </div>
 
       <div class="dlt-content">
@@ -1220,6 +1223,19 @@ tr:hover td { background: var(--bg3); }
               <button class="btn btn-primary" onclick="spinKL8Review()" style="font-size:1rem;padding:0.6rem 2rem;border-radius:50px">&#127922; 机选号码并分析</button>
             </div>
             <div id="kl8-review-analysis"></div>
+          </div>
+        </div>
+        <div class="dlt-tab" id="kl8-tab7">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128190;</span> 7. 往期预测记录</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              自动保存每次生成的选五/选十推荐号码，开奖后自动验证命中情况。支持清除历史记录。
+            </div>
+            <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap">
+              <button class="btn btn-primary" onclick="renderKL8PredictionHistory()" style="padding:0.4rem 1rem;border-radius:8px;font-size:0.8rem">&#128269; 刷新记录</button>
+              <button class="btn btn-secondary" onclick="clearKL8PredictionHistory()" style="padding:0.4rem 1rem;border-radius:8px;font-size:0.8rem;background:var(--bg3);color:var(--ink);border:1px solid var(--rule)">&#128465; 清除全部记录</button>
+            </div>
+            <div id="kl8-prediction-history"></div>
           </div>
         </div>
       </div>
@@ -1609,10 +1625,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026070726"></script>
-<script src="assets/pl-data.js?v=2026070726"></script>
-<script src="assets/pl-engine.js?v=2026070726"></script>
-<script src="assets/auto-review.js?v=2026070726"></script>
+<script src="assets/engine.js?v=2026070727"></script>
+<script src="assets/pl-data.js?v=2026070727"></script>
+<script src="assets/pl-engine.js?v=2026070727"></script>
+<script src="assets/auto-review.js?v=2026070727"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)
@@ -1647,10 +1663,14 @@ function switchSSQTab(tabId, btn) {
 
 function switchKL8Tab(tabId, btn) {
   document.querySelectorAll('#kl8-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('#kl8-tab0, #kl8-tab1, #kl8-tab2, #kl8-tab3, #kl8-tab4, #kl8-tab5, #kl8-tab6').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('#kl8-tab0, #kl8-tab1, #kl8-tab2, #kl8-tab3, #kl8-tab4, #kl8-tab5, #kl8-tab6, #kl8-tab7').forEach(function(t){ t.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   var tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');
+  // Tab7自动刷新预测记录
+  if (tabId === 'kl8-tab7' && typeof renderKL8PredictionHistory === 'function') {
+    setTimeout(renderKL8PredictionHistory, 100);
+  }
 }
 function switchPL3Tab(tabId, btn) {
   document.querySelectorAll('#pl3-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
