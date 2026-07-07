@@ -150,7 +150,8 @@ function comboDiversityScore(combos) {
  */
 function backtestModel(history, scoreFunc, recommendFunc, count, numPerDraw) {
   var results = [];
-  var testCount = Math.min(10, Math.floor(history.length / 2));
+  var missedNumbers = {}; // 统计推荐中被遗漏的实际开奖号码
+  var testCount = Math.min(15, Math.floor(history.length / 2));
   for (var i = 0; i < testCount; i++) {
     var trainEnd = history.length - testCount + i;
     var trainData = history.slice(0, trainEnd);
@@ -158,15 +159,30 @@ function backtestModel(history, scoreFunc, recommendFunc, count, numPerDraw) {
     if (!actual || trainData.length < 5) continue;
     var recommendation = recommendFunc(trainData, count);
     var hit = 0;
+    var hitNums = [];
     for (var j = 0; j < recommendation.length; j++) {
-      if (actual.indexOf(recommendation[j]) >= 0) hit++;
+      if (actual.indexOf(recommendation[j]) >= 0) {
+        hit++;
+        hitNums.push(recommendation[j]);
+      }
     }
-    results.push({ hit: hit, total: count, actualInDraw: numPerDraw, rate: hit / count });
+    results.push({ hit: hit, total: count, actualInDraw: numPerDraw, rate: hit / count, hitNums: hitNums, recommendation: recommendation });
+    // 统计实际开奖中未进入推荐的号码
+    for (var k = 0; k < actual.length; k++) {
+      if (recommendation.indexOf(actual[k]) < 0) {
+        missedNumbers[actual[k]] = (missedNumbers[actual[k]] || 0) + 1;
+      }
+    }
   }
-  if (!results.length) return { avgHit: 0, avgRate: 0, tests: 0 };
+  if (!results.length) return { avgHit: 0, avgRate: 0, tests: 0, missedNumbers: {} };
   var avgHit = results.reduce(function(s, r) { return s + r.hit; }, 0) / results.length;
   var avgRate = results.reduce(function(s, r) { return s + r.rate; }, 0) / results.length;
-  return { avgHit: avgHit, avgRate: avgRate, tests: results.length, details: results };
+  var bestHit = Math.max.apply(null, results.map(function(r){return r.hit;}));
+  var worstHit = Math.min.apply(null, results.map(function(r){return r.hit;}));
+  var hitZeroCount = results.filter(function(r){return r.hit===0;}).length;
+  // 找出遗漏最多的号码
+  var missedSorted = Object.keys(missedNumbers).map(function(n){return {num: parseInt(n), count: missedNumbers[n]};}).sort(function(a,b){return b.count-a.count;});
+  return { avgHit: avgHit, avgRate: avgRate, tests: results.length, details: results, bestHit: bestHit, worstHit: worstHit, hitZeroCount: hitZeroCount, missedNumbers: missedSorted };
 }
 
 // ==================== 大乐透分析 ====================
@@ -175,6 +191,7 @@ var DLT_ZONES = [[1,12],[13,23],[24,35]];
 var DLT_BACK_ZONES = [[1,4],[5,8],[9,12]];
 
 var dltSampleHistory = [
+  '11,18,22,25,29|04,12',
   '01,06,16,18,26|04,10',
   '01,04,10,23,25|01,12',
   '04,10,22,23,33|02,12',
@@ -1826,7 +1843,22 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   if (bt.tests > 0) {
     html += '<div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent2)">';
     html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:4px">🧪 回测验证（近'+bt.tests+'期）</div>';
-    html += '<div style="color:var(--muted);font-size:11px">前区Top5平均命中：'+bt.avgHit.toFixed(2)+'个（命中率 '+bt.avgRate.toFixed(1)+'%）</div>';
+    html += '<div style="color:var(--muted);font-size:11px">前区Top5平均命中：'+bt.avgHit.toFixed(2)+'个（命中率 '+bt.avgRate.toFixed(1)+'%）| 最佳：'+bt.bestHit+'个 | 最差：'+bt.worstHit+'个';
+    if (bt.hitZeroCount > 0) html += ' | 零命中：'+bt.hitZeroCount+'期';
+    html += '</div>';
+    // 遗漏号码分析：显示回测中被遗漏最多的号码
+    if (bt.missedNumbers && bt.missedNumbers.length > 0) {
+      var topMissed = bt.missedNumbers.slice(0, 5);
+      html += '<div style="margin-top:6px;padding:6px 8px;background:rgba(239,68,68,0.08);border-radius:6px">';
+      html += '<div style="color:var(--ink);font-size:11px;font-weight:bold;margin-bottom:3px">⚠️ 高频遗漏号码（模型盲区）</div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+      topMissed.forEach(function(m) {
+        html += '<span style="background:rgba(239,68,68,0.15);color:var(--accent2);padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600">' + pad(m.num) + '<span style="color:var(--muted);margin-left:2px">×'+m.count+'</span></span>';
+      });
+      html += '</div>';
+      html += '<div style="color:var(--muted);font-size:10px;margin-top:3px">这些号码频繁出现但模型未能识别，建议关注遗漏权重</div>';
+      html += '</div>';
+    }
     html += '</div>';
   }
 
@@ -1861,6 +1893,7 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
 var SSQ_ZONES = [[1,11],[12,22],[23,33]];
 
 var ssqSampleHistory = [
+  '01,04,05,14,18,25|04',
   '01,03,19,20,24,25|07',
   '08,12,18,21,24,30|01',
   '03,06,08,14,26,27|08',
@@ -2697,7 +2730,22 @@ function renderSSQRecommend(last, allReds, allBlues) {
   if (bt.tests > 0) {
     html += '<div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:8px;border-left:3px solid var(--accent2)">';
     html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:4px">🧪 回测验证（近'+bt.tests+'期）</div>';
-    html += '<div style="color:var(--muted);font-size:11px">红球Top6平均命中：'+bt.avgHit.toFixed(2)+'个（命中率 '+bt.avgRate.toFixed(1)+'%）</div>';
+    html += '<div style="color:var(--muted);font-size:11px">红球Top6平均命中：'+bt.avgHit.toFixed(2)+'个（命中率 '+bt.avgRate.toFixed(1)+'%）| 最佳：'+bt.bestHit+'个 | 最差：'+bt.worstHit+'个';
+    if (bt.hitZeroCount > 0) html += ' | 零命中：'+bt.hitZeroCount+'期';
+    html += '</div>';
+    // 遗漏号码分析
+    if (bt.missedNumbers && bt.missedNumbers.length > 0) {
+      var topMissed = bt.missedNumbers.slice(0, 5);
+      html += '<div style="margin-top:6px;padding:6px 8px;background:rgba(239,68,68,0.08);border-radius:6px">';
+      html += '<div style="color:var(--ink);font-size:11px;font-weight:bold;margin-bottom:3px">⚠️ 高频遗漏号码（模型盲区）</div>';
+      html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+      topMissed.forEach(function(m) {
+        html += '<span style="background:rgba(239,68,68,0.15);color:var(--accent2);padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600">' + pad(m.num) + '<span style="color:var(--muted);margin-left:2px">×'+m.count+'</span></span>';
+      });
+      html += '</div>';
+      html += '<div style="color:var(--muted);font-size:10px;margin-top:3px">这些号码频繁出现但模型未能识别，建议关注遗漏权重</div>';
+      html += '</div>';
+    }
     html += '</div>';
   }
 
@@ -3019,6 +3067,7 @@ function renderSSQTail(allReds) {
 var KL8_ZONES = [[1,20],[21,40],[41,60],[61,80]];
 
 var kl8SampleHistory = [
+  '05,10,12,19,20,26,27,30,35,38,44,45,46,47,49,54,56,61,72,77',
   '11,15,16,20,33,35,37,39,42,46,49,50,54,56,61,62,71,73,76,79',
   '07,08,14,21,22,26,29,33,36,39,40,57,59,63,64,67,70,72,73,76',
   '09,15,16,21,27,32,33,34,36,38,39,44,45,54,60,67,77,78,79,80',
@@ -4531,6 +4580,48 @@ function reviewDLT() {
   else html += '后区未命中，建议关注后区遗漏走势。';
   html += '</div></div>';
 
+  // 自动复盘：分析模型Top10推荐与实际开奖的对比
+  try {
+    var dltHistory = dltSampleHistory.map(function(h) {
+      var parts = h.split('|');
+      return parseNums(parts[0]);
+    });
+    var lastDLTFront = dltHistory[0];
+    var trainData = dltHistory.slice(1);
+    if (trainData.length >= 5) {
+      var modelScores = scoreDLTNumbers_V3(trainData[0], trainData);
+      var top10 = modelScores.slice(0, 10).map(function(s){return s.num;});
+      var modelHit = top10.filter(function(n){ return lastFront.indexOf(n) >= 0; }).length;
+      var missedByModel = lastFront.filter(function(n){ return top10.indexOf(n) < 0; });
+
+      html += '<div style="margin-top:0.75rem;padding:0.75rem;background:var(--bg3);border-radius:8px;border:1px solid var(--accent2)">';
+      html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">🤖 模型推荐复盘（基于上期数据预测本期）</div>';
+      html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:6px">模型Top10推荐：' + top10.map(function(n){return pad(n);}).join(',') + '</div>';
+      html += '<div style="color:var(--muted);font-size:0.85rem">模型命中：' + modelHit + '/10个（前区命中' + modelHit + '/5个）</div>';
+
+      if (missedByModel.length > 0) {
+        html += '<div style="margin-top:6px;padding:6px 8px;background:rgba(245,158,11,0.08);border-radius:6px">';
+        html += '<div style="color:var(--ink);font-size:11px;font-weight:bold;margin-bottom:3px">💡 模型遗漏号码</div>';
+        html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+        missedByModel.forEach(function(n) {
+          html += '<span class="ball red" style="width:32px;height:32px;font-size:0.7rem">' + pad(n) + '</span>';
+        });
+        html += '</div>';
+        // 分析遗漏号码的维度特征
+        var missedZones = missedByModel.map(function(n){ return n<=12?0:n<=23?1:2; });
+        var missedOdd = missedByModel.filter(function(n){return n%2===1;}).length;
+        var zoneNames = ['一区(01-12)', '二区(13-23)', '三区(24-35)'];
+        html += '<div style="color:var(--muted);font-size:10px;margin-top:4px">';
+        html += '遗漏号码区间：' + missedByModel.map(function(n,i){return pad(n)+'('+zoneNames[n<=12?0:n<=23?1:2]+')';}).join('、');
+        if (missedOdd > 0) html += ' | 奇数遗漏' + missedOdd + '个';
+        html += '</div></div>';
+      }
+      html += '</div>';
+    }
+  } catch(e) {
+    console.log('DLT自动复盘失败:', e.message);
+  }
+
   document.getElementById('dlt-review-result').innerHTML = html;
 }
 
@@ -4579,6 +4670,45 @@ function reviewSSQ() {
   if (hitBlue.length >= 1) html += '蓝球命中不错，继续保持。';
   else html += '蓝球未命中，建议关注蓝球遗漏走势。';
   html += '</div></div>';
+
+  // 自动复盘：分析模型Top10推荐与实际开奖的对比
+  try {
+    var ssqHistory = ssqSampleHistory.map(function(h) {
+      var parts = h.split('|');
+      return parseNums(parts[0]);
+    });
+    var trainData = ssqHistory.slice(1);
+    if (trainData.length >= 5) {
+      var modelScores = scoreSSQNumbers({red: trainData[0]}, trainData);
+      var top10 = modelScores.slice(0, 10).map(function(s){return s.num;});
+      var modelHit = top10.filter(function(n){ return lastRed.indexOf(n) >= 0; }).length;
+      var missedByModel = lastRed.filter(function(n){ return top10.indexOf(n) < 0; });
+
+      html += '<div style="margin-top:0.75rem;padding:0.75rem;background:var(--bg3);border-radius:8px;border:1px solid var(--accent2)">';
+      html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">🤖 模型推荐复盘（基于上期数据预测本期）</div>';
+      html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:6px">模型Top10推荐：' + top10.map(function(n){return pad(n);}).join(',') + '</div>';
+      html += '<div style="color:var(--muted);font-size:0.85rem">模型命中：' + modelHit + '/10个（红球命中' + modelHit + '/6个）</div>';
+
+      if (missedByModel.length > 0) {
+        html += '<div style="margin-top:6px;padding:6px 8px;background:rgba(245,158,11,0.08);border-radius:6px">';
+        html += '<div style="color:var(--ink);font-size:11px;font-weight:bold;margin-bottom:3px">💡 模型遗漏号码</div>';
+        html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+        missedByModel.forEach(function(n) {
+          html += '<span class="ball red" style="width:32px;height:32px;font-size:0.7rem">' + pad(n) + '</span>';
+        });
+        html += '</div>';
+        var zoneNames = ['一区(01-11)', '二区(12-22)', '三区(23-33)'];
+        var missedOdd = missedByModel.filter(function(n){return n%2===1;}).length;
+        html += '<div style="color:var(--muted);font-size:10px;margin-top:4px">';
+        html += '遗漏号码区间：' + missedByModel.map(function(n){return pad(n)+'('+zoneNames[n<=11?0:n<=22?1:2]+')';}).join('、');
+        if (missedOdd > 0) html += ' | 奇数遗漏' + missedOdd + '个';
+        html += '</div></div>';
+      }
+      html += '</div>';
+    }
+  } catch(e) {
+    console.log('SSQ自动复盘失败:', e.message);
+  }
 
   document.getElementById('ssq-review-result').innerHTML = html;
 }
