@@ -1532,14 +1532,6 @@ function switchKL8Tab(tabId, btn) {
       var target = document.getElementById('panel-' + game);
       if (target) { target.style.display = 'block'; target.classList.add('active'); }
       window.scrollTo(0,0);
-      // 进入玩法面板后自动执行分析（数据已在页面加载时填充）
-      setTimeout(function() {
-        if (game === 'dlt') { try { analyzeDLT(); } catch(e){} try { autoReviewDLT(); } catch(e){} }
-        else if (game === 'ssq') { try { analyzeSSQ(); } catch(e){} try { autoReviewSSQ(); } catch(e){} }
-        else if (game === 'kl8') { try { analyzeKL8(); } catch(e){} try { autoReviewKL8(); } catch(e){} }
-        else if (game === 'pl3') { try { analyzePL3(); } catch(e){} try { autoReviewPL3(); } catch(e){} }
-        else if (game === 'pl5') { try { analyzePL5(); } catch(e){} try { autoReviewPL5(); } catch(e){} }
-      }, 100);
     });
   });
   // Back to home
