@@ -3084,19 +3084,18 @@ function analyzeKL8() {
   var history = [];
   for (var i = 0; i < lines.length; i++) {
     var nums = parseNums(lines[i]);
-    if (nums.length >= 20) {
+    if (nums.length >= 10) {
       history.push(nums.slice(0, 20).sort(function(a,b){return a-b}));
     }
   }
 
-  if (history.length === 0 && lastNums.length >= 20) {
+  if (history.length === 0 && lastNums.length >= 10) {
     history.unshift(lastNums.slice(0, 20).sort(function(a,b){return a-b}));
   }
 
-  if (history.length < 2) { alert('请至少输入2期历史数据（每期20个号码）'); return; }
+  if (history.length < 2) { alert('请至少输入2期历史数据'); return; }
 
   var last = history[0];
-  var playType = parseInt(document.getElementById('kl8-playtype').value);
 
   document.getElementById('kl8-empty').style.display = 'none';
   document.getElementById('kl8-results').style.display = 'block';
@@ -3111,8 +3110,10 @@ function analyzeKL8() {
   try { renderKL8Tail(history); } catch(e) { console.log('renderKL8Tail error:', e.message); }
   try { renderKL8Consecutive(history); } catch(e) { console.log('renderKL8Consecutive error:', e.message); }
   try { renderKL8AC(history); } catch(e) { console.log('renderKL8AC error:', e.message); }
-  try { renderKL8DanTuo(last, history, playType); } catch(e) { console.log('renderKL8DanTuo error:', e.message); }
+  try { renderKL8DanTuo(last, history, 5, 'kl8-dantuo-5'); } catch(e) { console.log('renderKL8DanTuo 5 error:', e.message); }
+  try { renderKL8DanTuo(last, history, 10, 'kl8-dantuo-10'); } catch(e) { console.log('renderKL8DanTuo 10 error:', e.message); }
   try { renderKL8AllPlayTypes_V2(last, history); } catch(e) { console.log('renderKL8AllPlayTypes_V2 error:', e.message); }
+  try { renderKL8ProbAnalysis(); } catch(e) { console.log('renderKL8ProbAnalysis error:', e.message); }
 
   document.getElementById('kl8-results').scrollIntoView({ behavior: 'smooth' });
 }
@@ -3304,7 +3305,7 @@ function renderKL8HotCold(history) {
   renderKL8FreqChart(freqMap, expected);
 }
 
-function renderKL8DanTuo(last, history, playType) {
+function renderKL8DanTuo(last, history, playType, targetId) {
   var scores = scoreKL8Numbers(last, history);
   scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 
@@ -3345,7 +3346,7 @@ function renderKL8DanTuo(last, history, playType) {
   html += '</div>';
 
   html += '</div></div>';
-  document.getElementById('kl8-dantuo').innerHTML = html;
+  document.getElementById(targetId || 'kl8-dantuo').innerHTML = html;
 }
 
 function getKL8AdaptiveWeights() {
@@ -4032,6 +4033,56 @@ function renderKL8AllPlayTypes_V2(last, history) {
   html += '</div>';
 
   document.getElementById('kl8-recommend').innerHTML = html;
+
+  // 提取选五和选十的推荐写入独立容器
+  (function(){
+    var playTypeNames = {5:'五', 6:'六', 7:'七', 8:'八', 9:'九', 10:'十'};
+    [5, 10].forEach(function(pt) {
+      var strategies = allPlayTypeRecs[pt];
+      if (!strategies) return;
+      var containerId = pt === 5 ? 'kl8-recommend-5' : 'kl8-recommend-10';
+      var container = document.getElementById(containerId);
+      if (!container) return;
+
+      var h = '<div style="padding:12px">';
+      h += '<div style="font-size:0.85rem;color:var(--muted);margin-bottom:1rem">';
+      h += '基于4个策略的加权评分推荐，每个策略生成1注选' + playTypeNames[pt] + '号码</div>';
+
+      for (var si = 0; si < strategies.length; si++) {
+        var st = strategies[si];
+        h += '<div style="margin:12px 0;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--bg2)">';
+        h += '<h4 style="margin:0 0 6px 0;color:var(--ink)">策略' + (si+1) + '：' + st.name + '</h4>';
+        h += '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;flex-wrap:wrap">';
+        h += '<span style="font-weight:bold;color:var(--accent4)">方案：</span>';
+        st.picks.forEach(function(n) {
+          h += '<div class="ball red" style="width:32px;height:32px;font-size:12px">' + String(n).padStart(2,'0') + '</div>';
+        });
+        h += '<span style="margin-left:auto;background:'+(st.q>=85?'var(--accent3)':(st.q>=70?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:12px">质量分 '+st.q+'</span>';
+        h += '</div></div>';
+      }
+
+      // 复式推荐
+      if (pt === 5 || pt === 9) {
+        var fushiCount = pt === 5 ? 7 : 11;
+        var fushiPicks = scores.slice(0, fushiCount).map(function(s){return s.num;});
+        var fushiQ = qualityScoreKL8(fushiPicks);
+        h += '<div style="margin:12px 0;padding:12px;border:1px solid var(--rule);border-radius:8px;background:linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(59,130,246,0.08) 100%)">';
+        h += '<h4 style="margin:0 0 6px 0;color:var(--ink)">选' + playTypeNames[pt] + '复式（'+fushiCount+'个号码·C('+fushiCount+','+pt+')注）</h4>';
+        h += '<div style="display:flex;align-items:center;gap:8px;margin:4px 0;flex-wrap:wrap">';
+        h += '<span style="font-weight:bold;color:var(--accent)">复式方案：</span>';
+        fushiPicks.forEach(function(n) {
+          h += '<div class="ball gold" style="width:32px;height:32px;font-size:12px">' + String(n).padStart(2,'0') + '</div>';
+        });
+        h += '<span style="margin-left:auto;background:'+(fushiQ>=85?'var(--accent3)':(fushiQ>=70?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:12px">质量分 '+fushiQ+'</span>';
+        h += '</div>';
+        h += '<p style="margin:4px 0 0 0;color:var(--muted);font-size:11px">从'+fushiCount+'个号码中选取'+pt+'个，复式投注覆盖更多组合</p>';
+        h += '</div>';
+      }
+
+      h += '</div>';
+      container.innerHTML = h;
+    });
+  })();
 
   // 保存当前推荐到 localStorage，供次日回测直接使用（避免重新计算导致号码不一致）
   try {
@@ -5445,4 +5496,224 @@ function renderSSQProbAnalysis() {
     phtml += '未加载大乐透数据</div>';
   }
   document.getElementById('ssq-prob-dlt-pair').innerHTML = phtml;
+}
+
+// ==================== 快乐8新功能模块 ====================
+
+function renderKL8ProbAnalysis() {
+  var numsStr = document.getElementById('kl8-numbers').value;
+  var historyStr = document.getElementById('kl8-history').value;
+  var lastNums = parseNums(numsStr);
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var nums = parseNums(lines[i]);
+    if (nums.length >= 10) history.push(nums.slice(0,20).sort(function(a,b){return a-b;}));
+  }
+  if (history.length === 0 && lastNums.length >= 10) {
+    history.unshift(lastNums.slice(0,20).sort(function(a,b){return a-b;}));
+  }
+  if (history.length < 2) return;
+
+  var last = history[0];
+  var scores = scoreKL8Numbers(last, history);
+
+  // Top20评分表
+  var top20 = scores.slice(0, 20);
+  var html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
+  html += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule)">号码</th><th style="padding:6px;border:1px solid var(--rule)">频率</th><th style="padding:6px;border:1px solid var(--rule)">遗漏</th><th style="padding:6px;border:1px solid var(--rule)">遗漏%位</th><th style="padding:6px;border:1px solid var(--rule)">邻号</th><th style="padding:6px;border:1px solid var(--rule)">区间</th><th style="padding:6px;border:1px solid var(--rule)">总评分</th></tr></thead><tbody>';
+  top20.forEach(function(s){
+    html += '<tr><td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--accent4)">'+pad(s.num)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center">'+(s.wf*100).toFixed(1)+'%</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center">'+s.currentGap+'期</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center">'+(s.mp*100).toFixed(0)+'%</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center">'+(s.neighborScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center">'+(s.zoneScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--accent)">'+(s.totalScore*100).toFixed(1)+'</td></tr>';
+  });
+  html += '</tbody></table></div>';
+  document.getElementById('kl8-prob-nums').innerHTML = html;
+
+  // 重号分析
+  try { renderKL8Repeat(last, history); } catch(e) {}
+  var repeatHtml = document.getElementById('kl8-repeat').innerHTML;
+  if (repeatHtml) document.getElementById('kl8-prob-repeat').innerHTML = repeatHtml;
+
+  // 斜连分析
+  var dhtml = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
+  dhtml += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule)">号码</th><th style="padding:6px;border:1px solid var(--rule)">邻号分</th><th style="padding:6px;border:1px solid var(--rule)">说明</th></tr></thead><tbody>';
+  var diagTop = scores.slice().sort(function(a,b){return (b.neighborScore||0) - (a.neighborScore||0);}).slice(0, 10);
+  diagTop.forEach(function(s){
+    if ((s.neighborScore||0) < 0.5) return;
+    dhtml += '<tr><td style="padding:4px;border:1px solid var(--rule);text-align:center;font-weight:bold">'+pad(s.num)+'</td>';
+    dhtml += '<td style="padding:4px;border:1px solid var(--rule);text-align:center">'+(s.neighborScore*100).toFixed(0)+'</td>';
+    dhtml += '<td style="padding:4px;border:1px solid var(--rule);color:var(--muted);font-size:0.7rem">'+(s.neighborScore>0.7?'强邻号':'中邻号')+'</td></tr>';
+  });
+  dhtml += '</tbody></table></div>';
+  document.getElementById('kl8-prob-diagonal').innerHTML = dhtml;
+
+  // 区间分析
+  try { renderKL8Zone(history); } catch(e) {}
+  var zoneHtml = document.getElementById('kl8-zone').innerHTML;
+  if (zoneHtml) document.getElementById('kl8-prob-zone').innerHTML = zoneHtml;
+}
+
+function spinKL8Lottery() {
+  var numsStr = document.getElementById('kl8-numbers').value;
+  var historyStr = document.getElementById('kl8-history').value;
+  var lastNums = parseNums(numsStr);
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var nums = parseNums(lines[i]);
+    if (nums.length >= 10) history.push(nums.slice(0,20).sort(function(a,b){return a-b;}));
+  }
+  if (history.length === 0 && lastNums.length >= 10) {
+    history.unshift(lastNums.slice(0,20).sort(function(a,b){return a-b;}));
+  }
+  if (history.length < 2) { alert('请先加载数据进行分析'); return; }
+
+  var last = history[0];
+  var scores = scoreKL8Numbers(last, history);
+
+  function weightedPick(items, scores, count) {
+    var result = [];
+    var available = items.slice();
+    var scoreMap = {};
+    for (var i = 0; i < scores.length; i++) scoreMap[scores[i].num] = scores[i].totalScore + 0.5;
+    for (var r = 0; r < count; r++) {
+      if (available.length === 0) break;
+      var totalW = 0;
+      var weights = [];
+      for (var i = 0; i < available.length; i++) {
+        var w = scoreMap[available[i]] || 1;
+        weights.push(w);
+        totalW += w;
+      }
+      var rnd = Math.random() * totalW;
+      var cum = 0;
+      for (var i = 0; i < available.length; i++) {
+        cum += weights[i];
+        if (rnd <= cum) {
+          result.push(available[i]);
+          available.splice(i, 1);
+          break;
+        }
+      }
+    }
+    return result;
+  }
+
+  var allNums = [];
+  for (var n = 1; n <= 80; n++) allNums.push(n);
+
+  var results = [];
+  for (var set = 0; set < 5; set++) {
+    var picks = weightedPick(allNums, scores, 10);
+    picks.sort(function(a,b){return a-b;});
+    results.push(picks);
+  }
+
+  var html = '<div style="padding:0.5rem">';
+  html += '<div style="text-align:center;margin-bottom:1rem;font-size:0.9rem;color:var(--muted)">基于大模型评分加权抽选，分数越高的号码被摇中的概率越大</div>';
+  for (var s = 0; s < results.length; s++) {
+    // 胆码：评分最高的3个
+    var scoredNums = results[s].map(function(n){
+      var sc = scores.find(function(x){return x.num === n;});
+      return {num: n, score: sc ? sc.totalScore : 0};
+    }).sort(function(a,b){return b.score - a.score;});
+    var danNums = scoredNums.slice(0,3).map(function(x){return x.num;});
+
+    html += '<div style="display:flex;align-items:center;gap:1rem;padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<span style="font-weight:700;color:var(--accent);min-width:60px;font-size:0.9rem">第'+(s+1)+'注</span>';
+    html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">';
+    results[s].forEach(function(n){
+      var isDan = danNums.indexOf(n) >= 0;
+      html += '<div class="ball '+(isDan?'gold':'red')+'" style="width:30px;height:30px;font-size:0.7rem;'+(isDan?'box-shadow:0 0 8px rgba(245,158,11,0.6);':'')+'">'+pad(n)+'</div>';
+    });
+    html += '</div></div>';
+  }
+  html += '</div>';
+
+  document.getElementById('kl8-lottery-results').innerHTML = html;
+  document.getElementById('kl8-lottery-results').style.display = 'block';
+}
+
+function spinKL8Review() {
+  var numsStr = document.getElementById('kl8-numbers').value;
+  var historyStr = document.getElementById('kl8-history').value;
+  var lastNums = parseNums(numsStr);
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var nums = parseNums(lines[i]);
+    if (nums.length >= 10) history.push(nums.slice(0,20).sort(function(a,b){return a-b;}));
+  }
+  if (history.length === 0 && lastNums.length >= 10) {
+    history.unshift(lastNums.slice(0,20).sort(function(a,b){return a-b;}));
+  }
+  if (history.length < 2) { alert('请先加载数据进行分析'); return; }
+
+  var last = history[0];
+  var scores = scoreKL8Numbers(last, history);
+
+  var results = [];
+  var used = {};
+  for (var s = 0; s < 5; s++) {
+    var picks = [];
+    var zoneCount = [0,0,0,0];
+    for (var i = 0; i < scores.length && picks.length < 10; i++) {
+      var n = scores[i].num;
+      if (used[n]) continue;
+      var z = n <= 20 ? 0 : n <= 40 ? 1 : n <= 60 ? 2 : 3;
+      if (zoneCount[z] < 4 && Math.random() < 0.75) {
+        picks.push(n); used[n] = true; zoneCount[z]++;
+      }
+    }
+    for (var i = 0; i < scores.length && picks.length < 10; i++) {
+      var n = scores[i].num;
+      if (!used[n] && picks.indexOf(n) < 0) { picks.push(n); used[n] = true; }
+    }
+    picks.sort(function(a,b){return a-b;});
+    results.push(picks);
+  }
+
+  var actualNums = last;
+  var html = '<div style="padding:0.5rem">';
+  html += '<div style="margin-bottom:1rem;font-size:0.8rem;color:var(--muted)">上期开奖：' + actualNums.map(function(n){return pad(n);}).join(', ') + '</div>';
+
+  for (var s = 0; s < results.length; s++) {
+    var hits = results[s].filter(function(n){ return actualNums.indexOf(n) >= 0; });
+    html += '<div style="padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
+    html += '<span style="font-weight:700;color:var(--accent);min-width:50px;font-size:0.9rem">第'+(s+1)+'注</span>';
+    results[s].forEach(function(n){
+      html += '<div class="ball red" style="width:30px;height:30px;font-size:0.7rem">'+pad(n)+'</div>';
+    });
+    html += '<span style="margin-left:auto;background:'+(hits.length>=5?'var(--accent3)':(hits.length>=3?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">命中 '+hits.length+' 个</span>';
+    html += '</div>';
+    if (hits.length > 0) {
+      html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">命中：'+hits.map(function(n){return pad(n);}).join(', ')+'</div>';
+    }
+    html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">';
+    var reasons = [];
+    results[s].forEach(function(n){
+      for (var i = 0; i < scores.length; i++) {
+        if (scores[i].num === n) {
+          var r = [];
+          if (scores[i].wf > 0.15) r.push('高频');
+          if (scores[i].mp > 0.8) r.push('深冷回补');
+          if (scores[i].neighborScore > 0.7) r.push('邻号');
+          if (scores[i].mkScore > 0.7) r.push('冷转热');
+          if (r.length > 0) reasons.push(pad(n)+'('+r.join('·')+')');
+          break;
+        }
+      }
+    });
+    if (reasons.length > 0) html += '分析：'+reasons.join('，');
+    html += '</div></div>';
+  }
+  html += '</div>';
+
+  document.getElementById('kl8-review-analysis').innerHTML = html;
 }
