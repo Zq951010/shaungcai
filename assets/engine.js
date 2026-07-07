@@ -282,6 +282,8 @@ function analyzeDLT() {
   try { renderDLTHotCold(allFronts, allBacks); } catch(e) { console.log('renderDLTHotCold error:', e.message); }
   try { renderDLTDanTuo(last, allFronts, allBacks); } catch(e) { console.log('renderDLTDanTuo error:', e.message); }
   try { renderDLTRecommend_V3(last.front.concat(last.back), allFronts, allBacks); } catch(e) { console.log('renderDLTRecommend_V3 error:', e.message); }
+  try { renderDLTProbAnalysis(); } catch(e) { console.log('renderDLTProbAnalysis error:', e.message); }
+  try { renderDLTDual(); } catch(e) { console.log('renderDLTDual error:', e.message); }
 
   // Scroll to results
   document.getElementById('dlt-results').scrollIntoView({ behavior: 'smooth' });
@@ -4369,4 +4371,492 @@ function reviewKL8() {
   html += '</div></div>';
 
   document.getElementById('kl8-review-result').innerHTML = html;
+}
+
+// ==================== 大乐透新功能模块 ====================
+
+// 摇奖机模拟选号 - 基于大模型评分加权随机抽取
+function spinDLTLottery() {
+  var frontStr = document.getElementById('dlt-front').value;
+  var backStr = document.getElementById('dlt-back').value;
+  var historyStr = document.getElementById('dlt-history').value;
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var parts = lines[i].split('|');
+    var f = parseNums(parts[0]);
+    var b = parseNums(parts[1] || '');
+    if (f.length >= 5 && b.length >= 2) {
+      history.push({ front: f.slice(0, 5).sort(function(a,b){return a-b}), back: b.slice(0, 2).sort(function(a,b){return a-b}) });
+    }
+  }
+  var lastFront = parseNums(frontStr);
+  var lastBack = parseNums(backStr);
+  if (history.length === 0 && lastFront.length >= 5 && lastBack.length >= 2) {
+    history.unshift({ front: lastFront.slice(0,5).sort(function(a,b){return a-b}), back: lastBack.slice(0,2).sort(function(a,b){return a-b}) });
+  }
+  if (history.length < 2) { alert('请先加载数据进行分析'); return; }
+
+  var last = history[0];
+  var allFronts = history.map(function(h){ return h.front; });
+  var allBacks = history.map(function(h){ return h.back; });
+  var lastDraw = last.front.concat(last.back);
+  var hist = allFronts.map(function(f,i){ return f.concat(allBacks[i]); });
+  var frontScores = scoreDLTNumbers_V3(lastDraw, hist);
+  var backScores = scoreDLTBlueNumbers_V3(lastDraw, hist);
+
+  // 加权随机抽取
+  function weightedPick(items, scores, count) {
+    var result = [];
+    var available = items.slice();
+    var scoreMap = {};
+    for (var i = 0; i < scores.length; i++) scoreMap[scores[i].num] = scores[i].totalScore + 0.5;
+    for (var r = 0; r < count; r++) {
+      if (available.length === 0) break;
+      var totalW = 0;
+      var weights = [];
+      for (var i = 0; i < available.length; i++) {
+        var w = scoreMap[available[i]] || 1;
+        weights.push(w);
+        totalW += w;
+      }
+      var rnd = Math.random() * totalW;
+      var cum = 0;
+      for (var i = 0; i < available.length; i++) {
+        cum += weights[i];
+        if (rnd <= cum) {
+          result.push(available[i]);
+          available.splice(i, 1);
+          break;
+        }
+      }
+    }
+    return result;
+  }
+
+  var allFrontNums = [];
+  for (var n = 1; n <= 35; n++) allFrontNums.push(n);
+  var allBackNums = [];
+  for (var n = 1; n <= 12; n++) allBackNums.push(n);
+
+  var results = [];
+  for (var set = 0; set < 5; set++) {
+    var frontPicks = weightedPick(allFrontNums, frontScores, 5);
+    var backPicks = weightedPick(allBackNums, backScores, 2);
+    frontPicks.sort(function(a,b){return a-b;});
+    backPicks.sort(function(a,b){return a-b;});
+    results.push({ front: frontPicks, back: backPicks });
+  }
+
+  var html = '<div style="padding:0.5rem">';
+  html += '<div style="text-align:center;margin-bottom:1rem;font-size:0.9rem;color:var(--muted)">';
+  html += '基于大模型评分加权抽选，分数越高的号码被摇中的概率越大';
+  html += '</div>';
+  for (var s = 0; s < results.length; s++) {
+    html += '<div style="display:flex;align-items:center;gap:1rem;padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<span style="font-weight:700;color:var(--accent);min-width:60px;font-size:0.9rem">第'+(s+1)+'注</span>';
+    html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">';
+    html += '<span style="font-size:0.75rem;color:var(--muted)">前区</span>';
+    results[s].front.forEach(function(n){
+      html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
+    });
+    html += '<span style="font-size:0.75rem;color:var(--muted);margin-left:0.5rem">后区</span>';
+    results[s].back.forEach(function(n){
+      html += '<div class="ball blue" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
+    });
+    // 质量分
+    var q = 0;
+    try { q = qualityScore(results[s].front, results[s].back); } catch(e) {}
+    html += '<span style="margin-left:auto;background:var(--accent);color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">质量分 '+(q||'-')+'</span>';
+    html += '</div></div>';
+  }
+  html += '</div>';
+
+  document.getElementById('dlt-lottery-results').innerHTML = html;
+  document.getElementById('dlt-lottery-results').style.display = 'block';
+}
+
+// 双彩结合推荐 - 结合双色球斜连/重号/历史规律
+function renderDLTDual() {
+  var frontStr = document.getElementById('dlt-front').value;
+  var backStr = document.getElementById('dlt-back').value;
+  var historyStr = document.getElementById('dlt-history').value;
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var parts = lines[i].split('|');
+    var f = parseNums(parts[0]);
+    var b = parseNums(parts[1] || '');
+    if (f.length >= 5 && b.length >= 2) {
+      history.push({ front: f.slice(0, 5).sort(function(a,b){return a-b}), back: b.slice(0, 2).sort(function(a,b){return a-b}) });
+    }
+  }
+  var lastFront = parseNums(frontStr);
+  var lastBack = parseNums(backStr);
+  if (history.length === 0 && lastFront.length >= 5 && lastBack.length >= 2) {
+    history.unshift({ front: lastFront.slice(0,5).sort(function(a,b){return a-b}), back: lastBack.slice(0,2).sort(function(a,b){return a-b}) });
+  }
+  if (history.length < 2) { return; }
+
+  var last = history[0];
+  var allFronts = history.map(function(h){ return h.front; });
+  var allBacks = history.map(function(h){ return h.back; });
+  var lastDraw = last.front.concat(last.back);
+  var hist = allFronts.map(function(f,i){ return f.concat(allBacks[i]); });
+  var frontScores = scoreDLTNumbers_V3(lastDraw, hist);
+  var backScores = scoreDLTBlueNumbers_V3(lastDraw, hist);
+
+  // 获取双色球最新数据用于斜连分析
+  var ssqNums = [];
+  try {
+    if (typeof ssqSampleHistory !== 'undefined' && ssqSampleHistory.length > 0) {
+      ssqNums = ssqSampleHistory[0].split('|')[0].split(',').map(Number);
+    }
+  } catch(e) {}
+
+  // 双彩融合评分：DLT评分 + 双色球斜连加分
+  function dualScore(num) {
+    var base = 0;
+    for (var i = 0; i < frontScores.length; i++) {
+      if (frontScores[i].num === num) {
+        base = frontScores[i].totalScore * 100;
+        break;
+      }
+    }
+    // 双色球斜连加分
+    var crossBonus = 0;
+    for (var j = 0; j < ssqNums.length; j++) {
+      var diff = Math.abs(num - ssqNums[j]);
+      if (diff === 1) crossBonus += 15;
+      else if (diff === 2) crossBonus += 10;
+      else if (diff === 3) crossBonus += 5;
+    }
+    // 双色球重号加分（与SSQ相同号码）
+    for (var j = 0; j < ssqNums.length; j++) {
+      if (num === ssqNums[j]) crossBonus += 20;
+    }
+    return base + crossBonus;
+  }
+
+  var scored = [];
+  for (var n = 1; n <= 35; n++) {
+    scored.push({ num: n, score: dualScore(n) });
+  }
+  scored.sort(function(a,b){return b.score - a.score;});
+
+  // 生成5个方案
+  var results = [];
+  var used = {};
+  for (var s = 0; s < 5; s++) {
+    var picks = [];
+    var zoneCount = [0,0,0];
+    for (var i = 0; i < scored.length && picks.length < 5; i++) {
+      var n = scored[i].num;
+      if (used[n]) continue;
+      var z = n <= 12 ? 0 : n <= 23 ? 1 : 2;
+      if (zoneCount[z] < 3) {
+        // 随机加入一些差异化
+        if (Math.random() < 0.7 || s > 0) {
+          picks.push(n);
+          used[n] = true;
+          zoneCount[z]++;
+        }
+      }
+    }
+    // 补足
+    for (var i = 0; i < scored.length && picks.length < 5; i++) {
+      var n = scored[i].num;
+      if (!used[n] && picks.indexOf(n) < 0) {
+        picks.push(n);
+        used[n] = true;
+      }
+    }
+    picks.sort(function(a,b){return a-b;});
+    var b = [backScores[0].num, backScores[Math.min(1,backScores.length-1)].num];
+    if (s > 0) {
+      b = [backScores[Math.min(s % backScores.length, backScores.length-1)].num,
+           backScores[Math.min((s+1) % backScores.length, backScores.length-1)].num];
+    }
+    results.push({ front: picks, back: b });
+  }
+
+  var html = '<div style="padding:0.5rem">';
+  html += '<div style="margin-bottom:1rem;font-size:0.8rem;color:var(--muted)">';
+  html += '结合双色球最新开奖号: ';
+  if (ssqNums.length > 0) {
+    html += ssqNums.map(function(n){return pad(n);}).join(', ');
+  } else {
+    html += '未加载';
+  }
+  html += ' 的斜连/重号规律进行推荐</div>';
+
+  for (var s = 0; s < results.length; s++) {
+    var q = 0;
+    try { q = qualityScore(results[s].front, results[s].back); } catch(e) {}
+    html += '<div style="display:flex;align-items:center;gap:1rem;padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<span style="font-weight:700;color:var(--accent);min-width:60px;font-size:0.9rem">第'+(s+1)+'注</span>';
+    html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">';
+    results[s].front.forEach(function(n){
+      html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
+    });
+    html += '<span style="font-size:0.75rem;color:var(--muted);margin-left:0.5rem">+</span>';
+    results[s].back.forEach(function(n){
+      html += '<div class="ball blue" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
+    });
+    html += '<span style="margin-left:auto;background:'+(q>=85?'var(--accent3)':(q>=70?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">质量分 '+q+'</span>';
+    html += '</div></div>';
+  }
+  html += '</div>';
+
+  document.getElementById('dlt-dual-results').innerHTML = html;
+}
+
+// 机选复盘分析
+function spinDLTReview() {
+  var frontStr = document.getElementById('dlt-front').value;
+  var backStr = document.getElementById('dlt-back').value;
+  var historyStr = document.getElementById('dlt-history').value;
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var parts = lines[i].split('|');
+    var f = parseNums(parts[0]);
+    var b = parseNums(parts[1] || '');
+    if (f.length >= 5 && b.length >= 2) {
+      history.push({ front: f.slice(0, 5).sort(function(a,b){return a-b}), back: b.slice(0, 2).sort(function(a,b){return a-b}) });
+    }
+  }
+  var lastFront = parseNums(frontStr);
+  var lastBack = parseNums(backStr);
+  if (history.length === 0 && lastFront.length >= 5 && lastBack.length >= 2) {
+    history.unshift({ front: lastFront.slice(0,5).sort(function(a,b){return a-b}), back: lastBack.slice(0,2).sort(function(a,b){return a-b}) });
+  }
+  if (history.length < 2) { alert('请先加载数据进行分析'); return; }
+
+  var last = history[0];
+  var allFronts = history.map(function(h){ return h.front; });
+  var allBacks = history.map(function(h){ return h.back; });
+  var lastDraw = last.front.concat(last.back);
+  var hist = allFronts.map(function(f,i){ return f.concat(allBacks[i]); });
+  var frontScores = scoreDLTNumbers_V3(lastDraw, hist);
+  var backScores = scoreDLTBlueNumbers_V3(lastDraw, hist);
+
+  // 获取SSQ数据
+  var ssqNums = [];
+  try {
+    if (typeof ssqSampleHistory !== 'undefined' && ssqSampleHistory.length > 0) {
+      ssqNums = ssqSampleHistory[0].split('|')[0].split(',').map(Number);
+    }
+  } catch(e) {}
+
+  // 双彩融合评分
+  function dualScore(num) {
+    var base = 0;
+    for (var i = 0; i < frontScores.length; i++) {
+      if (frontScores[i].num === num) {
+        base = frontScores[i].totalScore * 100;
+        break;
+      }
+    }
+    var crossBonus = 0;
+    for (var j = 0; j < ssqNums.length; j++) {
+      var diff = Math.abs(num - ssqNums[j]);
+      if (diff === 1) crossBonus += 15;
+      else if (diff === 2) crossBonus += 10;
+      else if (diff === 3) crossBonus += 5;
+    }
+    for (var j = 0; j < ssqNums.length; j++) {
+      if (num === ssqNums[j]) crossBonus += 20;
+    }
+    return base + crossBonus;
+  }
+
+  var scored = [];
+  for (var n = 1; n <= 35; n++) scored.push({ num: n, score: dualScore(n) });
+  scored.sort(function(a,b){return b.score - a.score;});
+
+  // 机选5注
+  var results = [];
+  var used = {};
+  for (var s = 0; s < 5; s++) {
+    var picks = [];
+    var zoneCount = [0,0,0];
+    for (var i = 0; i < scored.length && picks.length < 5; i++) {
+      var n = scored[i].num;
+      if (used[n]) continue;
+      var z = n <= 12 ? 0 : n <= 23 ? 1 : 2;
+      if (zoneCount[z] < 3 && Math.random() < 0.75) {
+        picks.push(n);
+        used[n] = true;
+        zoneCount[z]++;
+      }
+    }
+    for (var i = 0; i < scored.length && picks.length < 5; i++) {
+      var n = scored[i].num;
+      if (!used[n] && picks.indexOf(n) < 0) { picks.push(n); used[n] = true; }
+    }
+    picks.sort(function(a,b){return a-b;});
+    var b = [backScores[Math.min(s % backScores.length, backScores.length-1)].num,
+             backScores[Math.min((s+1) % backScores.length, backScores.length-1)].num];
+    b.sort(function(a,b){return a-b;});
+    results.push({ front: picks, back: b });
+  }
+
+  // 分析命中（与上期开奖对比）
+  var actualFront = last.front;
+  var actualBack = last.back;
+
+  var html = '<div style="padding:0.5rem">';
+  html += '<div style="margin-bottom:1rem;font-size:0.8rem;color:var(--muted)">';
+  html += '上期开奖：前区 ';
+  actualFront.forEach(function(n){ html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;border-radius:50%;background:var(--accent4);color:#fff;text-align:center;font-size:0.7rem;margin:0 2px">'+pad(n)+'</span>'; });
+  html += ' 后区 ';
+  actualBack.forEach(function(n){ html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;border-radius:50%;background:var(--accent2);color:#fff;text-align:center;font-size:0.7rem;margin:0 2px">'+pad(n)+'</span>'; });
+  html += '</div>';
+
+  for (var s = 0; s < results.length; s++) {
+    var frontHits = results[s].front.filter(function(n){ return actualFront.indexOf(n) >= 0; });
+    var backHits = results[s].back.filter(function(n){ return actualBack.indexOf(n) >= 0; });
+    var q = 0;
+    try { q = qualityScore(results[s].front, results[s].back); } catch(e) {}
+    html += '<div style="padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
+    html += '<span style="font-weight:700;color:var(--accent);min-width:50px;font-size:0.9rem">第'+(s+1)+'注</span>';
+    results[s].front.forEach(function(n){
+      var hit = actualFront.indexOf(n) >= 0;
+      html += '<div class="ball '+(hit?'red':'gray')+'" style="width:34px;height:34px;font-size:0.75rem;'+(hit?'': 'border-color:var(--rule)')+'">'+pad(n)+'</div>';
+    });
+    html += '<span style="font-size:0.75rem;color:var(--muted)">+</span>';
+    results[s].back.forEach(function(n){
+      var hit = actualBack.indexOf(n) >= 0;
+      html += '<div class="ball '+(hit?'blue':'gray')+'" style="width:34px;height:34px;font-size:0.75rem;'+(hit?'': 'border-color:var(--rule)')+'">'+pad(n)+'</div>';
+    });
+    html += '<span style="margin-left:auto;background:'+(q>=85?'var(--accent3)':(q>=70?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">质量分 '+q+'</span>';
+    html += '</div>';
+    // 命中分析
+    if (frontHits.length > 0 || backHits.length > 0) {
+      html += '<div style="margin-top:0.4rem;font-size:0.75rem;color:var(--muted)">';
+      if (frontHits.length > 0) {
+        html += '前区命中：'+frontHits.map(function(n){return pad(n);}).join(', ')+' ';
+      }
+      if (backHits.length > 0) {
+        html += '后区命中：'+backHits.map(function(n){return pad(n);}).join(', ');
+      }
+      if (frontHits.length === 0 && backHits.length === 0) {
+        html += '本期未命中';
+      }
+      html += '</div>';
+    }
+    // 分析理由
+    html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">';
+    var reasons = [];
+    results[s].front.forEach(function(n){
+      for (var i = 0; i < frontScores.length; i++) {
+        if (frontScores[i].num === n) {
+          var r = [];
+          if (frontScores[i].wf > 0.2) r.push('高频');
+          if (frontScores[i].mp > 0.8) r.push('深冷回补');
+          if (frontScores[i].mkScore > 0.7) r.push('冷转热');
+          if (frontScores[i].neighborScore > 0.7) r.push('邻号');
+          if (frontScores[i].diagonalScore > 0.7) r.push('斜连');
+          if (r.length > 0) reasons.push(pad(n)+'('+r.join('·')+')');
+          break;
+        }
+      }
+    });
+    if (reasons.length > 0) html += '分析：'+reasons.join('，');
+    html += '</div></div>';
+  }
+  html += '</div>';
+
+  document.getElementById('dlt-review-analysis').innerHTML = html;
+}
+
+// 使用双色球数据填充大乐透Tab2/Tab5/Tab6的额外分析
+function renderDLTProbAnalysis() {
+  var frontStr = document.getElementById('dlt-front').value;
+  var backStr = document.getElementById('dlt-back').value;
+  var historyStr = document.getElementById('dlt-history').value;
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var parts = lines[i].split('|');
+    var f = parseNums(parts[0]);
+    var b = parseNums(parts[1] || '');
+    if (f.length >= 5 && b.length >= 2) {
+      history.push({ front: f.slice(0, 5).sort(function(a,b){return a-b}), back: b.slice(0, 2).sort(function(a,b){return a-b}) });
+    }
+  }
+  var lastFront = parseNums(frontStr);
+  var lastBack = parseNums(backStr);
+  if (history.length === 0 && lastFront.length >= 5 && lastBack.length >= 2) {
+    history.unshift({ front: lastFront.slice(0,5).sort(function(a,b){return a-b}), back: lastBack.slice(0,2).sort(function(a,b){return a-b}) });
+  }
+  if (history.length < 2) return;
+
+  var last = history[0];
+  var allFronts = history.map(function(h){ return h.front; });
+  var allBacks = history.map(function(h){ return h.back; });
+  var lastDraw = last.front.concat(last.back);
+  var hist = allFronts.map(function(f,i){ return f.concat(allBacks[i]); });
+  var frontScores = scoreDLTNumbers_V3(lastDraw, hist);
+  var backScores = scoreDLTBlueNumbers_V3(lastDraw, hist);
+
+  // Tab2: 前区Top15评分
+  var top15 = frontScores.slice(0, 15);
+  var html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
+  html += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">号码</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">频率</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏%位</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">马尔可夫</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">邻号</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">斜连</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">总评分</th></tr></thead><tbody>';
+  top15.forEach(function(s){
+    html += '<tr><td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--accent4)">'+pad(s.num)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.wf*100).toFixed(1)+'%</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+s.currentGap+'期</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.mp*100).toFixed(0)+'%</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.mkScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.neighborScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.diagonalScore*100).toFixed(0)+'</td>';
+    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--accent)">'+(s.totalScore*100).toFixed(1)+'</td></tr>';
+  });
+  html += '</tbody></table></div>';
+  document.getElementById('dlt-prob-front').innerHTML = html;
+
+  // Tab2: 后区Top8评分
+  var top8 = backScores.slice(0, 8);
+  html = '<div style="display:flex;gap:0.6rem;flex-wrap:wrap">';
+  top8.forEach(function(s){
+    html += '<div style="padding:0.6rem 1rem;border:1px solid var(--rule);border-radius:6px;background:var(--bg2);text-align:center;min-width:80px">';
+    html += '<div style="font-weight:bold;color:var(--accent2);font-size:1.1rem">'+pad(s.num)+'</div>';
+    html += '<div style="color:var(--muted);font-size:0.7rem">'+(s.totalScore*100).toFixed(1)+'分</div>';
+    html += '<div style="color:var(--muted);font-size:0.65rem">遗漏'+s.currentGap+'期</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  document.getElementById('dlt-prob-back').innerHTML = html;
+
+  // Tab2: 重号分析
+  try { renderDLTRepeat(last, history); } catch(e) {}
+  // 重号分析内容复制到dlt-prob-repeat
+  var repeatHtml = document.getElementById('dlt-repeat').innerHTML;
+  if (repeatHtml) document.getElementById('dlt-prob-repeat').innerHTML = repeatHtml;
+
+  // Tab2: 斜连号分析
+  var dhtml = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
+  dhtml += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">号码</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">斜连分</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">邻号分</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">跨彩种斜连</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">说明</th></tr></thead><tbody>';
+  var diagonalTop = frontScores.slice().sort(function(a,b){return (b.diagonalScore||0) - (a.diagonalScore||0);}).slice(0, 10);
+  var ssqNums = [];
+  try { if (typeof ssqSampleHistory !== 'undefined' && ssqSampleHistory.length > 0) { ssqNums = ssqSampleHistory[0].split('|')[0].split(',').map(Number); } } catch(e) {}
+  diagonalTop.forEach(function(s){
+    if ((s.diagonalScore||0) < 0.5) return;
+    var crossNote = '';
+    for (var j = 0; j < ssqNums.length; j++) {
+      var diff = Math.abs(s.num - ssqNums[j]);
+      if (diff <= 2) { crossNote = 'SSQ斜连'+pad(ssqNums[j])+'('+diff+')'; break; }
+    }
+    dhtml += '<tr><td style="padding:4px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--ink)">'+pad(s.num)+'</td>';
+    dhtml += '<td style="padding:4px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.diagonalScore*100).toFixed(0)+'</td>';
+    dhtml += '<td style="padding:4px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.neighborScore*100).toFixed(0)+'</td>';
+    dhtml += '<td style="padding:4px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(crossNote||'-')+'</td>';
+    dhtml += '<td style="padding:4px;border:1px solid var(--rule);color:var(--muted);font-size:0.7rem">'+(s.diagonalScore>0.7?'强斜连':'中斜连')+'</td></tr>';
+  });
+  dhtml += '</tbody></table></div>';
+  document.getElementById('dlt-prob-diagonal').innerHTML = dhtml;
 }

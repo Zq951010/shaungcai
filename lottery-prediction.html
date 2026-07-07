@@ -586,6 +586,72 @@ tr:hover td { background: var(--bg3); }
 .hl-blue { color: var(--accent2); font-weight: 700; }
 .hl-gold { color: var(--accent); font-weight: 700; }
 .hl-green { color: var(--accent3); font-weight: 700; }
+
+/* DLT Sidebar Layout */
+.dlt-layout {
+  display: flex;
+  gap: 1.5rem;
+  min-height: 500px;
+}
+.dlt-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--bg2);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 0.5rem;
+  align-self: flex-start;
+  position: sticky;
+  top: 80px;
+}
+.dlt-sidebar-btn {
+  display: block;
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 2px;
+  line-height: 1.4;
+}
+.dlt-sidebar-btn:hover {
+  background: var(--bg3);
+  color: var(--ink);
+}
+.dlt-sidebar-btn.active {
+  background: var(--accent);
+  color: #000;
+  font-weight: 600;
+}
+.dlt-sidebar-btn .badge-sm {
+  display: inline-block;
+  font-size: 0.65rem;
+  padding: 0 0.3rem;
+  border-radius: 3px;
+  margin-right: 0.4rem;
+  font-weight: 700;
+}
+.dlt-content {
+  flex: 1;
+  min-width: 0;
+}
+.dlt-tab {
+  display: none;
+}
+.dlt-tab.active {
+  display: block;
+}
+@media (max-width: 768px) {
+  .dlt-layout { flex-direction: column; }
+  .dlt-sidebar { width: 100%; position: static; display: flex; flex-wrap: wrap; gap: 0.3rem; }
+  .dlt-sidebar-btn { width: auto; flex: 1; min-width: 100px; font-size: 0.75rem; padding: 0.5rem; }
+}
 </style>
 </head>
 <body>
@@ -639,7 +705,6 @@ tr:hover td { background: var(--bg3); }
 <div class="lottery-panel" id="panel-dlt">
   <div style="margin-bottom:1rem"><button class="back-to-home" style="padding:0.4rem 1rem;border:1px solid var(--rule);border-radius:6px;background:var(--bg3);color:var(--ink);cursor:pointer;font-size:0.85rem">← 返回首页</button></div>
 
-  <!-- 规则说明 -->
   <div class="card">
     <div class="card-title"><span class="icon">&#127942;</span> 大乐透玩法规则</div>
     <div class="rule-box">
@@ -649,12 +714,11 @@ tr:hover td { background: var(--bg3); }
     </div>
   </div>
 
-  <!-- 数据输入 -->
   <div class="input-section">
     <h3>输入上期开奖号码</h3>
     <div class="input-row">
       <label>前区号码：</label>
-      <input type="text" id="dlt-front" placeholder="如: 03,15,22,28,35" style="width:280px">
+      <input type="text" id="dlt-front" placeholder="如: 03,15,22,28,35" style="width:300px">
     </div>
     <div class="input-row" style="margin-top:0.5rem">
       <label>后区号码：</label>
@@ -673,110 +737,121 @@ tr:hover td { background: var(--bg3); }
 
   <!-- 分析结果容器 -->
   <div id="dlt-results" style="display:none">
-    <!-- 基本统计 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128200;</span> 基本统计指标</div>
-      <div class="stat-grid" id="dlt-stats"></div>
-    </div>
-
-    <!-- 重号分析 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128260;</span> 上期重号分析</div>
-      <div id="dlt-repeat"></div>
-    </div>
-
-    <!-- 区间比分析 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128202;</span> 区间比分析</div>
-      <div id="dlt-zone"></div>
-      <figure class="chart-figure">
-        <figcaption>前区区间比分布趋势</figcaption>
-        <div id="chart-dlt-zone" style="width:100%;min-height:350px"></div>
-      </figure>
-    </div>
-
-    <!-- 和值分析 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128736;</span> 和值分析</div>
-      <div id="dlt-sum"></div>
-      <figure class="chart-figure">
-        <figcaption>前区和值走势</figcaption>
-        <div id="chart-dlt-sum" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-
-    <!-- 跨度分析 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#129504;</span> 跨度分析</div>
-      <div id="dlt-span"></div>
-      <figure class="chart-figure">
-        <figcaption>前区跨度走势</figcaption>
-        <div id="chart-dlt-span" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-
-    <!-- 冷热号分析 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#127777;&#10052;&#65039;</span> 冷热号分析</div>
-      <div id="dlt-hotcold"></div>
-      <figure class="chart-figure">
-        <figcaption>前区号码出现频率</figcaption>
-        <div id="chart-dlt-freq" style="width:100%;min-height:400px"></div>
-      </figure>
-    </div>
-
-    <!-- 胆码拖码推荐 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#11088;</span> 胆码 / 拖码推荐</div>
-      <div id="dlt-dantuo"></div>
-    </div>
-
-    <!-- 综合推荐 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#127919;</span> 综合推荐号码</div>
-      <div id="dlt-recommend"></div>
-    </div>
-
-    <!-- 智能预测推荐（AI模型） -->
-    <div class="card" id="dlt-smart-card">
-      <div class="card-title"><span class="icon">&#129302;</span> 智能预测推荐（AI模型）</div>
-      <div id="dlt-smart-recommend"></div>
-    </div>
-
-    <!-- 票花自主分析 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#127802;</span> 票花自主分析</div>
-      <div style="margin-bottom:0.5rem;font-size:0.8rem;color:var(--muted)">支持多组票花+号码综合分析。每行一组，格式：票花代码|号码（如 PZFBBW|02,04,14...）。也可分开填写：票花每行一个，号码每行一组，行数对应。</div>
-      <div class="input-row" style="margin-bottom:0.5rem;align-items:flex-start">
-        <label>票花代码：</label>
-        <textarea id="dlt-flower-input" placeholder="如: PZFBBW&#10;ABC&#10;CFQ*LY" style="width:150px;text-transform:uppercase;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
+    <div class="dlt-layout">
+      <!-- 左侧导航 -->
+      <div class="dlt-sidebar" id="dlt-sidebar">
+        <button class="dlt-sidebar-btn active" onclick="switchDLTTab('tab1', this)">
+          <span class="badge-sm" style="background:var(--accent4);color:#fff">1</span>常规冷热号分析
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchDLTTab('tab2', this)">
+          <span class="badge-sm" style="background:var(--accent2);color:#fff">2</span>大模型统计概率
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchDLTTab('tab3', this)">
+          <span class="badge-sm" style="background:var(--accent3);color:#fff">3</span>AI模型推测方案
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchDLTTab('tab4', this)">
+          <span class="badge-sm" style="background:var(--accent5);color:#fff">4</span>摇奖机模拟选号
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchDLTTab('tab5', this)">
+          <span class="badge-sm" style="background:var(--gold);color:#000">5</span>双彩结合推荐
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchDLTTab('tab6', this)">
+          <span class="badge-sm" style="background:var(--accent);color:#000">6</span>模型复盘与推荐
+        </button>
       </div>
-      <div class="input-row" style="margin-bottom:0.75rem;align-items:flex-start">
-        <label>号码：</label>
-        <textarea id="dlt-flower-numbers" placeholder="02,04,14,19,23,25,26,28,30,33,3&#10;01,05,12,18,22,29,34,02,08&#10;03,11,15,20,27,35,05,09" style="width:280px;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
-        <button class="btn btn-secondary" onclick="renderFlowerAnalysis('dlt')" style="margin-left:0.5rem;align-self:flex-start">票花分析</button>
-      </div>
-      <div id="dlt-flower-result"></div>
-    </div>
 
-    <!-- 上期选号复盘 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128260;</span> 上期选号复盘</div>
-      <div class="input-row" style="margin-bottom:0.75rem">
-        <label>您上期的选号：</label>
-        <input type="text" id="dlt-review-numbers" placeholder="前区如: 03,11,12,21,22" style="width:220px">
-        <input type="text" id="dlt-review-blue" placeholder="后区如: 06,10" style="width:120px">
-        <button class="btn btn-secondary" onclick="reviewDLT()" style="margin-left:0.5rem">复盘对比</button>
-      </div>
-      <div id="dlt-review-result"></div>
-    </div>
+      <!-- 右侧内容 -->
+      <div class="dlt-content">
+        <!-- Tab 1: 常规冷热号分析 -->
+        <div class="dlt-tab active" id="tab1">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#127777;&#10052;&#65039;</span> 1. 常规冷热号分析</div>
+            <div id="dlt-hotcold"></div>
+            <div id="chart-dlt-freq" style="width:100%;min-height:400px"></div>
+          </div>
+        </div>
 
-    <!-- 模型自动复盘与优化 -->
-    <div class="card" id="dlt-auto-review-card" style="display:none">
-      <div class="card-title"><span class="icon">&#128736;</span> 模型自动复盘与优化</div>
-      <div id="dlt-auto-review"></div>
+        <!-- Tab 2: 大模型统计概率 -->
+        <div class="dlt-tab" id="tab2">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128202;</span> 2. 大模型统计概率分析</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              基于加权频率、遗漏百分位、马尔可夫转移、邻号、区间、奇偶、大小、尾数、共现等多维评分模型，对前区1-35和后区01-12所有号码进行综合评分。
+            </div>
+            <h4 style="margin-bottom:0.5rem;color:var(--ink)">前区号码评分 Top 15</h4>
+            <div id="dlt-prob-front"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">后区号码评分 Top 8</h4>
+            <div id="dlt-prob-back"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">上期重号分析</h4>
+            <div id="dlt-prob-repeat"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">斜连号分析</h4>
+            <div id="dlt-prob-diagonal"></div>
+          </div>
+        </div>
+
+        <!-- Tab 3: AI模型推测方案 -->
+        <div class="dlt-tab" id="tab3">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#129302;</span> 3. AI模型推测方案</div>
+            <div id="dlt-recommend"></div>
+          </div>
+          <div class="card" id="dlt-smart-card">
+            <div class="card-title"><span class="icon">&#129302;</span> 智能预测推荐（AI模型）</div>
+            <div id="dlt-smart-recommend"></div>
+          </div>
+        </div>
+
+        <!-- Tab 4: 摇奖机模拟选号 -->
+        <div class="dlt-tab" id="tab4">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#127922;</span> 4. 摇奖机模拟选号</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              基于大模型评分结果，通过摇奖机方式模拟从前区1-35、后区01-12中机选5注号码。<br>
+              <strong>摇奖规则：</strong>前区号码池中总分越高的号码被抽中的概率越大，后区同理。每摇出一注后，已选号码暂时移出池中，避免重复。
+            </div>
+            <div style="text-align:center;margin:1.5rem 0">
+              <button class="btn btn-primary" onclick="spinDLTLottery()" style="font-size:1.1rem;padding:0.8rem 2.5rem;border-radius:50px">&#127922; 开始摇奖</button>
+            </div>
+            <div id="dlt-lottery-results" style="display:none"></div>
+          </div>
+        </div>
+
+        <!-- Tab 5: 双彩结合推荐 -->
+        <div class="dlt-tab" id="tab5">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128258;</span> 5. 双彩结合推荐</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              结合双色球最新开奖号的左右侧斜连、重号、历史规律，与大乐透自身评分模型融合推荐。
+            </div>
+            <div id="dlt-dual-results"></div>
+          </div>
+        </div>
+
+        <!-- Tab 6: 模型复盘与推荐 -->
+        <div class="dlt-tab" id="tab6">
+          <div class="card" id="dlt-auto-review-card">
+            <div class="card-title"><span class="icon">&#128736;</span> 6. 模型自动复盘与推荐</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              结合双色球冷热号、左右侧斜连、重号、历史规律，推荐5注号码。支持自主机选并对机选号码进行命中分析。
+            </div>
+            <div id="dlt-auto-review"></div>
+            <div style="text-align:center;margin:1rem 0">
+              <button class="btn btn-primary" onclick="spinDLTReview()" style="font-size:1rem;padding:0.6rem 2rem;border-radius:50px">&#127922; 机选号码并分析</button>
+            </div>
+            <div id="dlt-review-analysis"></div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
+
+  <!-- 隐藏占位元素 - 保持与老函数兼容 -->
+  <div id="dlt-stats" style="display:none"></div>
+  <div id="dlt-repeat" style="display:none"></div>
+  <div id="dlt-zone" style="display:none"></div>
+  <div id="dlt-sum" style="display:none"></div>
+  <div id="dlt-span" style="display:none"></div>
+  <div id="dlt-dantuo" style="display:none"></div>
 
   <!-- 空状态 -->
   <div id="dlt-empty" class="empty-state">
@@ -1359,10 +1434,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026070706"></script>
+<script src="assets/engine.js?v=2026070707"></script>
 <script src="assets/pl-data.js?v=202607062300"></script>
 <script src="assets/pl-engine.js?v=202607062300"></script>
-<script src="assets/auto-review.js?v=2026070706"></script>
+<script src="assets/auto-review.js?v=2026070707"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data and analyze on page load (analysis runs in background)
@@ -1392,6 +1467,16 @@ window.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+
+<script>
+function switchDLTTab(tabId, btn) {
+  document.querySelectorAll('#dlt-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('.dlt-tab').forEach(function(t){ t.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  var tab = document.getElementById(tabId);
+  if (tab) tab.classList.add('active');
+}
+</script>
 
 <script>
 // Home navigation + light theme enhancements
