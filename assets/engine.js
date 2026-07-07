@@ -344,7 +344,6 @@ function renderDLTStats(last, history) {
 
 function renderDLTRepeat(last, history) {
   var html = '';
-
   // Count repeat numbers from last period in each subsequent period
   var repeatCounts = [];
   for (var i = 1; i < history.length; i++) {
@@ -5991,6 +5990,29 @@ function spinKL8Review() {
     results.push(picks);
   }
 
+  // 自动保存机选号码预测记录
+  var machineRec = {
+    key: new Date().toISOString().slice(0,10) + '_machine',
+    date: new Date().toISOString().slice(0,10),
+    period: '',
+    lastDraw: actualNums.slice().sort(function(a,b){return a-b;}),
+    playType: 10,
+    playTypeName: '机选选十',
+    actualDraw: null,
+    verified: false,
+    strategies: results.map(function(r, idx){ return {name: '机选第'+(idx+1)+'注', picks: r}; }),
+    savedAt: new Date().toISOString()
+  };
+  var predHistory = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
+  var existIdx = -1;
+  for (var i = 0; i < predHistory.length; i++) {
+    if (predHistory[i].key === machineRec.key) { existIdx = i; break; }
+  }
+  if (existIdx >= 0) predHistory[existIdx] = machineRec;
+  else predHistory.unshift(machineRec);
+  if (predHistory.length > KL8_MAX_PREDICTIONS) predHistory = predHistory.slice(0, KL8_MAX_PREDICTIONS);
+  localStorage.setItem(KL8_PREDICTION_STORAGE_KEY, JSON.stringify(predHistory));
+
   // ==================== 选五/选十 策略推荐复盘 ====================
   function genStrategy1(pt) {
     var picks = [];
@@ -6215,6 +6237,14 @@ function clearKL8PredictionHistory() {
   if (!confirm('确定要清除所有往期预测记录吗？')) return;
   localStorage.removeItem(KL8_PREDICTION_STORAGE_KEY);
   document.getElementById('kl8-prediction-history').innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem">已清除全部记录</div>';
+  var statsEl = document.getElementById('kl8-prediction-stats');
+  if (statsEl) statsEl.innerHTML = '';
+  var dateFilterEl = document.getElementById('kl8-history-date-filter');
+  if (dateFilterEl) { dateFilterEl.innerHTML = '<option value="all">全部日期</option>'; }
+}
+
+function filterKL8HistoryByDate() {
+  renderKL8PredictionHistory();
 }
 
 // 渲染预测历史
@@ -6224,10 +6254,68 @@ function renderKL8PredictionHistory() {
 
   if (history.length === 0) {
     container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem">暂无预测记录，请先在"选五/选十推荐"中生成推荐号码</div>';
+    var statsEl = document.getElementById('kl8-prediction-stats');
+    if (statsEl) statsEl.innerHTML = '';
     return;
   }
 
+  // 填充日期筛选器
+  var dateFilterEl = document.getElementById('kl8-history-date-filter');
+  if (dateFilterEl) {
+    var allDates = [];
+    for (var i = 0; i < history.length; i++) {
+      var d = history[i].date;
+      if (allDates.indexOf(d) < 0) allDates.push(d);
+    }
+    allDates.sort().reverse();
+    // 保存当前选中值
+    var currentVal = dateFilterEl.value;
+    dateFilterEl.innerHTML = '<option value="all">全部日期（'+history.length+'条记录）</option>';
+    for (var i = 0; i < allDates.length; i++) {
+      var dayRecs = history.filter(function(r){return r.date===allDates[i];});
+      var verifiedCount = dayRecs.filter(function(r){return r.verified;}).length;
+      dateFilterEl.innerHTML += '<option value="'+allDates[i]+'">'+allDates[i]+' ('+dayRecs.length+'条'+(verifiedCount>0?'，'+verifiedCount+'条已验证':'')+')</option>';
+    }
+    dateFilterEl.value = currentVal;
+  }
+
   var html = '';
+  // 命中率统计面板
+  var statsHtml = '<div style="padding:0.8rem;background:var(--bg2);border-radius:8px;border:1px solid var(--rule);margin-bottom:1rem;font-size:0.8rem">';
+  var verifiedRecs = history.filter(function(r){return r.verified;});
+  var pendingRecs = history.filter(function(r){return !r.verified;});
+  statsHtml += '<div style="display:flex;gap:1.5rem;flex-wrap:wrap">';
+  statsHtml += '<div><span style="color:var(--muted)">总记录：</span><strong>'+history.length+'条</strong></div>';
+  statsHtml += '<div><span style="color:var(--muted)">已验证：</span><strong style="color:var(--accent3)">'+verifiedRecs.length+'条</strong></div>';
+  statsHtml += '<div><span style="color:var(--muted)">待开奖：</span><strong style="color:var(--accent)">'+pendingRecs.length+'条</strong></div>';
+  // 各策略累计命中率
+  if (verifiedRecs.length > 0) {
+    var strategyHitMap = {};
+    var strategyTotalMap = {};
+    for (var i = 0; i < verifiedRecs.length; i++) {
+      for (var j = 0; j < verifiedRecs[i].strategies.length; j++) {
+        var sn = verifiedRecs[i].strategies[j].name;
+        if (!strategyHitMap[sn]) { strategyHitMap[sn] = 0; strategyTotalMap[sn] = 0; }
+        strategyHitMap[sn] += (verifiedRecs[i].strategies[j].hits || 0);
+        strategyTotalMap[sn] += verifiedRecs[i].playType;
+      }
+    }
+    statsHtml += '</div><div style="margin-top:0.5rem;border-top:1px solid var(--rule);padding-top:0.5rem">';
+    statsHtml += '<div style="color:var(--muted);margin-bottom:0.3rem">各策略累计命中率：</div>';
+    var sNames = Object.keys(strategyHitMap);
+    for (var i = 0; i < sNames.length; i++) {
+      var rate = Math.round(strategyHitMap[sNames[i]] / strategyTotalMap[sNames[i]] * 100);
+      var barColor = rate>=40?'var(--accent3)':(rate>=20?'var(--accent)':'var(--accent4)');
+      statsHtml += '<div style="display:flex;align-items:center;gap:0.5rem;margin:0.2rem 0">';
+      statsHtml += '<span style="min-width:100px;font-size:0.75rem">'+sNames[i]+'</span>';
+      statsHtml += '<div style="flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+rate+'%;background:'+barColor+';border-radius:3px"></div></div>';
+      statsHtml += '<span style="font-size:0.75rem;font-weight:600;color:'+barColor+'">'+rate+'%</span>';
+      statsHtml += '</div>';
+    }
+  }
+  statsHtml += '</div></div>';
+  var statsEl = document.getElementById('kl8-prediction-stats');
+  if (statsEl) statsEl.innerHTML = statsHtml;
   // 按日期分组
   var grouped = {};
   for (var i = 0; i < history.length; i++) {
@@ -6236,6 +6324,18 @@ function renderKL8PredictionHistory() {
     grouped[d].push(history[i]);
   }
   var dates = Object.keys(grouped).sort().reverse();
+
+  // 按日期筛选
+  var filterDate = document.getElementById('kl8-history-date-filter');
+  var filterVal = filterDate ? filterDate.value : 'all';
+  if (filterVal !== 'all') {
+    grouped = {};
+    grouped[filterVal] = [];
+    for (var i = 0; i < history.length; i++) {
+      if (history[i].date === filterVal) grouped[filterVal].push(history[i]);
+    }
+    dates = [filterVal];
+  }
 
   for (var di = 0; di < dates.length; di++) {
     var date = dates[di];

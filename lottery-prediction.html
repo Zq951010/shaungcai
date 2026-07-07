@@ -1231,10 +1231,15 @@ tr:hover td { background: var(--bg3); }
             <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
               自动保存每次生成的选五/选十推荐号码，开奖后自动验证命中情况。支持清除历史记录。
             </div>
-            <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap">
+            <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
               <button class="btn btn-primary" onclick="renderKL8PredictionHistory()" style="padding:0.4rem 1rem;border-radius:8px;font-size:0.8rem">&#128269; 刷新记录</button>
               <button class="btn btn-secondary" onclick="clearKL8PredictionHistory()" style="padding:0.4rem 1rem;border-radius:8px;font-size:0.8rem;background:var(--bg3);color:var(--ink);border:1px solid var(--rule)">&#128465; 清除全部记录</button>
+              <label style="font-size:0.8rem;color:var(--muted);margin-left:auto">按日期筛选：</label>
+              <select id="kl8-history-date-filter" onchange="filterKL8HistoryByDate()" style="padding:0.3rem 0.5rem;border-radius:6px;border:1px solid var(--rule);background:var(--bg2);color:var(--ink);font-size:0.8rem">
+                <option value="all">全部日期</option>
+              </select>
             </div>
+            <div id="kl8-prediction-stats"></div>
             <div id="kl8-prediction-history"></div>
           </div>
         </div>
@@ -1625,10 +1630,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026070727"></script>
-<script src="assets/pl-data.js?v=2026070727"></script>
-<script src="assets/pl-engine.js?v=2026070727"></script>
-<script src="assets/auto-review.js?v=2026070727"></script>
+<script src="assets/engine.js?v=2026070728"></script>
+<script src="assets/pl-data.js?v=2026070728"></script>
+<script src="assets/pl-engine.js?v=2026070728"></script>
+<script src="assets/auto-review.js?v=2026070728"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)
