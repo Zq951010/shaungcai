@@ -1899,10 +1899,12 @@ function loadSSQSample() {
   document.getElementById('ssq-red').value = parts[0];
   document.getElementById('ssq-blue').value = parts[1];
   document.getElementById('ssq-history').value = ssqSampleHistory.join('\n');
-  // 填充复盘输入框默认值
+  // 填充复盘输入框默认值（兼容旧版复盘输入框）
   var sampleRed = parts[0].split(',').slice(0,6).join(',');
-  document.getElementById('ssq-review-numbers').value = sampleRed;
-  document.getElementById('ssq-review-blue').value = parts[1];
+  var reviewNums = document.getElementById('ssq-review-numbers');
+  var reviewBlue = document.getElementById('ssq-review-blue');
+  if (reviewNums) reviewNums.value = sampleRed;
+  if (reviewBlue) reviewBlue.value = parts[1];
 }
 
 function clearSSQ() {
