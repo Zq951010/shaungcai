@@ -1203,7 +1203,7 @@ tr:hover td { background: var(--bg3); }
     <div class="card-title"><span class="icon">&#127942;</span> 排列三玩法规则</div>
     <div class="rule-box">
       <strong>号码池：</strong>从 0-9 中选取 3 个数字（可重复）&nbsp;|&nbsp; <strong>开奖频率：</strong>每天一期（晚21:15开奖）<br>
-      <strong>玩法类型：</strong>直选（位置对应）、组三（有两个相同）、组六（三个不同）、1D/2D（定位）<br>
+      <strong>玩法类型：</strong>直选（位置对应）、组三（有两个相同）、组六（三个不同）<br>
       <strong>和值范围：</strong>0-27 &nbsp;|&nbsp; <strong>跨度范围：</strong>0-9
     </div>
   </div>
@@ -1226,105 +1226,128 @@ tr:hover td { background: var(--bg3); }
   </div>
 
   <div id="pl3-results" style="display:none">
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128200;</span> 基本统计指标</div>
-      <div class="stat-grid" id="pl3-stats"></div>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128260;</span> 上期重号分析</div>
-      <div id="pl3-repeat"></div>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128736;</span> 和值分析</div>
-      <div id="pl3-sum"></div>
-      <figure class="chart-figure">
-        <figcaption>和值走势</figcaption>
-        <div id="chart-pl3-sum" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#129504;</span> 跨度分析</div>
-      <div id="pl3-span"></div>
-      <figure class="chart-figure">
-        <figcaption>跨度走势</figcaption>
-        <div id="chart-pl3-span" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#127777;&#10052;&#65039;</span> 冷热号分析</div>
-      <div id="pl3-hotcold"></div>
-      <figure class="chart-figure">
-        <figcaption>号码出现频率</figcaption>
-        <div id="chart-pl3-freq" style="width:100%;min-height:350px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128204;</span> 奇偶比 / 大小比分析</div>
-      <div id="pl3-odd-even"></div>
-      <figure class="chart-figure">
-        <figcaption>奇偶比走势</figcaption>
-        <div id="chart-pl3-oddeven" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128291;</span> 尾数分布分析</div>
-      <div id="pl3-tail"></div>
-      <figure class="chart-figure">
-        <figcaption>尾数出现频率</figcaption>
-        <div id="chart-pl3-tail" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128279;</span> 遗漏分析</div>
-      <div id="pl3-miss"></div>
-      <figure class="chart-figure">
-        <figcaption>各号码遗漏期数</figcaption>
-        <div id="chart-pl3-miss" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#127919;</span> 综合推荐号码</div>
-      <div id="pl3-recommend"></div>
-    </div>
-
-    <!-- 智能预测推荐（AI模型） -->
-    <div class="card" id="pl3-smart-card">
-      <div class="card-title"><span class="icon">&#129302;</span> 智能预测推荐（AI模型）</div>
-      <div id="pl3-smart-recommend"></div>
-    </div>
-
-    <!-- 票花自主分析 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#127802;</span> 票花自主分析</div>
-      <div style="margin-bottom:0.5rem;font-size:0.8rem;color:var(--muted)">支持多组票花+号码综合分析。每行一组，格式：票花代码|号码（如 ABC|5,6,2）。也可分开填写：票花每行一个，号码每行一组（每组3个，按百十个位顺序），行数对应。</div>
-      <div class="input-row" style="margin-bottom:0.5rem;align-items:flex-start">
-        <label>票花代码：</label>
-        <textarea id="pl3-flower-input" placeholder="如: ABC&#10;PZM&#10;KHU" style="width:150px;text-transform:uppercase;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
+    <div class="dlt-layout">
+      <div class="dlt-sidebar" id="pl3-sidebar">
+        <button class="dlt-sidebar-btn active" onclick="switchPL3Tab('pl3-tab1', this)">
+          <span class="badge-sm" style="background:var(--accent4);color:#fff">1</span>常规冷热号分析
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchPL3Tab('pl3-tab2', this)">
+          <span class="badge-sm" style="background:var(--accent2);color:#fff">2</span>大模型统计概率
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchPL3Tab('pl3-tab3', this)">
+          <span class="badge-sm" style="background:var(--accent3);color:#fff">3</span>AI模型推测方案
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchPL3Tab('pl3-tab4', this)">
+          <span class="badge-sm" style="background:var(--accent5);color:#fff">4</span>摇奖机模拟选号
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchPL3Tab('pl3-tab5', this)">
+          <span class="badge-sm" style="background:var(--gold);color:#000">5</span>模型复盘与推荐
+        </button>
       </div>
-      <div class="input-row" style="margin-bottom:0.75rem;align-items:flex-start">
-        <label>号码：</label>
-        <textarea id="pl3-flower-numbers" placeholder="5,6,2&#10;3,8,9&#10;1,4,7" style="width:200px;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
-        <button class="btn btn-secondary" onclick="renderFlowerAnalysis('pl3')" style="margin-left:0.5rem;align-self:flex-start">票花分析</button>
-      </div>
-      <div id="pl3-flower-result"></div>
-    </div>
 
-    <!-- 上期选号复盘 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128260;</span> 上期选号复盘</div>
-      <div class="input-row" style="margin-bottom:0.75rem">
-        <label>您上期的选号：</label>
-        <input type="text" id="pl3-review-numbers" placeholder="如: 5,6,2" style="width:150px">
-        <button class="btn btn-secondary" onclick="reviewPL3()" style="margin-left:0.5rem">复盘对比</button>
-      </div>
-      <div id="pl3-review-result"></div>
-    </div>
+      <div class="dlt-content">
+        <!-- Tab 1 -->
+        <div class="dlt-tab active" id="pl3-tab1">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#127777;&#10052;&#65039;</span> 1. 常规冷热号分析</div>
+            <div id="pl3-hotcold"></div>
+            <figure class="chart-figure">
+              <figcaption>号码出现频率</figcaption>
+              <div id="chart-pl3-freq" style="width:100%;min-height:350px"></div>
+            </figure>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128279;</span> 遗漏分析</div>
+            <div id="pl3-miss"></div>
+            <figure class="chart-figure">
+              <figcaption>各号码遗漏期数</figcaption>
+              <div id="chart-pl3-miss" style="width:100%;min-height:300px"></div>
+            </figure>
+          </div>
+        </div>
 
-    <!-- 模型自动复盘与优化 -->
-    <div class="card" id="pl3-auto-review-card" style="display:none">
-      <div class="card-title"><span class="icon">&#128736;</span> 模型自动复盘与优化</div>
-      <div id="pl3-auto-review"></div>
+        <!-- Tab 2 -->
+        <div class="dlt-tab" id="pl3-tab2">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128202;</span> 2. 大模型统计概率</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              基于加权频率、遗漏回补、邻号、奇偶、大小、跨度等多维评分模型，对百位/十位/个位分别评分。
+            </div>
+            <h4 style="margin-bottom:0.5rem;color:var(--ink)">百位号码评分</h4>
+            <div id="pl3-prob-hundreds"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">十位号码评分</h4>
+            <div id="pl3-prob-tens"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">个位号码评分</h4>
+            <div id="pl3-prob-ones"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">上期重号分析</h4>
+            <div id="pl3-prob-repeat"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">和值/跨度分析</h4>
+            <div id="pl3-prob-sumspan"></div>
+          </div>
+        </div>
+
+        <!-- Tab 3 -->
+        <div class="dlt-tab" id="pl3-tab3">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#129302;</span> 3. AI模型推测方案</div>
+            <div id="pl3-recommend"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="icon">&#127802;</span> 票花自主分析</div>
+            <div style="margin-bottom:0.5rem;font-size:0.8rem;color:var(--muted)">支持多组票花+号码综合分析。每行一组，格式：票花代码|号码（如 ABC|5,6,2）。也可分开填写：票花每行一个，号码每行一组（每组3个，按百十个位顺序），行数对应。</div>
+            <div class="input-row" style="margin-bottom:0.5rem;align-items:flex-start">
+              <label>票花代码：</label>
+              <textarea id="pl3-flower-input" placeholder="如: ABC&#10;PZM&#10;KHU" style="width:150px;text-transform:uppercase;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
+            </div>
+            <div class="input-row" style="margin-bottom:0.75rem;align-items:flex-start">
+              <label>号码：</label>
+              <textarea id="pl3-flower-numbers" placeholder="5,6,2&#10;3,8,9&#10;1,4,7" style="width:200px;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
+              <button class="btn btn-secondary" onclick="renderFlowerAnalysis('pl3')" style="margin-left:0.5rem;align-self:flex-start">票花分析</button>
+            </div>
+            <div id="pl3-flower-result"></div>
+          </div>
+        </div>
+
+        <!-- Tab 4 -->
+        <div class="dlt-tab" id="pl3-tab4">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#127922;</span> 4. 摇奖机模拟选号</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              基于大模型评分加权随机抽取0-9数字，机选5注排列三号码。
+            </div>
+            <div style="text-align:center;margin:1.5rem 0">
+              <button class="btn btn-primary" onclick="spinPL3Lottery()" style="font-size:1.1rem;padding:0.8rem 2.5rem;border-radius:50px">&#127922; 开始摇奖</button>
+            </div>
+            <div id="pl3-lottery-results" style="display:none"></div>
+          </div>
+        </div>
+
+        <!-- Tab 5 -->
+        <div class="dlt-tab" id="pl3-tab5">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128736;</span> 5. 模型自动复盘与推荐</div>
+            <div id="pl3-auto-review"></div>
+            <div class="input-row" style="margin:1rem 0">
+              <label>您上期的选号：</label>
+              <input type="text" id="pl3-review-numbers" placeholder="如: 5,6,2" style="width:150px">
+              <button class="btn btn-secondary" onclick="reviewPL3()" style="margin-left:0.5rem">复盘对比</button>
+            </div>
+            <div id="pl3-review-result"></div>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
+
+  <!-- Backward compatibility -->
+  <div style="display:none">
+    <div id="pl3-stats"></div>
+    <div id="pl3-repeat"></div>
+    <div id="pl3-sum"></div>
+    <div id="pl3-span"></div>
+    <div id="pl3-odd-even"></div>
+    <div id="pl3-tail"></div>
+    <div id="pl3-smart-recommend"></div>
   </div>
 
   <div id="pl3-empty" class="empty-state">
@@ -1340,7 +1363,7 @@ tr:hover td { background: var(--bg3); }
     <div class="card-title"><span class="icon">&#127942;</span> 排列五玩法规则</div>
     <div class="rule-box">
       <strong>号码池：</strong>从 0-9 中选取 5 个数字（可重复）&nbsp;|&nbsp; <strong>开奖频率：</strong>每天一期（晚21:15开奖）<br>
-      <strong>玩法类型：</strong>直选（位置对应）、组选（不考虑顺序）&nbsp;|&nbsp; <strong>前三位与排列三相同</strong><br>
+      <strong>玩法类型：</strong>直选（位置对应）、组选（不考虑顺序）<br>
       <strong>和值范围：</strong>0-45 &nbsp;|&nbsp; <strong>跨度范围：</strong>0-9
     </div>
   </div>
@@ -1363,105 +1386,130 @@ tr:hover td { background: var(--bg3); }
   </div>
 
   <div id="pl5-results" style="display:none">
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128200;</span> 基本统计指标</div>
-      <div class="stat-grid" id="pl5-stats"></div>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128260;</span> 上期重号分析</div>
-      <div id="pl5-repeat"></div>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128736;</span> 和值分析</div>
-      <div id="pl5-sum"></div>
-      <figure class="chart-figure">
-        <figcaption>和值走势</figcaption>
-        <div id="chart-pl5-sum" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#129504;</span> 跨度分析</div>
-      <div id="pl5-span"></div>
-      <figure class="chart-figure">
-        <figcaption>跨度走势</figcaption>
-        <div id="chart-pl5-span" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#127777;&#10052;&#65039;</span> 冷热号分析</div>
-      <div id="pl5-hotcold"></div>
-      <figure class="chart-figure">
-        <figcaption>号码出现频率</figcaption>
-        <div id="chart-pl5-freq" style="width:100%;min-height:350px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128204;</span> 奇偶比 / 大小比分析</div>
-      <div id="pl5-odd-even"></div>
-      <figure class="chart-figure">
-        <figcaption>奇偶比走势</figcaption>
-        <div id="chart-pl5-oddeven" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128291;</span> 尾数分布分析</div>
-      <div id="pl5-tail"></div>
-      <figure class="chart-figure">
-        <figcaption>尾数出现频率</figcaption>
-        <div id="chart-pl5-tail" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128279;</span> 遗漏分析</div>
-      <div id="pl5-miss"></div>
-      <figure class="chart-figure">
-        <figcaption>各号码遗漏期数</figcaption>
-        <div id="chart-pl5-miss" style="width:100%;min-height:300px"></div>
-      </figure>
-    </div>
-    <div class="card">
-      <div class="card-title"><span class="icon">&#127919;</span> 综合推荐号码</div>
-      <div id="pl5-recommend"></div>
-    </div>
-
-    <!-- 智能预测推荐（AI模型） -->
-    <div class="card" id="pl5-smart-card">
-      <div class="card-title"><span class="icon">&#129302;</span> 智能预测推荐（AI模型）</div>
-      <div id="pl5-smart-recommend"></div>
-    </div>
-
-    <!-- 票花自主分析 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#127802;</span> 票花自主分析</div>
-      <div style="margin-bottom:0.5rem;font-size:0.8rem;color:var(--muted)">支持多组票花+号码综合分析。每行一组，格式：票花代码|号码（如 ABC|5,6,2,0,5）。也可分开填写：票花每行一个，号码每行一组（每组5个，按万位到个位顺序），行数对应。</div>
-      <div class="input-row" style="margin-bottom:0.5rem;align-items:flex-start">
-        <label>票花代码：</label>
-        <textarea id="pl5-flower-input" placeholder="如: ABC&#10;PZM&#10;KHU" style="width:150px;text-transform:uppercase;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
+    <div class="dlt-layout">
+      <div class="dlt-sidebar" id="pl5-sidebar">
+        <button class="dlt-sidebar-btn active" onclick="switchPL5Tab('pl5-tab1', this)">
+          <span class="badge-sm" style="background:var(--accent4);color:#fff">1</span>常规冷热号分析
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchPL5Tab('pl5-tab2', this)">
+          <span class="badge-sm" style="background:var(--accent2);color:#fff">2</span>大模型统计概率
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchPL5Tab('pl5-tab3', this)">
+          <span class="badge-sm" style="background:var(--accent3);color:#fff">3</span>AI模型推测方案
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchPL5Tab('pl5-tab4', this)">
+          <span class="badge-sm" style="background:var(--accent5);color:#fff">4</span>摇奖机模拟选号
+        </button>
+        <button class="dlt-sidebar-btn" onclick="switchPL5Tab('pl5-tab5', this)">
+          <span class="badge-sm" style="background:var(--gold);color:#000">5</span>模型复盘与推荐
+        </button>
       </div>
-      <div class="input-row" style="margin-bottom:0.75rem;align-items:flex-start">
-        <label>号码：</label>
-        <textarea id="pl5-flower-numbers" placeholder="5,6,2,0,5&#10;3,8,9,1,4&#10;1,4,7,2,6" style="width:200px;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
-        <button class="btn btn-secondary" onclick="renderFlowerAnalysis('pl5')" style="margin-left:0.5rem;align-self:flex-start">票花分析</button>
-      </div>
-      <div id="pl5-flower-result"></div>
-    </div>
 
-    <!-- 上期选号复盘 -->
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128260;</span> 上期选号复盘</div>
-      <div class="input-row" style="margin-bottom:0.75rem">
-        <label>您上期的选号：</label>
-        <input type="text" id="pl5-review-numbers" placeholder="如: 5,6,2,0,5" style="width:200px">
-        <button class="btn btn-secondary" onclick="reviewPL5()" style="margin-left:0.5rem">复盘对比</button>
-      </div>
-      <div id="pl5-review-result"></div>
-    </div>
+      <div class="dlt-content">
+        <!-- Tab 1 -->
+        <div class="dlt-tab active" id="pl5-tab1">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#127777;&#10052;&#65039;</span> 1. 常规冷热号分析</div>
+            <div id="pl5-hotcold"></div>
+            <figure class="chart-figure">
+              <figcaption>号码出现频率</figcaption>
+              <div id="chart-pl5-freq" style="width:100%;min-height:350px"></div>
+            </figure>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128279;</span> 遗漏分析</div>
+            <div id="pl5-miss"></div>
+            <figure class="chart-figure">
+              <figcaption>各号码遗漏期数</figcaption>
+              <div id="chart-pl5-miss" style="width:100%;min-height:300px"></div>
+            </figure>
+          </div>
+        </div>
 
-    <!-- 模型自动复盘与优化 -->
-    <div class="card" id="pl5-auto-review-card" style="display:none">
-      <div class="card-title"><span class="icon">&#128736;</span> 模型自动复盘与优化</div>
-      <div id="pl5-auto-review"></div>
+        <!-- Tab 2 -->
+        <div class="dlt-tab" id="pl5-tab2">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128202;</span> 2. 大模型统计概率</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              基于加权频率、遗漏回补、邻号、奇偶、大小、跨度等多维评分模型，对万位到个位分别评分。
+            </div>
+            <h4 style="margin-bottom:0.5rem;color:var(--ink)">万位号码评分</h4>
+            <div id="pl5-prob-wan"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">千位号码评分</h4>
+            <div id="pl5-prob-qian"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">百位号码评分</h4>
+            <div id="pl5-prob-hundreds"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">十位号码评分</h4>
+            <div id="pl5-prob-tens"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">个位号码评分</h4>
+            <div id="pl5-prob-ones"></div>
+            <h4 style="margin:1rem 0 0.5rem;color:var(--ink)">和值/跨度分析</h4>
+            <div id="pl5-prob-sumspan"></div>
+          </div>
+        </div>
+
+        <!-- Tab 3 -->
+        <div class="dlt-tab" id="pl5-tab3">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#129302;</span> 3. AI模型推测方案</div>
+            <div id="pl5-recommend"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="icon">&#127802;</span> 票花自主分析</div>
+            <div style="margin-bottom:0.5rem;font-size:0.8rem;color:var(--muted)">支持多组票花+号码综合分析。每行一组，格式：票花代码|号码（如 ABC|5,6,2,0,5）。也可分开填写：票花每行一个，号码每行一组（每组5个，按万位到个位顺序），行数对应。</div>
+            <div class="input-row" style="margin-bottom:0.5rem;align-items:flex-start">
+              <label>票花代码：</label>
+              <textarea id="pl5-flower-input" placeholder="如: ABC&#10;PZM&#10;KHU" style="width:150px;text-transform:uppercase;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
+            </div>
+            <div class="input-row" style="margin-bottom:0.75rem;align-items:flex-start">
+              <label>号码：</label>
+              <textarea id="pl5-flower-numbers" placeholder="5,6,2,0,5&#10;3,8,9,1,4&#10;1,4,7,2,6" style="width:200px;min-height:60px;resize:vertical;font-family:inherit;font-size:0.85rem"></textarea>
+              <button class="btn btn-secondary" onclick="renderFlowerAnalysis('pl5')" style="margin-left:0.5rem;align-self:flex-start">票花分析</button>
+            </div>
+            <div id="pl5-flower-result"></div>
+          </div>
+        </div>
+
+        <!-- Tab 4 -->
+        <div class="dlt-tab" id="pl5-tab4">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#127922;</span> 4. 摇奖机模拟选号</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              基于大模型评分加权随机抽取0-9数字，机选5注排列五号码。
+            </div>
+            <div style="text-align:center;margin:1.5rem 0">
+              <button class="btn btn-primary" onclick="spinPL5Lottery()" style="font-size:1.1rem;padding:0.8rem 2.5rem;border-radius:50px">&#127922; 开始摇奖</button>
+            </div>
+            <div id="pl5-lottery-results" style="display:none"></div>
+          </div>
+        </div>
+
+        <!-- Tab 5 -->
+        <div class="dlt-tab" id="pl5-tab5">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128736;</span> 5. 模型自动复盘与推荐</div>
+            <div id="pl5-auto-review"></div>
+            <div class="input-row" style="margin:1rem 0">
+              <label>您上期的选号：</label>
+              <input type="text" id="pl5-review-numbers" placeholder="如: 5,6,2,0,5" style="width:200px">
+              <button class="btn btn-secondary" onclick="reviewPL5()" style="margin-left:0.5rem">复盘对比</button>
+            </div>
+            <div id="pl5-review-result"></div>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
+
+  <!-- Backward compatibility -->
+  <div style="display:none">
+    <div id="pl5-stats"></div>
+    <div id="pl5-repeat"></div>
+    <div id="pl5-sum"></div>
+    <div id="pl5-span"></div>
+    <div id="pl5-odd-even"></div>
+    <div id="pl5-tail"></div>
+    <div id="pl5-smart-recommend"></div>
   </div>
 
   <div id="pl5-empty" class="empty-state">
@@ -1478,7 +1526,7 @@ tr:hover td { background: var(--bg3); }
 <script src="assets/pl-charts.js?v=3"></script>
 <script src="assets/engine.js?v=2026070713"></script>
 <script src="assets/pl-data.js?v=2026070713"></script>
-<script src="assets/pl-engine.js?v=2026070713"></script>
+<script src="assets/pl-engine.js?v=2026070714"></script>
 <script src="assets/auto-review.js?v=2026070713"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
@@ -1515,6 +1563,20 @@ function switchSSQTab(tabId, btn) {
 function switchKL8Tab(tabId, btn) {
   document.querySelectorAll('#kl8-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
   document.querySelectorAll('#kl8-tab1, #kl8-tab2, #kl8-tab3, #kl8-tab4, #kl8-tab5, #kl8-tab6').forEach(function(t){ t.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  var tab = document.getElementById(tabId);
+  if (tab) tab.classList.add('active');
+}
+function switchPL3Tab(tabId, btn) {
+  document.querySelectorAll('#pl3-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('#pl3-tab1, #pl3-tab2, #pl3-tab3, #pl3-tab4, #pl3-tab5').forEach(function(t){ t.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  var tab = document.getElementById(tabId);
+  if (tab) tab.classList.add('active');
+}
+function switchPL5Tab(tabId, btn) {
+  document.querySelectorAll('#pl5-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.querySelectorAll('#pl5-tab1, #pl5-tab2, #pl5-tab3, #pl5-tab4, #pl5-tab5').forEach(function(t){ t.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   var tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');

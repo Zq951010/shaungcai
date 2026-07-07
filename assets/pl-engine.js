@@ -2152,4 +2152,130 @@ function reviewPL5() {
     });
   };
 
+// ==================== 排列三/五新功能模块 ====================
+
+function spinPL3Lottery() {
+  var numsStr = document.getElementById('pl3-numbers').value;
+  var historyStr = document.getElementById('pl3-history').value;
+  var lastNums = parseNums(numsStr);
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var nums = parseNums(lines[i]);
+    if (nums.length >= 3) history.push(nums.slice(0,3));
+  }
+  if (history.length === 0 && lastNums.length >= 3) {
+    history.unshift(lastNums.slice(0,3));
+  }
+  if (history.length < 2) { alert('请先加载数据进行分析'); return; }
+
+  var last = history[0];
+  var posScores = scorePL3Position(last, history);
+  var results = [];
+  for (var s = 0; s < 5; s++) {
+    var picks = [];
+    for (var p = 0; p < 3; p++) {
+      var pool = [];
+      for (var d = 0; d <= 9; d++) pool.push(d);
+      var scores = posScores[p];
+      var totalW = 0, weights = [];
+      for (var d = 0; d <= 9; d++) {
+        var w = (scores[d] ? scores[d].totalScore : 0) + 0.5;
+        weights.push(w);
+        totalW += w;
+      }
+      var rnd = Math.random() * totalW;
+      var cum = 0;
+      for (var d = 0; d <= 9; d++) {
+        cum += weights[d];
+        if (rnd <= cum) { picks.push(d); break; }
+      }
+    }
+    results.push(picks);
+  }
+
+  var html = '<div style="padding:0.5rem">';
+  html += '<div style="text-align:center;margin-bottom:1rem;font-size:0.9rem;color:var(--muted)">基于各位置大模型评分加权抽选</div>';
+  for (var s = 0; s < results.length; s++) {
+    html += '<div style="display:flex;align-items:center;gap:1rem;padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<span style="font-weight:700;color:var(--accent);min-width:60px;font-size:0.9rem">第'+(s+1)+'注</span>';
+    html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">';
+    html += '<span style="font-size:0.75rem;color:var(--muted)">百位</span>';
+    html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+results[s][0]+'</div>';
+    html += '<span style="font-size:0.75rem;color:var(--muted);margin-left:0.3rem">十位</span>';
+    html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+results[s][1]+'</div>';
+    html += '<span style="font-size:0.75rem;color:var(--muted);margin-left:0.3rem">个位</span>';
+    html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+results[s][2]+'</div>';
+    html += '</div></div>';
+  }
+  html += '</div>';
+
+  document.getElementById('pl3-lottery-results').innerHTML = html;
+  document.getElementById('pl3-lottery-results').style.display = 'block';
+}
+
+function spinPL5Lottery() {
+  var numsStr = document.getElementById('pl5-numbers').value;
+  var historyStr = document.getElementById('pl5-history').value;
+  var lastNums = parseNums(numsStr);
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var history = [];
+  for (var i = 0; i < lines.length; i++) {
+    var nums = parseNums(lines[i]);
+    if (nums.length >= 5) history.push(nums.slice(0,5));
+  }
+  if (history.length === 0 && lastNums.length >= 5) {
+    history.unshift(lastNums.slice(0,5));
+  }
+  if (history.length < 2) { alert('请先加载数据进行分析'); return; }
+
+  var last = history[0];
+  var posScores = scorePL5Position(last, history);
+  var results = [];
+  for (var s = 0; s < 5; s++) {
+    var picks = [];
+    for (var p = 0; p < 5; p++) {
+      var pool = [];
+      for (var d = 0; d <= 9; d++) pool.push(d);
+      var scores = posScores[p];
+      var totalW = 0, weights = [];
+      for (var d = 0; d <= 9; d++) {
+        var w = (scores[d] ? scores[d].totalScore : 0) + 0.5;
+        weights.push(w);
+        totalW += w;
+      }
+      var rnd = Math.random() * totalW;
+      var cum = 0;
+      for (var d = 0; d <= 9; d++) {
+        cum += weights[d];
+        if (rnd <= cum) { picks.push(d); break; }
+      }
+    }
+    results.push(picks);
+  }
+
+  var html = '<div style="padding:0.5rem">';
+  html += '<div style="text-align:center;margin-bottom:1rem;font-size:0.9rem;color:var(--muted)">基于各位置大模型评分加权抽选</div>';
+  for (var s = 0; s < results.length; s++) {
+    html += '<div style="display:flex;align-items:center;gap:1rem;padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<span style="font-weight:700;color:var(--accent);min-width:60px;font-size:0.9rem">第'+(s+1)+'注</span>';
+    html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">';
+    html += '<span style="font-size:0.75rem;color:var(--muted)">万位</span>';
+    html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+results[s][0]+'</div>';
+    html += '<span style="font-size:0.75rem;color:var(--muted)">千位</span>';
+    html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+results[s][1]+'</div>';
+    html += '<span style="font-size:0.75rem;color:var(--muted)">百位</span>';
+    html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+results[s][2]+'</div>';
+    html += '<span style="font-size:0.75rem;color:var(--muted)">十位</span>';
+    html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+results[s][3]+'</div>';
+    html += '<span style="font-size:0.75rem;color:var(--muted)">个位</span>';
+    html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+results[s][4]+'</div>';
+    html += '</div></div>';
+  }
+  html += '</div>';
+
+  document.getElementById('pl5-lottery-results').innerHTML = html;
+  document.getElementById('pl5-lottery-results').style.display = 'block';
+}
+
 })();
