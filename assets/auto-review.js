@@ -1352,7 +1352,31 @@ function autoReviewDLT() {
   var simScores = scoreDLTNumbers_V3(simLast, simAllFronts.map(function(f,i){ return f.concat(simAllBacks[i]); }));
   var simBackScores = scoreDLTBlueNumbers_V3(simLast, simAllFronts.map(function(f,i){ return f.concat(simAllBacks[i]); }));
 
-  var simRecommendations = generateDLTSimPicks(simScores, simBackScores);
+  // 优先使用 localStorage 保存的昨日推荐（确保回测号码与昨日实际推荐一致，避免重新计算导致差异）
+  var savedRecs = null;
+  try {
+    var saved = localStorage.getItem('dlt_previous_recommendations');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      savedRecs = parsed.recommendations;
+    }
+  } catch(e) {}
+
+  var simRecommendations;
+  if (savedRecs && savedRecs.length >= 4) {
+    // 使用保存的昨日推荐，确保回测号码与昨日页面显示完全一致
+    simRecommendations = [];
+    for (var si = 0; si < 4; si++) {
+      var combo = savedRecs[si].combos[0];
+      simRecommendations.push({
+        front: combo.slice(0, 5),
+        back: combo.slice(5)
+      });
+    }
+  } else {
+    // 无保存数据时回退到重新计算
+    simRecommendations = generateDLTSimPicks(simScores, simBackScores);
+  }
 
   var reviewResults = [];
   var bestHitRate = 0;

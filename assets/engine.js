@@ -1718,6 +1718,26 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   html += '</div>';
 
   document.getElementById('dlt-recommend').innerHTML = html;
+
+  // 保存当前推荐到 localStorage，供次日回测直接使用（避免重新计算导致号码不一致）
+  try {
+    var newLastDraw = last.join(',');
+    var currentSaved = localStorage.getItem('dlt_recommendations');
+    if (currentSaved) {
+      var currentParsed = JSON.parse(currentSaved);
+      if (currentParsed.lastDraw !== newLastDraw) {
+        localStorage.setItem('dlt_previous_recommendations', currentSaved);
+      }
+    }
+    var recsData = {
+      date: new Date().toISOString().split('T')[0],
+      lastDraw: newLastDraw,
+      recommendations: strategies
+    };
+    localStorage.setItem('dlt_recommendations', JSON.stringify(recsData));
+  } catch(e) {
+    console.log('保存DLT推荐失败:', e.message);
+  }
 }
 
 
