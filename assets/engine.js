@@ -190,11 +190,16 @@ function backtestModel(history, scoreFunc, recommendFunc, count, numPerDraw) {
 var DLT_ZONES = [[1,12],[13,23],[24,35]];
 var DLT_BACK_ZONES = [[1,4],[5,8],[9,12]];
 
+// 大乐透真实历史开奖数据（30期，从新到旧）
 var dltSampleHistory = [
   '11,18,22,25,29|04,12',
   '01,06,16,18,26|04,10',
   '01,04,10,23,25|01,12',
   '04,10,22,23,33|02,12',
+  '01,13,26,29,30|09,11',
+  '05,13,22,26,32|02,03',
+  '04,05,15,21,32|02,11',
+  '12,19,21,24,29|03,10',
   '03,11,12,21,22|06,10',
   '06,16,18,19,28|07,11',
   '10,13,19,21,30|04,05',
@@ -217,15 +222,41 @@ var dltSampleHistory = [
   '01,06,14,15,17|02,03',
   '11,17,20,23,35|01,10',
   '09,20,21,23,28|06,11',
-  '01,13,18,27,33|04,07',
-  '01,15,21,26,33|04,07',
-  '03,08,22,26,29|07,10',
-  '08,12,14,19,22|11,12',
-  '02,07,13,19,24|03,08',
-  '24,25,27,29,34|02,06',
-  '06,12,13,21,34|08,09',
-  '09,11,20,26,27|06,09',
-  '08,17,21,33,35|06,07'
+  '01,13,18,27,33|04,07'
+];
+
+// 完整元数据：期号、日期、星期
+var dltSampleMeta = [
+  {period:'26075', date:'2026-07-06', weekday:'一'},
+  {period:'26074', date:'2026-07-04', weekday:'六'},
+  {period:'26073', date:'2026-07-01', weekday:'三'},
+  {period:'26072', date:'2026-06-29', weekday:'一'},
+  {period:'26071', date:'2026-06-27', weekday:'六'},
+  {period:'26070', date:'2026-06-24', weekday:'三'},
+  {period:'26069', date:'2026-06-22', weekday:'一'},
+  {period:'26068', date:'2026-06-20', weekday:'六'},
+  {period:'26067', date:'2026-06-17', weekday:'三'},
+  {period:'26066', date:'2026-06-15', weekday:'一'},
+  {period:'26065', date:'2026-06-13', weekday:'六'},
+  {period:'26064', date:'2026-06-10', weekday:'三'},
+  {period:'26063', date:'2026-06-08', weekday:'一'},
+  {period:'26062', date:'2026-06-06', weekday:'六'},
+  {period:'26061', date:'2026-06-03', weekday:'三'},
+  {period:'26060', date:'2026-06-01', weekday:'一'},
+  {period:'26059', date:'2026-05-30', weekday:'六'},
+  {period:'26058', date:'2026-05-27', weekday:'三'},
+  {period:'26057', date:'2026-05-25', weekday:'一'},
+  {period:'26056', date:'2026-05-23', weekday:'六'},
+  {period:'26055', date:'2026-05-20', weekday:'三'},
+  {period:'26054', date:'2026-05-18', weekday:'一'},
+  {period:'26053', date:'2026-05-16', weekday:'六'},
+  {period:'26052', date:'2026-05-13', weekday:'三'},
+  {period:'26051', date:'2026-05-11', weekday:'一'},
+  {period:'26050', date:'2026-05-09', weekday:'六'},
+  {period:'26049', date:'2026-05-06', weekday:'三'},
+  {period:'26048', date:'2026-05-04', weekday:'一'},
+  {period:'26047', date:'2026-05-02', weekday:'六'},
+  {period:'26046', date:'2026-04-29', weekday:'三'}
 ];
 
 // 星期名称
@@ -313,7 +344,7 @@ function syncDLTInputToTextarea() {
   document.getElementById('dlt-history').value = lines.join('\n');
 }
 
-function fillDLTInputTable(dataLines) {
+function fillDLTInputTable(dataLines, metaData) {
   var tbody = document.querySelector('#dlt-input-table tbody');
   if (!tbody) return;
   tbody.innerHTML = '';
@@ -321,11 +352,15 @@ function fillDLTInputTable(dataLines) {
     var parts = dataLines[i].split('|');
     var front = parts[0] || '';
     var back = parts[1] || '';
+    var meta = metaData && metaData[i] ? metaData[i] : null;
+    var periodVal = meta ? meta.period : '';
+    var dateVal = meta ? meta.date : '';
+    var weekdayVal = meta ? meta.weekday : '';
     var tr = document.createElement('tr');
     tr.setAttribute('data-row', i);
-    tr.innerHTML = '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="dlt-input-period" placeholder="期号" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--ink);font-weight:600"></td>' +
-      '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="dlt-input-date" placeholder="YYYY-MM-DD" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--muted)"></td>' +
-      '<td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem"></td>' +
+    tr.innerHTML = '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="dlt-input-period" placeholder="期号" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--ink);font-weight:600" value="' + periodVal + '"></td>' +
+      '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="dlt-input-date" placeholder="YYYY-MM-DD" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--muted)" value="' + dateVal + '"></td>' +
+      '<td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">' + weekdayVal + '</td>' +
       '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" value="' + front + '" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td>' +
       '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" value="' + back + '" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td>' +
       '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td>';
@@ -354,7 +389,7 @@ function loadDLTSample() {
   var reviewBack = document.getElementById('dlt-review-blue');
   if (reviewNums) reviewNums.value = sampleFront;
   if (reviewBack) reviewBack.value = sampleBack;
-  fillDLTInputTable(dltSampleHistory);
+  fillDLTInputTable(dltSampleHistory, dltSampleMeta);
 }
 
 function clearDLT() {
