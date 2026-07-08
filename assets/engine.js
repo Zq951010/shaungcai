@@ -827,6 +827,9 @@ function renderDLTZone(allFronts) {
 
   // Chart
   renderDLTZoneChart(zoneCounts, zoneNames);
+
+  // 走势图
+  renderDLTTrendChart(history);
 }
 
 function renderDLTSum(allFronts) {
@@ -5757,6 +5760,150 @@ function renderDLTDual() {
   html += '</div>';
 
   document.getElementById('dlt-dual-results').innerHTML = html;
+}
+
+function renderDLTTrendChart(history) {
+  if (!history || history.length === 0) return;
+
+  // 从表格读取期号/日期元数据
+  var tbody = document.querySelector('#dlt-input-table tbody');
+  var metaRows = [];
+  if (tbody) {
+    var rows = tbody.querySelectorAll('tr');
+    for (var i = 0; i < rows.length; i++) {
+      var period = rows[i].querySelector('.dlt-input-period');
+      var date = rows[i].querySelector('.dlt-input-date');
+      var weekday = rows[i].querySelector('.dlt-weekday');
+      var front = rows[i].querySelector('.dlt-input-front');
+      var back = rows[i].querySelector('.dlt-input-back');
+      if (front && back && front.value.trim() && back.value.trim()) {
+        metaRows.push({
+          period: period ? period.value.trim() : '',
+          date: date ? date.value.trim() : '',
+          weekday: weekday ? weekday.textContent.trim() : ''
+        });
+      }
+    }
+  }
+  if (metaRows.length === 0 && typeof dltSampleMeta !== 'undefined') {
+    for (var i = 0; i < history.length && i < dltSampleMeta.length; i++) {
+      metaRows.push({
+        period: dltSampleMeta[i].period,
+        date: dltSampleMeta[i].date,
+        weekday: dltSampleMeta[i].weekday
+      });
+    }
+  }
+
+  var frontMiss = {};
+  for (var n = 1; n <= 35; n++) frontMiss[n] = 0;
+  var backMiss = {};
+  for (var n = 1; n <= 12; n++) backMiss[n] = 0;
+
+  var rowsHtml = '';
+
+  for (var i = 0; i < history.length; i++) {
+    var h = history[i];
+    var meta = metaRows[i] || {period: '', weekday: ''};
+
+    // 统计计算
+    var rowSum = 0;
+    for (var j = 0; j < h.front.length; j++) rowSum += h.front[j];
+    var rowSpan = h.front[h.front.length - 1] - h.front[0];
+    var zoneCounts = [0, 0, 0];
+    var oddCount = 0;
+    for (var j = 0; j < h.front.length; j++) {
+      var n = h.front[j];
+      if (n <= 12) zoneCounts[0]++;
+      else if (n <= 24) zoneCounts[1]++;
+      else zoneCounts[2]++;
+      if (n % 2 === 1) oddCount++;
+    }
+    var zoneRatio = zoneCounts[0] + ':' + zoneCounts[1] + ':' + zoneCounts[2];
+    var oddEvenRatio = oddCount + ':' + (5 - oddCount);
+
+    // 前区单元格
+    var frontCells = '';
+    for (var n = 1; n <= 35; n++) {
+      var isHit = h.front.indexOf(n) >= 0;
+      var content = '';
+      var cellStyle = 'padding:3px 1px;text-align:center;font-size:0.7rem;width:26px;height:26px;border:1px solid #eee;vertical-align:middle;';
+      if (n <= 12) cellStyle += 'background:#fff8f8;';
+      else if (n <= 24) cellStyle += 'background:#f8fbff;';
+      else cellStyle += 'background:#f8fff8;';
+      if (isHit) {
+        frontMiss[n] = 0;
+        content = '<span style="display:inline-block;width:20px;height:20px;line-height:20px;border-radius:50%;background:#e74c3c;color:#fff;font-weight:700;font-size:0.65rem;text-align:center">' + pad(n) + '</span>';
+      } else {
+        frontMiss[n]++;
+        content = '<span style="color:#bbb;font-size:0.6rem">' + frontMiss[n] + '</span>';
+      }
+      frontCells += '<td style="' + cellStyle + '">' + content + '</td>';
+    }
+
+    // 后区单元格
+    var backCells = '';
+    for (var n = 1; n <= 12; n++) {
+      var isHit = h.back.indexOf(n) >= 0;
+      var content = '';
+      var cellStyle = 'padding:3px 1px;text-align:center;font-size:0.7rem;width:26px;height:26px;border:1px solid #eee;vertical-align:middle;background:#f5f8ff;';
+      if (isHit) {
+        backMiss[n] = 0;
+        content = '<span style="display:inline-block;width:20px;height:20px;line-height:20px;border-radius:50%;background:#3498db;color:#fff;font-weight:700;font-size:0.65rem;text-align:center">' + pad(n) + '</span>';
+      } else {
+        backMiss[n]++;
+        content = '<span style="color:#bbb;font-size:0.6rem">' + backMiss[n] + '</span>';
+      }
+      backCells += '<td style="' + cellStyle + '">' + content + '</td>';
+    }
+
+    // 统计列
+    var statCells = '<td style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #eee;font-weight:600;background:#fafafa">' + rowSum + '</td>' +
+      '<td style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #eee;font-weight:600;background:#fafafa">' + rowSpan + '</td>' +
+      '<td style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #eee;background:#fafafa">' + zoneRatio + '</td>' +
+      '<td style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #eee;background:#fafafa">' + oddEvenRatio + '</td>';
+
+    // 最近3期高亮
+    var rowBg = i < 3 ? 'background:#fff8f0;' : '';
+
+    rowsHtml += '<tr style="' + rowBg + '">' +
+      '<td style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #eee;font-weight:600;white-space:nowrap;background:#fafafa;position:sticky;left:0;z-index:1">' + (meta.period || '') + '</td>' +
+      '<td style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #eee;color:var(--muted);white-space:nowrap;background:#fafafa;position:sticky;left:40px;z-index:1">' + (meta.weekday || '') + '</td>' +
+      frontCells + backCells + statCells +
+      '</tr>';
+  }
+
+  // 表头
+  var frontHeaders = '';
+  for (var n = 1; n <= 35; n++) {
+    var zoneBg = n <= 12 ? 'background:#ffe0e0' : (n <= 24 ? 'background:#e0f0ff' : 'background:#e0ffe0');
+    frontHeaders += '<th style="padding:3px 1px;text-align:center;font-size:0.65rem;border:1px solid #ddd;font-weight:600;width:26px;' + zoneBg + '">' + pad(n) + '</th>';
+  }
+  var backHeaders = '';
+  for (var n = 1; n <= 12; n++) {
+    backHeaders += '<th style="padding:3px 1px;text-align:center;font-size:0.65rem;border:1px solid #ddd;font-weight:600;width:26px;background:#d0e0ff">' + pad(n) + '</th>';
+  }
+
+  var html = '<table style="border-collapse:collapse;font-size:0.75rem;white-space:nowrap;margin:0 auto">' +
+    '<thead>' +
+    '<tr>' +
+    '<th rowspan="2" style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #ddd;background:var(--bg3);position:sticky;left:0;z-index:2">期号</th>' +
+    '<th rowspan="2" style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #ddd;background:var(--bg3);position:sticky;left:40px;z-index:2">星期</th>' +
+    '<th colspan="12" style="padding:3px;text-align:center;font-size:0.7rem;border:1px solid #ddd;background:#ffe0e0;font-weight:600">一区 01-12</th>' +
+    '<th colspan="12" style="padding:3px;text-align:center;font-size:0.7rem;border:1px solid #ddd;background:#e0f0ff;font-weight:600">二区 13-24</th>' +
+    '<th colspan="11" style="padding:3px;text-align:center;font-size:0.7rem;border:1px solid #ddd;background:#e0ffe0;font-weight:600">三区 25-35</th>' +
+    '<th colspan="12" style="padding:3px;text-align:center;font-size:0.7rem;border:1px solid #ddd;background:#d0e0ff;font-weight:600">后区 01-12</th>' +
+    '<th rowspan="2" style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #ddd;background:var(--bg3)">和值</th>' +
+    '<th rowspan="2" style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #ddd;background:var(--bg3)">跨度</th>' +
+    '<th rowspan="2" style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #ddd;background:var(--bg3)">区间比</th>' +
+    '<th rowspan="2" style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #ddd;background:var(--bg3)">奇偶比</th>' +
+    '</tr>' +
+    '<tr>' + frontHeaders + backHeaders + '</tr>' +
+    '</thead>' +
+    '<tbody>' + rowsHtml + '</tbody>' +
+    '</table>';
+
+  document.getElementById('dlt-trend-chart').innerHTML = html;
 }
 
 // 机选复盘分析

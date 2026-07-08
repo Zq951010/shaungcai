@@ -790,6 +790,9 @@ tr:hover td { background: var(--bg3); }
         <button class="dlt-sidebar-btn" onclick="switchDLTTab('tab6', this)">
           <span class="badge-sm" style="background:var(--accent);color:#000">6</span>模型复盘与推荐
         </button>
+        <button class="dlt-sidebar-btn" onclick="switchDLTTab('tab7', this)">
+          <span class="badge-sm" style="background:#e74c3c;color:#fff">7</span>走势图
+        </button>
       </div>
 
       <!-- 右侧内容 -->
@@ -881,6 +884,17 @@ tr:hover td { background: var(--bg3); }
               <button class="btn btn-primary" onclick="spinDLTReview()" style="font-size:1rem;padding:0.6rem 2rem;border-radius:50px">&#127922; 机选号码并分析</button>
             </div>
             <div id="dlt-review-analysis"></div>
+          </div>
+        </div>
+
+        <!-- Tab 7: 走势图 -->
+        <div class="dlt-tab" id="tab7">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128200;</span> 7. 历史开奖走势图</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              红色圆圈表示前区开奖号码，蓝色圆圈表示后区开奖号码，灰色数字表示该号码的遗漏期数。右侧统计列包含和值、跨度、区间比与奇偶比。
+            </div>
+            <div id="dlt-trend-chart" style="overflow-x:auto"></div>
           </div>
         </div>
       </div>
@@ -1716,9 +1730,9 @@ tr:hover td { background: var(--bg3); }
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
 <script src="assets/engine.js?v=2026070819"></script>
-<script src="assets/engine.js?v=2026070821"></script>
-<script src="assets/pl-engine.js?v=2026070821"></script>
-<script src="assets/auto-review.js?v=2026070821"></script>
+<script src="assets/engine.js?v=2026070822"></script>
+<script src="assets/pl-engine.js?v=2026070822"></script>
+<script src="assets/auto-review.js?v=2026070822"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)
@@ -1735,7 +1749,7 @@ window.addEventListener('DOMContentLoaded', function() {
 <script>
 function switchDLTTab(tabId, btn) {
   document.querySelectorAll('#dlt-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('#dlt-tab0, #tab1, #tab2, #tab3, #tab4, #tab5, #tab6').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('#dlt-tab0, #tab1, #tab2, #tab3, #tab4, #tab5, #tab6, #tab7').forEach(function(t){ t.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   var tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');
