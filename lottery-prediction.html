@@ -730,19 +730,23 @@ tr:hover td { background: var(--bg3); }
     <!-- 表格形式的历史数据输入 -->
     <div class="input-row" style="margin-top:0.5rem;align-items:flex-start">
       <label style="margin-top:0.5rem">近N期数据：</label>
-      <div style="flex:1">
-        <table id="dlt-input-table" style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-bottom:0.5rem">
+      <div style="flex:1;overflow-x:auto">
+        <table id="dlt-input-table" style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-bottom:0.5rem;min-width:600px">
           <thead>
             <tr style="background:var(--bg3)">
-              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:50px">期号</th>
+              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:55px">期号</th>
+              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:90px">日期</th>
+              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:40px">星期</th>
               <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center">前区号码</th>
               <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:120px">后区号码</th>
-              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:50px">操作</th>
+              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:40px">操作</th>
             </tr>
           </thead>
           <tbody>
             <tr data-row="0">
-              <td style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted)">1</td>
+              <td class="dlt-period" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--ink);font-weight:600;white-space:nowrap;font-size:0.8rem">26081</td>
+              <td class="dlt-date" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">2026-07-08</td>
+              <td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">三</td>
               <td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" onblur="syncDLTInputToTextarea()" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td>
               <td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" onblur="syncDLTInputToTextarea()" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td>
               <td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td>
@@ -770,6 +774,7 @@ tr:hover td { background: var(--bg3); }
             <tr style="background:var(--bg3)">
               <th style="padding:8px 10px;border:1px solid var(--rule);text-align:center;white-space:nowrap">期号</th>
               <th style="padding:8px 10px;border:1px solid var(--rule);text-align:center;white-space:nowrap">开奖日期</th>
+              <th style="padding:8px 10px;border:1px solid var(--rule);text-align:center;white-space:nowrap">星期</th>
               <th style="padding:8px 10px;border:1px solid var(--rule);text-align:center">前区</th>
               <th style="padding:8px 10px;border:1px solid var(--rule);text-align:center">后区</th>
             </tr>
@@ -1676,10 +1681,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026070813"></script>
-<script src="assets/pl-data.js?v=2026070813"></script>
-<script src="assets/pl-engine.js?v=2026070813"></script>
-<script src="assets/auto-review.js?v=2026070813"></script>
+<script src="assets/engine.js?v=2026070814"></script>
+<script src="assets/pl-data.js?v=2026070814"></script>
+<script src="assets/pl-engine.js?v=2026070814"></script>
+<script src="assets/auto-review.js?v=2026070814"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)

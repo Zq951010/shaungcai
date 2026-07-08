@@ -228,6 +228,22 @@ var dltSampleHistory = [
   '08,17,21,33,35|06,07'
 ];
 
+// 大乐透期号计算：2026年第一期：2026-01-01是周四，第一期是2026-01-03(周六) = 26001
+var DLT_DRAW_DAYS = [1, 3, 6]; // 周一、三、六
+var DLT_WEEK_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
+var DLT_FIRST_DRAW = new Date(2026, 0, 3); // 2026-01-03 Saturday
+
+function calcDLTPeriodNum(date) {
+  var count = 0;
+  var d = new Date(DLT_FIRST_DRAW);
+  while (d <= date) {
+    count++;
+    d.setDate(d.getDate() + 1);
+    while (DLT_DRAW_DAYS.indexOf(d.getDay()) < 0) d.setDate(d.getDate() + 1);
+  }
+  return 26000 + count;
+}
+
 function renderDLTHistoryTable() {
   var historyStr = document.getElementById('dlt-history').value;
   var lines = historyStr.trim().split('\n').filter(function(l) { return l.trim(); });
@@ -239,12 +255,9 @@ function renderDLTHistoryTable() {
   var tbody = document.querySelector('#dlt-history-table tbody');
   if (!tbody) return;
 
-  // 大乐透每周一、三、六开奖，从最近一期倒推日期
-  var drawDays = [1, 3, 6]; // 周一、三、六
-  var today = new Date();
+  var today = new Date(2026, 6, 8); // 2026-07-08
   var lastDrawDate = new Date(today);
-  // 找到最近的一个开奖日
-  while (drawDays.indexOf(lastDrawDate.getDay()) < 0) {
+  while (DLT_DRAW_DAYS.indexOf(lastDrawDate.getDay()) < 0) {
     lastDrawDate.setDate(lastDrawDate.getDate() - 1);
   }
 
@@ -255,23 +268,21 @@ function renderDLTHistoryTable() {
     var frontNums = parts[0].split(',').filter(function(n){return n.trim();});
     var backNums = parts[1].split(',').filter(function(n){return n.trim();});
 
-    // 推算期号：假设最新一期有期号，倒推
-    var periodNum = lines.length - i;
-
-    // 推算日期：倒推开奖日
+    // 倒推日期
     var drawDate = new Date(lastDrawDate);
     var steps = i;
     while (steps > 0) {
       drawDate.setDate(drawDate.getDate() - 1);
-      if (drawDays.indexOf(drawDate.getDay()) >= 0) {
-        steps--;
-      }
+      if (DLT_DRAW_DAYS.indexOf(drawDate.getDay()) >= 0) steps--;
     }
     var dateStr = drawDate.getFullYear() + '-' + String(drawDate.getMonth()+1).padStart(2,'0') + '-' + String(drawDate.getDate()).padStart(2,'0');
+    var weekday = DLT_WEEK_NAMES[drawDate.getDay()];
+    var periodNum = calcDLTPeriodNum(drawDate);
 
     html += '<tr style="border-bottom:1px solid var(--rule)">';
-    html += '<td style="padding:8px 10px;text-align:center;color:var(--muted);white-space:nowrap">' + periodNum + '</td>';
+    html += '<td style="padding:8px 10px;text-align:center;color:var(--ink);font-weight:600;white-space:nowrap">' + periodNum + '</td>';
     html += '<td style="padding:8px 10px;text-align:center;color:var(--muted);white-space:nowrap">' + dateStr + '</td>';
+    html += '<td style="padding:8px 10px;text-align:center;color:var(--muted);white-space:nowrap">' + weekday + '</td>';
     html += '<td style="padding:8px 10px;text-align:center">';
     for (var j = 0; j < frontNums.length; j++) {
       html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;background:#4a90d9;color:#fff;font-size:0.75rem;font-weight:600;margin:1px">' + frontNums[j] + '</span>';
@@ -293,14 +304,39 @@ function addDLTInputRow() {
   var tbody = document.querySelector('#dlt-input-table tbody');
   if (!tbody) return;
   var rowCount = tbody.children.length;
+  // 倒推上一期的期号/日期/星期
+  var prevPeriod = 26081;
+  var prevDate = new Date(2026, 6, 8); // 2026-07-08
+  if (rowCount > 0) {
+    var lastRow = tbody.children[rowCount - 1];
+    var periodCell = lastRow.querySelector('.dlt-period');
+    if (periodCell) prevPeriod = parseInt(periodCell.textContent) || 26081;
+  }
+  var newPeriod = prevPeriod - 1;
+  var prevDateStr = '';
+  var prevRow = tbody.children[0];
+  if (prevRow) {
+    var dateCell = prevRow.querySelector('.dlt-date');
+    if (dateCell) prevDateStr = dateCell.textContent;
+  }
+  if (prevDateStr) {
+    var parts = prevDateStr.split('-');
+    prevDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+  }
+  var newDate = new Date(prevDate);
+  do { newDate.setDate(newDate.getDate() - 1); } while (DLT_DRAW_DAYS.indexOf(newDate.getDay()) < 0);
+  var dateStr = newDate.getFullYear() + '-' + String(newDate.getMonth()+1).padStart(2,'0') + '-' + String(newDate.getDate()).padStart(2,'0');
+  var weekday = DLT_WEEK_NAMES[newDate.getDay()];
+
   var tr = document.createElement('tr');
   tr.setAttribute('data-row', rowCount);
-  tr.innerHTML = '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted)">' + (rowCount + 1) + '</td>' +
+  tr.innerHTML = '<td class="dlt-period" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--ink);font-weight:600;white-space:nowrap;font-size:0.8rem">' + newPeriod + '</td>' +
+    '<td class="dlt-date" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">' + dateStr + '</td>' +
+    '<td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">' + weekday + '</td>' +
     '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td>' +
     '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td>' +
     '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td>';
   tbody.appendChild(tr);
-  // 绑定输入事件同步到textarea
   var frontInput = tr.querySelector('.dlt-input-front');
   var backInput = tr.querySelector('.dlt-input-back');
   if (frontInput) frontInput.addEventListener('blur', syncDLTInputToTextarea);
@@ -343,18 +379,32 @@ function fillDLTInputTable(dataLines) {
   var tbody = document.querySelector('#dlt-input-table tbody');
   if (!tbody) return;
   tbody.innerHTML = '';
+
   for (var i = 0; i < dataLines.length; i++) {
     var parts = dataLines[i].split('|');
     var front = parts[0] || '';
     var back = parts[1] || '';
+
+    // 计算日期（从最新一期倒推）
+    var steps = i;
+    var drawDate = new Date(2026, 6, 8);
+    do {
+      drawDate.setDate(drawDate.getDate() - 1);
+      if (DLT_DRAW_DAYS.indexOf(drawDate.getDay()) >= 0) steps--;
+    } while (steps > 0);
+    var dateStr = drawDate.getFullYear() + '-' + String(drawDate.getMonth()+1).padStart(2,'0') + '-' + String(drawDate.getDate()).padStart(2,'0');
+    var weekday = DLT_WEEK_NAMES[drawDate.getDay()];
+    var periodNum = calcDLTPeriodNum(drawDate);
+
     var tr = document.createElement('tr');
     tr.setAttribute('data-row', i);
-    tr.innerHTML = '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted)">' + (i + 1) + '</td>' +
+    tr.innerHTML = '<td class="dlt-period" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--ink);font-weight:600;white-space:nowrap;font-size:0.8rem">' + periodNum + '</td>' +
+      '<td class="dlt-date" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">' + dateStr + '</td>' +
+      '<td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">' + weekday + '</td>' +
       '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" value="' + front + '" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td>' +
       '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" value="' + back + '" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td>' +
       '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td>';
     tbody.appendChild(tr);
-    // 绑定blur事件
     var frontInput = tr.querySelector('.dlt-input-front');
     var backInput = tr.querySelector('.dlt-input-back');
     if (frontInput) frontInput.addEventListener('blur', syncDLTInputToTextarea);
@@ -392,8 +442,7 @@ function clearDLT() {
   // 清空表格输入
   var tbody = document.querySelector('#dlt-input-table tbody');
   if (tbody) {
-    tbody.innerHTML = '<tr data-row="0"><td style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted)">1</td><td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td><td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td><td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td></tr>';
-    // 绑定blur事件
+    tbody.innerHTML = '<tr data-row="0"><td class="dlt-period" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--ink);font-weight:600;white-space:nowrap;font-size:0.8rem">26081</td><td class="dlt-date" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">2026-07-08</td><td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">三</td><td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td><td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td><td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td></tr>';
     var firstRow = tbody.querySelector('tr');
     if (firstRow) {
       var fi = firstRow.querySelector('.dlt-input-front');
