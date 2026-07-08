@@ -6291,14 +6291,174 @@ function verifyKL8Predictions(actualDraw) {
   }
   if (updated) {
     localStorage.setItem(KL8_PREDICTION_STORAGE_KEY, JSON.stringify(history));
+    // 验证完成后触发自主学习
+    try { learnFromHistory(); } catch(e) { console.log('learnFromHistory error:', e.message); }
   }
   return updated;
+}
+
+// ==================== 模型自主学习引擎 ====================
+
+var KL8_LEARNING_KEY = 'kl8_learning_log';
+
+// 根据历史命中率自动调整评分权重
+function learnFromHistory() {
+  var predictions = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
+  var verified = predictions.filter(function(r){ return r.verified; });
+  if (verified.length < 3) return null; // 数据不足，不调整
+
+  // 只取最近20期进行学习
+  var recent = verified.slice(0, Math.min(20, verified.length));
+
+  // 计算各策略的命中率
+  var strategyStats = {};
+  for (var i = 0; i < recent.length; i++) {
+    var rec = recent[i];
+    for (var j = 0; j < rec.strategies.length; j++) {
+      var st = rec.strategies[j];
+      var name = st.name;
+      if (!strategyStats[name]) {
+        strategyStats[name] = { hits: 0, total: 0, count: 0, rates: [] };
+      }
+      strategyStats[name].hits += (st.hits || 0);
+      strategyStats[name].total += rec.playType;
+      strategyStats[name].count++;
+      strategyStats[name].rates.push((st.hits || 0) / rec.playType);
+    }
+  }
+
+  // 计算平均命中率
+  var strategyRates = {};
+  var names = Object.keys(strategyStats);
+  for (var i = 0; i < names.length; i++) {
+    var s = strategyStats[names[i]];
+    strategyRates[names[i]] = s.hits / s.total;
+  }
+
+  // 获取当前权重
+  var weights = getKL8AdaptiveWeights();
+
+  // 策略与评分维度的映射
+  var strategyToWeights = {
+    '区间均衡+热号': ['zoneScore', 'wf'],
+    '冷号优先+遗漏': ['lastMissScore', 'mpScore'],
+    '周期+马尔可夫': ['cycleScore', 'mkScore'],
+    '重号优选': ['neighborScore']
+  };
+
+  var adjustments = [];
+  var adjustAmount = 0.008; // 每次微调幅度
+  var minWeight = 0.02, maxWeight = 0.25;
+
+  // 找出最高和最低命中率的策略
+  var sortedNames = names.slice().sort(function(a,b){ return strategyRates[b] - strategyRates[a]; });
+  if (sortedNames.length >= 2) {
+    var best = sortedNames[0];
+    var worst = sortedNames[sortedNames.length - 1];
+    var bestRate = strategyRates[best];
+    var worstRate = strategyRates[worst];
+
+    // 只有当差距足够大时才调整
+    if (bestRate - worstRate > 0.03) {
+      var bestWeights = strategyToWeights[best];
+      var worstWeights = strategyToWeights[worst];
+
+      if (bestWeights) {
+        for (var i = 0; i < bestWeights.length; i++) {
+          var wk = bestWeights[i];
+          if (weights[wk] + adjustAmount <= maxWeight) {
+            weights[wk] += adjustAmount;
+            adjustments.push(wk + ' +' + (adjustAmount*100).toFixed(1) + '%');
+          }
+        }
+      }
+      if (worstWeights) {
+        for (var i = 0; i < worstWeights.length; i++) {
+          var wk = worstWeights[i];
+          if (weights[wk] - adjustAmount >= minWeight) {
+            weights[wk] -= adjustAmount;
+            adjustments.push(wk + ' -' + (adjustAmount*100).toFixed(1) + '%');
+          }
+        }
+      }
+    }
+  }
+
+  // 保存调整后的权重
+  if (adjustments.length > 0) {
+    localStorage.setItem('kl8_adaptive_weights_v2', JSON.stringify(weights));
+
+    // 记录学习日志
+    var log = JSON.parse(localStorage.getItem(KL8_LEARNING_KEY) || '[]');
+    log.unshift({
+      date: new Date().toISOString().slice(0,10),
+      time: new Date().toISOString(),
+      sampleSize: recent.length,
+      strategyRates: strategyRates,
+      adjustments: adjustments,
+      newWeights: weights
+    });
+    if (log.length > 30) log = log.slice(0, 30);
+    localStorage.setItem(KL8_LEARNING_KEY, JSON.stringify(log));
+  }
+
+  return { strategyRates: strategyRates, adjustments: adjustments, weights: weights };
+}
+
+// 渲染学习报告
+function renderKL8LearningReport() {
+  var log = JSON.parse(localStorage.getItem(KL8_LEARNING_KEY) || '[]');
+  var weights = getKL8AdaptiveWeights();
+
+  var html = '<div style="padding:0.8rem;background:var(--bg2);border-radius:8px;border:1px solid var(--rule);margin-bottom:1rem;font-size:0.8rem">';
+  html += '<div style="font-weight:700;color:var(--ink);margin-bottom:0.5rem">🧠 模型自主学习报告</div>';
+
+  // 当前权重
+  html += '<div style="color:var(--muted);margin-bottom:0.3rem">当前评分权重（根据历史命中率自动优化）：</div>';
+  var weightNames = {
+    wf: '热号频率', mpScore: '遗漏百分位', mkScore: '马尔可夫',
+    zoneScore: '区间均衡', neighborScore: '重号邻号', oddEvenScore: '奇偶均衡',
+    bigSmallScore: '大小均衡', lastMissScore: '遗漏回补', tailScore: '尾数分散',
+    stability: '稳定性', consecutiveScore: '连号历史', maScore: '移动平均',
+    cycleScore: '周期性', heatDecay: '热号衰减', sumRegression: '和值回归'
+  };
+  var wKeys = Object.keys(weights).filter(function(k){ return weightNames[k]; });
+  for (var i = 0; i < wKeys.length; i++) {
+    var k = wKeys[i];
+    var pct = Math.round(weights[k] * 100);
+    html += '<div style="display:flex;align-items:center;gap:0.5rem;margin:0.15rem 0">';
+    html += '<span style="min-width:90px;font-size:0.72rem">' + weightNames[k] + '</span>';
+    html += '<div style="flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden">';
+    html += '<div style="height:100%;width:'+pct+'%;background:var(--accent);border-radius:4px"></div></div>';
+    html += '<span style="font-size:0.72rem;width:35px;text-align:right">'+pct+'%</span>';
+    html += '</div>';
+  }
+
+  // 最近调整记录
+  if (log.length > 0) {
+    html += '<div style="margin-top:0.5rem;border-top:1px solid var(--rule);padding-top:0.5rem">';
+    html += '<div style="color:var(--muted);margin-bottom:0.3rem">最近权重调整记录：</div>';
+    for (var i = 0; i < Math.min(5, log.length); i++) {
+      var entry = log[i];
+      html += '<div style="font-size:0.72rem;color:var(--ink);margin:0.1rem 0">';
+      html += entry.date + '：' + entry.adjustments.join('，');
+      html += '</div>';
+    }
+    html += '</div>';
+  } else {
+    html += '<div style="margin-top:0.5rem;color:var(--muted);font-size:0.75rem">暂无调整记录，需要至少3期验证数据后自动开始学习。</div>';
+  }
+
+  html += '</div>';
+  return html;
 }
 
 // 清除预测历史
 function clearKL8PredictionHistory() {
   if (!confirm('确定要清除所有往期预测记录吗？')) return;
   localStorage.removeItem(KL8_PREDICTION_STORAGE_KEY);
+  localStorage.removeItem(KL8_LEARNING_KEY);
+  localStorage.removeItem('kl8_adaptive_weights_v2');
   document.getElementById('kl8-prediction-history').innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem">已清除全部记录</div>';
   var statsEl = document.getElementById('kl8-prediction-stats');
   if (statsEl) statsEl.innerHTML = '';
@@ -6343,6 +6503,38 @@ function renderKL8PredictionHistory() {
   }
 
   var html = '';
+
+  // 显示今日待开奖推荐
+  var todayStr = new Date().toISOString().slice(0,10);
+  var todayRecs = history.filter(function(r){ return r.date === todayStr && !r.verified; });
+  if (todayRecs.length > 0) {
+    html += '<div style="padding:0.8rem;background:var(--bg3);border-radius:8px;border:2px solid var(--accent);margin-bottom:1rem">';
+    html += '<div style="font-weight:700;color:var(--accent);margin-bottom:0.5rem;font-size:0.9rem">&#127775; 今日推荐（待开奖）</div>';
+    html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem">以下推荐基于今日历史数据生成，晚上开奖后将自动验证命中情况</div>';
+    for (var tri = 0; tri < todayRecs.length; tri++) {
+      var trec = todayRecs[tri];
+      html += '<div style="padding:0.5rem;background:var(--bg2);border-radius:6px;margin-bottom:0.4rem">';
+      html += '<div style="font-weight:600;color:var(--ink);font-size:0.8rem">'+trec.playTypeName+'</div>';
+      for (var tsi = 0; tsi < trec.strategies.length; tsi++) {
+        var tst = trec.strategies[tsi];
+        html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-top:0.2rem">';
+        html += '<span style="font-size:0.7rem;color:var(--muted);min-width:70px">'+tst.name+'</span>';
+        for (var tni = 0; tni < tst.picks.length; tni++) {
+          html += '<span style="display:inline-block;width:24px;height:24px;line-height:24px;text-align:center;border-radius:50%;font-size:0.6rem;background:var(--accent4);color:#fff;">'+pad(tst.picks[tni])+'</span>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  // 显示自主学习报告
+  try {
+    var learningHtml = renderKL8LearningReport();
+    if (learningHtml) html += learningHtml;
+  } catch(e) { console.log('renderKL8LearningReport error:', e.message); }
+
   // 命中率统计面板
   var statsHtml = '<div style="padding:0.8rem;background:var(--bg2);border-radius:8px;border:1px solid var(--rule);margin-bottom:1rem;font-size:0.8rem">';
   var verifiedRecs = history.filter(function(r){return r.verified;});
