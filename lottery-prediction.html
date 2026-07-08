@@ -735,6 +735,26 @@ tr:hover td { background: var(--bg3); }
     </div>
   </div>
 
+  <!-- 历史开奖数据表格展示 -->
+  <div id="dlt-history-table-wrap" style="display:none;margin-bottom:1rem">
+    <div class="card">
+      <div class="card-title"><span class="icon">&#128200;</span> 超级大乐透历史开奖</div>
+      <div style="overflow-x:auto">
+        <table id="dlt-history-table" style="width:100%;border-collapse:collapse;font-size:0.85rem">
+          <thead>
+            <tr style="background:var(--bg3)">
+              <th style="padding:8px 10px;border:1px solid var(--rule);text-align:center;white-space:nowrap">期号</th>
+              <th style="padding:8px 10px;border:1px solid var(--rule);text-align:center;white-space:nowrap">开奖日期</th>
+              <th style="padding:8px 10px;border:1px solid var(--rule);text-align:center">前区</th>
+              <th style="padding:8px 10px;border:1px solid var(--rule);text-align:center">后区</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
   <!-- 分析结果容器 -->
   <div id="dlt-results" style="display:none">
     <div class="dlt-layout">
@@ -1631,10 +1651,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026070811"></script>
-<script src="assets/pl-data.js?v=2026070811"></script>
-<script src="assets/pl-engine.js?v=2026070811"></script>
-<script src="assets/auto-review.js?v=2026070811"></script>
+<script src="assets/engine.js?v=2026070812"></script>
+<script src="assets/pl-data.js?v=2026070812"></script>
+<script src="assets/pl-engine.js?v=2026070812"></script>
+<script src="assets/auto-review.js?v=2026070812"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)

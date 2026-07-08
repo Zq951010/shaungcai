@@ -228,6 +228,67 @@ var dltSampleHistory = [
   '08,17,21,33,35|06,07'
 ];
 
+function renderDLTHistoryTable() {
+  var historyStr = document.getElementById('dlt-history').value;
+  var lines = historyStr.trim().split('\n').filter(function(l) { return l.trim(); });
+  if (lines.length === 0) {
+    document.getElementById('dlt-history-table-wrap').style.display = 'none';
+    return;
+  }
+
+  var tbody = document.querySelector('#dlt-history-table tbody');
+  if (!tbody) return;
+
+  // 大乐透每周一、三、六开奖，从最近一期倒推日期
+  var drawDays = [1, 3, 6]; // 周一、三、六
+  var today = new Date();
+  var lastDrawDate = new Date(today);
+  // 找到最近的一个开奖日
+  while (drawDays.indexOf(lastDrawDate.getDay()) < 0) {
+    lastDrawDate.setDate(lastDrawDate.getDate() - 1);
+  }
+
+  var html = '';
+  for (var i = 0; i < lines.length; i++) {
+    var parts = lines[i].split('|');
+    if (parts.length < 2) continue;
+    var frontNums = parts[0].split(',').filter(function(n){return n.trim();});
+    var backNums = parts[1].split(',').filter(function(n){return n.trim();});
+
+    // 推算期号：假设最新一期有期号，倒推
+    var periodNum = lines.length - i;
+
+    // 推算日期：倒推开奖日
+    var drawDate = new Date(lastDrawDate);
+    var steps = i;
+    while (steps > 0) {
+      drawDate.setDate(drawDate.getDate() - 1);
+      if (drawDays.indexOf(drawDate.getDay()) >= 0) {
+        steps--;
+      }
+    }
+    var dateStr = drawDate.getFullYear() + '-' + String(drawDate.getMonth()+1).padStart(2,'0') + '-' + String(drawDate.getDate()).padStart(2,'0');
+
+    html += '<tr style="border-bottom:1px solid var(--rule)">';
+    html += '<td style="padding:8px 10px;text-align:center;color:var(--muted);white-space:nowrap">' + periodNum + '</td>';
+    html += '<td style="padding:8px 10px;text-align:center;color:var(--muted);white-space:nowrap">' + dateStr + '</td>';
+    html += '<td style="padding:8px 10px;text-align:center">';
+    for (var j = 0; j < frontNums.length; j++) {
+      html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;background:#4a90d9;color:#fff;font-size:0.75rem;font-weight:600;margin:1px">' + frontNums[j] + '</span>';
+    }
+    html += '</td>';
+    html += '<td style="padding:8px 10px;text-align:center">';
+    for (var j = 0; j < backNums.length; j++) {
+      html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;background:#f5a623;color:#fff;font-size:0.75rem;font-weight:600;margin:1px">' + backNums[j] + '</span>';
+    }
+    html += '</td>';
+    html += '</tr>';
+  }
+
+  tbody.innerHTML = html;
+  document.getElementById('dlt-history-table-wrap').style.display = 'block';
+}
+
 function loadDLTSample() {
   var last = dltSampleHistory[0];
   var parts = last.split('|');
@@ -241,6 +302,8 @@ function loadDLTSample() {
   var reviewBack = document.getElementById('dlt-review-blue');
   if (reviewNums) reviewNums.value = sampleFront;
   if (reviewBack) reviewBack.value = sampleBack;
+  // 渲染历史开奖表格
+  renderDLTHistoryTable();
 }
 
 function clearDLT() {
@@ -249,6 +312,7 @@ function clearDLT() {
   document.getElementById('dlt-history').value = '';
   document.getElementById('dlt-results').style.display = 'none';
   document.getElementById('dlt-empty').style.display = 'block';
+  document.getElementById('dlt-history-table-wrap').style.display = 'none';
 }
 
 function analyzeDLT() {
@@ -274,6 +338,9 @@ function analyzeDLT() {
       history.push({ front: f.slice(0, 5).sort(function(a,b){return a-b}), back: b.slice(0, 2).sort(function(a,b){return a-b}) });
     }
   }
+
+  // 渲染历史开奖表格
+  renderDLTHistoryTable();
 
   // If no history parsed but we have last numbers, use them as single entry
   if (history.length === 0 && lastFront.length >= 5 && lastBack.length >= 2) {
