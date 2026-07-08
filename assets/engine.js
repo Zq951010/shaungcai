@@ -3428,13 +3428,14 @@ function renderKL8DanTuo(last, history, playType, targetId) {
 
 function getKL8AdaptiveWeights() {
   var defaults = {
-    wf: 0.11, mpScore: 0.12, mkScore: 0.11, zoneScore: 0.10,
-    neighborScore: 0.13, oddEvenScore: 0.07, bigSmallScore: 0.07,
-    lastMissScore: 0.09, tailScore: 0.06, stability: 0.03,
-    consecutiveScore: 0.04, maScore: 0.03, cycleScore: 0.04
+    wf: 0.09, mpScore: 0.13, mkScore: 0.10, zoneScore: 0.12,
+    neighborScore: 0.10, oddEvenScore: 0.07, bigSmallScore: 0.07,
+    lastMissScore: 0.14, tailScore: 0.06, stability: 0.03,
+    consecutiveScore: 0.05, maScore: 0.03, cycleScore: 0.05,
+    heatDecay: 0.04, sumRegression: 0.03
   };
   try {
-    var saved = localStorage.getItem('kl8_adaptive_weights');
+    var saved = localStorage.getItem('kl8_adaptive_weights_v2');
     if (saved) {
       var parsed = JSON.parse(saved);
       for (var k in parsed) {
@@ -3612,20 +3613,47 @@ function scoreKL8Numbers(last, history, weights) {
     var cycle = cycleAnalysis(n, history);
     var cycleScore = cycle.score;
 
-    // 上期遗漏回补评分：上期未开但遗漏值适中的号码（遗漏5-15期）加分
+    // 上期遗漏回补评分：精细分级，遗漏3-8期最优回补窗口
     var lastMissScore = 0;
+    var lastMiss = 0;
     if (last.indexOf(n) < 0) {
-      var lastMiss = 0;
       for (var mi = 0; mi < history.length; mi++) {
         if (history[mi].indexOf(n) >= 0) break;
         lastMiss++;
       }
-      if (lastMiss >= 3 && lastMiss <= 10) lastMissScore = 0.75;
-      else if (lastMiss >= 11 && lastMiss <= 20) lastMissScore = 0.55;
+      if (lastMiss >= 3 && lastMiss <= 5) lastMissScore = 0.95;
+      else if (lastMiss >= 6 && lastMiss <= 8) lastMissScore = 0.85;
+      else if (lastMiss >= 9 && lastMiss <= 12) lastMissScore = 0.70;
+      else if (lastMiss >= 13 && lastMiss <= 18) lastMissScore = 0.55;
+      else if (lastMiss >= 19 && lastMiss <= 25) lastMissScore = 0.40;
+    }
+
+    // 热号衰减：连续2-3期出现的热号降低评分（防止过度追捧）
+    var heatDecay = 0;
+    var recentAppear = 0;
+    for (var hi = 0; hi < Math.min(3, history.length); hi++) {
+      if (history[hi].indexOf(n) >= 0) recentAppear++;
+    }
+    if (recentAppear >= 3) heatDecay = -0.25;
+    else if (recentAppear >= 2) heatDecay = -0.12;
+    else if (recentAppear === 0 && wf > 0.20) heatDecay = 0.08; // 隔期热号回升
+
+    // 和值回归信号：计算历史平均和值，号码对回归的贡献
+    var sumRegression = 0;
+    if (history.length >= 5) {
+      var allSums = history.map(function(h){ return sum(h); });
+      var avgSum = avg(allSums);
+      var lastSum = sum(last);
+      var diff = lastSum - avgSum;
+      // 如果和值偏高，小号区号码加分；偏低则大号区加分
+      if (diff > 40 && n <= 30) sumRegression = 0.20;
+      else if (diff > 20 && n <= 35) sumRegression = 0.10;
+      else if (diff < -40 && n >= 51) sumRegression = 0.20;
+      else if (diff < -20 && n >= 46) sumRegression = 0.10;
     }
 
     // V4权重参数化：支持自适应学习调整
-    var totalScore = wf*w.wf + mpScore*w.mpScore + mkScore*w.mkScore + zoneScore*w.zoneScore + neighborScore*w.neighborScore + oddEvenScore*w.oddEvenScore + bigSmallScore*w.bigSmallScore + lastMissScore*w.lastMissScore + tailScore*w.tailScore + stability*w.stability + consecutiveScore*w.consecutiveScore + maScore*w.maScore + cycleScore*w.cycleScore;
+    var totalScore = wf*w.wf + mpScore*w.mpScore + mkScore*w.mkScore + zoneScore*w.zoneScore + neighborScore*w.neighborScore + oddEvenScore*w.oddEvenScore + bigSmallScore*w.bigSmallScore + lastMissScore*w.lastMissScore + tailScore*w.tailScore + stability*w.stability + consecutiveScore*w.consecutiveScore + maScore*w.maScore + cycleScore*w.cycleScore + heatDecay*w.heatDecay + sumRegression*w.sumRegression;
 
     var reasons = [];
     if (wf > 0.25) reasons.push('高频');
@@ -3642,8 +3670,11 @@ function scoreKL8Numbers(last, history, weights) {
     if (stability > 0.7) reasons.push('稳定');
     if (ma.trend === 'up') reasons.push('趋势升');
     if (cycleScore > 0.85) reasons.push('周期到');
+    if (heatDecay < -0.1) reasons.push('热号降温');
+    else if (heatDecay > 0) reasons.push('隔期回升');
+    if (sumRegression > 0.1) reasons.push('和值回归');
 
-    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, oddEvenScore: oddEvenScore, bigSmallScore: bigSmallScore, tailScore: tailScore, neighborScore: neighborScore, lastMissScore: lastMissScore, stability: stability, maScore: maScore, cycleScore: cycleScore, totalScore: totalScore, reasons: reasons });
+    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, oddEvenScore: oddEvenScore, bigSmallScore: bigSmallScore, tailScore: tailScore, neighborScore: neighborScore, lastMissScore: lastMissScore, stability: stability, maScore: maScore, cycleScore: cycleScore, heatDecay: heatDecay, sumRegression: sumRegression, totalScore: totalScore, reasons: reasons });
   }
   return scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 }
@@ -3810,12 +3841,22 @@ function runKL8AutoReview(history) {
 function generateKL8Picks_V2(scores, history, playType) {
   // V2全玩法推荐策略（与综合推荐完全一致的选号逻辑）
   function genStrategy1(pt) {
+    // S1优化：区间均衡 + 遗漏回补优先 + 热号降温过滤
     var picks = [];
     var used = {};
     var zoneLimits = [Math.ceil(pt/2), Math.ceil(pt/2), Math.ceil(pt/2), Math.ceil(pt/2)];
     var zoneCounts = [0,0,0,0];
-    for (var i=0;i<scores.length && picks.length<pt;i++) {
-      var n = scores[i].num;
+    // 优先选有遗漏回补信号且非热号降温的号码
+    var sortedScores = scores.slice().sort(function(a,b){
+      var aScore = a.lastMissScore * 0.4 + a.zoneScore * 0.3 + a.wf * 0.2 + (a.sumRegression||0) * 0.1;
+      var bScore = b.lastMissScore * 0.4 + b.zoneScore * 0.3 + b.wf * 0.2 + (b.sumRegression||0) * 0.1;
+      // 热号降温的排后
+      if (a.heatDecay < -0.1 && b.heatDecay >= -0.1) return 1;
+      if (b.heatDecay < -0.1 && a.heatDecay >= -0.1) return -1;
+      return bScore - aScore;
+    });
+    for (var i=0;i<sortedScores.length && picks.length<pt;i++) {
+      var n = sortedScores[i].num;
       var z = n<=20?0:n<=40?1:n<=60?2:3;
       if (zoneCounts[z] < zoneLimits[z]) {
         picks.push(n);
@@ -3823,10 +3864,10 @@ function generateKL8Picks_V2(scores, history, playType) {
         zoneCounts[z]++;
       }
     }
-    for (var i=0;i<scores.length && picks.length<pt;i++) {
-      if (!used[scores[i].num]) {
-        picks.push(scores[i].num);
-        used[scores[i].num] = true;
+    for (var i=0;i<sortedScores.length && picks.length<pt;i++) {
+      if (!used[sortedScores[i].num]) {
+        picks.push(sortedScores[i].num);
+        used[sortedScores[i].num] = true;
       }
     }
     picks.sort(function(a,b){return a-b;});
@@ -3834,18 +3875,19 @@ function generateKL8Picks_V2(scores, history, playType) {
   }
 
   function genStrategy2(pt) {
-    var cold = scores.slice().sort(function(a,b){
-      var aCold = a.lastMissScore * 0.6 + a.mp * 0.4;
-      var bCold = b.lastMissScore * 0.6 + b.mp * 0.4;
+    // S2优化：冷号优先+遗漏回补，更激进地利用lastMissScore，排除热号降温
+    var cold = scores.slice().filter(function(s){ return s.heatDecay >= -0.05; }).sort(function(a,b){
+      var aCold = a.lastMissScore * 0.7 + a.mp * 0.2 + a.mkScore * 0.1;
+      var bCold = b.lastMissScore * 0.7 + b.mp * 0.2 + b.mkScore * 0.1;
       return bCold - aCold;
-    }).slice(0, 12).map(function(s){return s.num;});
-    var hot = scores.slice(0, 6).map(function(s){return s.num;});
-    var hotCount = Math.ceil(pt * 0.3);
+    }).slice(0, Math.max(pt, 15)).map(function(s){return s.num;});
+    var hot = scores.slice(0, 8).filter(function(s){ return s.heatDecay >= -0.05; }).map(function(s){return s.num;});
+    var hotCount = Math.ceil(pt * 0.25); // 冷号占75%
     var picks = cold.slice(0, pt - hotCount).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0, hotCount));
     var unique = [];
     for (var i=0;i<picks.length && unique.length<pt;i++) if (unique.indexOf(picks[i])<0) unique.push(picks[i]);
     for (var i=0;i<scores.length && unique.length<pt;i++) {
-      if (unique.indexOf(scores[i].num)<0) unique.push(scores[i].num);
+      if (unique.indexOf(scores[i].num)<0 && scores[i].heatDecay >= -0.05) unique.push(scores[i].num);
     }
     unique.sort(function(a,b){return a-b;});
     return unique;
@@ -3947,12 +3989,20 @@ function renderKL8AllPlayTypes_V2(last, history) {
   }
 
   function genStrategy1(playType) {
+    // S1优化：区间均衡 + 遗漏回补优先 + 热号降温过滤
     var picks = [];
     var used = {};
     var zoneLimits = [Math.ceil(playType/2), Math.ceil(playType/2), Math.ceil(playType/2), Math.ceil(playType/2)];
     var zoneCounts = [0,0,0,0];
-    for (var i=0;i<scores.length && picks.length<playType;i++) {
-      var n = scores[i].num;
+    var sortedScores = scores.slice().sort(function(a,b){
+      var aScore = a.lastMissScore * 0.4 + a.zoneScore * 0.3 + a.wf * 0.2 + (a.sumRegression||0) * 0.1;
+      var bScore = b.lastMissScore * 0.4 + b.zoneScore * 0.3 + b.wf * 0.2 + (b.sumRegression||0) * 0.1;
+      if (a.heatDecay < -0.1 && b.heatDecay >= -0.1) return 1;
+      if (b.heatDecay < -0.1 && a.heatDecay >= -0.1) return -1;
+      return bScore - aScore;
+    });
+    for (var i=0;i<sortedScores.length && picks.length<playType;i++) {
+      var n = sortedScores[i].num;
       var z = n<=20?0:n<=40?1:n<=60?2:3;
       if (zoneCounts[z] < zoneLimits[z]) {
         picks.push(n);
@@ -3960,10 +4010,10 @@ function renderKL8AllPlayTypes_V2(last, history) {
         zoneCounts[z]++;
       }
     }
-    for (var i=0;i<scores.length && picks.length<playType;i++) {
-      if (!used[scores[i].num]) {
-        picks.push(scores[i].num);
-        used[scores[i].num] = true;
+    for (var i=0;i<sortedScores.length && picks.length<playType;i++) {
+      if (!used[sortedScores[i].num]) {
+        picks.push(sortedScores[i].num);
+        used[sortedScores[i].num] = true;
       }
     }
     picks.sort(function(a,b){return a-b;});
@@ -3971,19 +4021,19 @@ function renderKL8AllPlayTypes_V2(last, history) {
   }
 
   function genStrategy2(playType) {
-    // V4猎冷回补策略：优先选取遗漏回补信号强(lastMissScore高)且深冷(mp高)的号码
-    var cold = scores.slice().sort(function(a,b){
-      var aCold = a.lastMissScore * 0.6 + a.mp * 0.4;
-      var bCold = b.lastMissScore * 0.6 + b.mp * 0.4;
+    // S2优化：冷号优先+遗漏回补，更激进地利用lastMissScore，排除热号降温
+    var cold = scores.slice().filter(function(s){ return s.heatDecay >= -0.05; }).sort(function(a,b){
+      var aCold = a.lastMissScore * 0.7 + a.mp * 0.2 + a.mkScore * 0.1;
+      var bCold = b.lastMissScore * 0.7 + b.mp * 0.2 + b.mkScore * 0.1;
       return bCold - aCold;
-    }).slice(0, 12).map(function(s){return s.num;});
-    var hot = scores.slice(0, 6).map(function(s){return s.num;});
-    var hotCount = Math.ceil(playType * 0.3); // 冷号占70%
+    }).slice(0, Math.max(playType, 15)).map(function(s){return s.num;});
+    var hot = scores.slice(0, 8).filter(function(s){ return s.heatDecay >= -0.05; }).map(function(s){return s.num;});
+    var hotCount = Math.ceil(playType * 0.25);
     var picks = cold.slice(0, playType - hotCount).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0, hotCount));
     var unique = [];
     for (var i=0;i<picks.length && unique.length<playType;i++) if (unique.indexOf(picks[i])<0) unique.push(picks[i]);
     for (var i=0;i<scores.length && unique.length<playType;i++) {
-      if (unique.indexOf(scores[i].num)<0) unique.push(scores[i].num);
+      if (unique.indexOf(scores[i].num)<0 && scores[i].heatDecay >= -0.05) unique.push(scores[i].num);
     }
     unique.sort(function(a,b){return a-b;});
     return unique;
@@ -6019,32 +6069,39 @@ function spinKL8Review() {
     var used = {};
     var zoneLimits = [Math.ceil(pt/2), Math.ceil(pt/2), Math.ceil(pt/2), Math.ceil(pt/2)];
     var zoneCounts = [0,0,0,0];
-    for (var i=0;i<scores.length && picks.length<pt;i++) {
-      var n = scores[i].num;
+    var sortedScores = scores.slice().sort(function(a,b){
+      var aScore = a.lastMissScore * 0.4 + a.zoneScore * 0.3 + a.wf * 0.2 + (a.sumRegression||0) * 0.1;
+      var bScore = b.lastMissScore * 0.4 + b.zoneScore * 0.3 + b.wf * 0.2 + (b.sumRegression||0) * 0.1;
+      if (a.heatDecay < -0.1 && b.heatDecay >= -0.1) return 1;
+      if (b.heatDecay < -0.1 && a.heatDecay >= -0.1) return -1;
+      return bScore - aScore;
+    });
+    for (var i=0;i<sortedScores.length && picks.length<pt;i++) {
+      var n = sortedScores[i].num;
       var z = n<=20?0:n<=40?1:n<=60?2:3;
       if (zoneCounts[z] < zoneLimits[z]) {
         picks.push(n); used[n] = true; zoneCounts[z]++;
       }
     }
-    for (var i=0;i<scores.length && picks.length<pt;i++) {
-      if (!used[scores[i].num]) { picks.push(scores[i].num); used[scores[i].num] = true; }
+    for (var i=0;i<sortedScores.length && picks.length<pt;i++) {
+      if (!used[sortedScores[i].num]) { picks.push(sortedScores[i].num); used[sortedScores[i].num] = true; }
     }
     picks.sort(function(a,b){return a-b;});
     return picks;
   }
   function genStrategy2(pt) {
-    var cold = scores.slice().sort(function(a,b){
-      var aCold = a.lastMissScore * 0.6 + a.mp * 0.4;
-      var bCold = b.lastMissScore * 0.6 + b.mp * 0.4;
+    var cold = scores.slice().filter(function(s){ return s.heatDecay >= -0.05; }).sort(function(a,b){
+      var aCold = a.lastMissScore * 0.7 + a.mp * 0.2 + a.mkScore * 0.1;
+      var bCold = b.lastMissScore * 0.7 + b.mp * 0.2 + b.mkScore * 0.1;
       return bCold - aCold;
-    }).slice(0, 12).map(function(s){return s.num;});
-    var hot = scores.slice(0, 6).map(function(s){return s.num;});
-    var hotCount = Math.ceil(pt * 0.3);
+    }).slice(0, Math.max(pt, 15)).map(function(s){return s.num;});
+    var hot = scores.slice(0, 8).filter(function(s){ return s.heatDecay >= -0.05; }).map(function(s){return s.num;});
+    var hotCount = Math.ceil(pt * 0.25);
     var picks = cold.slice(0, pt - hotCount).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0, hotCount));
     var unique = [];
     for (var i=0;i<picks.length && unique.length<pt;i++) if (unique.indexOf(picks[i])<0) unique.push(picks[i]);
     for (var i=0;i<scores.length && unique.length<pt;i++) {
-      if (unique.indexOf(scores[i].num)<0) unique.push(scores[i].num);
+      if (unique.indexOf(scores[i].num)<0 && scores[i].heatDecay >= -0.05) unique.push(scores[i].num);
     }
     unique.sort(function(a,b){return a-b;});
     return unique;
