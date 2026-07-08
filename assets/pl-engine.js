@@ -421,6 +421,40 @@ function renderPL3Miss(history) {
   renderPL3MissChart(missData);
 }
 
+// ==================== 排列三/排列五 通用辅助函数 ====================
+
+function isZu3(nums) { return new Set(nums).size === 2; }
+
+function isBaozi(nums) { return new Set(nums).size === 1; }
+
+function hasLianhao(nums) {
+  var s = nums.slice().sort(function(a,b){return a-b;});
+  for (var i = 0; i < s.length - 1; i++) {
+    if (s[i+1] - s[i] === 1) return true;
+  }
+  return false;
+}
+
+function hasRepeat(last, picks) {
+  for (var i = 0; i < picks.length; i++) {
+    if (last.indexOf(picks[i]) >= 0) return true;
+  }
+  return false;
+}
+
+function get012lu(nums) {
+  var roads = [0,0,0];
+  for (var i = 0; i < nums.length; i++) roads[nums[i] % 3]++;
+  return roads;
+}
+
+function getPL5SumZone(sum) {
+  if (sum >= 25 && sum <= 34) return '黄金区';
+  if (sum < 15) return '偏低区';
+  if (sum > 40) return '偏高区';
+  return '正常区';
+}
+
 function scorePL3Numbers(last, history) {
   // V2: position-independent 8-dimensional model for Bai, Shi, Ge
   var posScores = [];
@@ -955,11 +989,58 @@ function renderPL3Recommend_V2(last, history) {
     return;
   }
 
-  // 获取各位置Top3号码，用于生成多样化推荐
+  // 获取各位置Top5号码，用于生成候选组合
+  var posTop5 = [];
+  for (var pos = 0; pos < 3; pos++) {
+    posTop5.push(posScores[pos].slice().sort(function(a, b) { return b.total - a.total; }).slice(0, 5));
+  }
+
+  // 获取各位置Top3号码，用于生成备选
   var posTop3 = [];
   for (var pos = 0; pos < 3; pos++) {
     posTop3.push(posScores[pos].slice().sort(function(a, b) { return b.total - a.total; }).slice(0, 3));
   }
+
+  // 计算近5期和值、跨度
+  var recent5 = history.slice(0, Math.min(5, history.length));
+  var recentSums = [];
+  var recentSpans = [];
+  for (var i = 0; i < recent5.length; i++) {
+    recentSums.push(sum(recent5[i]));
+    recentSpans.push(span(recent5[i]));
+  }
+  var avgRecentSum = recentSums.length ? recentSums.reduce(function(a,b){return a+b;},0) / recentSums.length : 14;
+  var avgRecentSpan = recentSpans.length ? recentSpans.reduce(function(a,b){return a+b;},0) / recentSpans.length : 5;
+
+  // 组三热度判断
+  var zu3Count = 0;
+  for (var i = 0; i < recent5.length; i++) {
+    if (isZu3(recent5[i])) zu3Count++;
+  }
+  var zu3Hot = zu3Count >= 2;
+
+  // 获取某号码在某位置的评分
+  function getPosScore(num, pos) {
+    for (var i = 0; i < posScores[pos].length; i++) {
+      if (posScores[pos][i].num === num) return posScores[pos][i].total;
+    }
+    return 0;
+  }
+
+  // 生成所有交叉组合（Top5）
+  function genAllCandidates() {
+    var candidates = [];
+    for (var i0 = 0; i0 < posTop5[0].length; i0++) {
+      for (var i1 = 0; i1 < posTop5[1].length; i1++) {
+        for (var i2 = 0; i2 < posTop5[2].length; i2++) {
+          candidates.push([posTop5[0][i0].num, posTop5[1][i1].num, posTop5[2][i2].num]);
+        }
+      }
+    }
+    return candidates;
+  }
+
+  var allCandidates = genAllCandidates();
 
   function pickByStrategy(strategy) {
     var picks = [];
@@ -982,15 +1063,13 @@ function renderPL3Recommend_V2(last, history) {
           return b.total - a.total;
         });
       } else if (strategy === 'coldhot') {
-        // 冷热搭配：热号位置选冷号，冷号位置选热号
         scores.sort(function(a, b) {
           var aHot = a.reasons.indexOf('高频热号') >= 0 || a.reasons.indexOf('热持续') >= 0 ? 1 : 0;
           var bHot = b.reasons.indexOf('高频热号') >= 0 || b.reasons.indexOf('热持续') >= 0 ? 1 : 0;
-          if (aHot !== bHot) return aHot - bHot; // 冷号优先
+          if (aHot !== bHot) return aHot - bHot;
           return b.total - a.total;
         });
       } else if (strategy === 'oddeven') {
-        // 奇偶均衡：当前奇多则选偶，偶多则选奇
         var oddTrend = 0, evenTrend = 0;
         for (var i = 0; i < Math.min(3, history.length); i++) {
           if (history[i][pos] % 2 === 1) oddTrend++; else evenTrend++;
@@ -998,12 +1077,11 @@ function renderPL3Recommend_V2(last, history) {
         scores.sort(function(a, b) {
           var aOdd = a.num % 2 === 1 ? 1 : 0;
           var bOdd = b.num % 2 === 1 ? 1 : 0;
-          if (oddTrend > evenTrend) return aOdd - bOdd; // 偶数优先
-          if (evenTrend > oddTrend) return bOdd - aOdd; // 奇数优先
+          if (oddTrend > evenTrend) return aOdd - bOdd;
+          if (evenTrend > oddTrend) return bOdd - aOdd;
           return b.total - a.total;
         });
       } else if (strategy === 'bigsmall') {
-        // 大小交替
         var bigTrend = 0, smallTrend = 0;
         for (var i = 0; i < Math.min(3, history.length); i++) {
           if (history[i][pos] >= 5) bigTrend++; else smallTrend++;
@@ -1011,39 +1089,35 @@ function renderPL3Recommend_V2(last, history) {
         scores.sort(function(a, b) {
           var aBig = a.num >= 5 ? 1 : 0;
           var bBig = b.num >= 5 ? 1 : 0;
-          if (bigTrend > smallTrend) return aBig - bBig; // 小号优先
-          if (smallTrend > bigTrend) return bBig - aBig; // 大号优先
+          if (bigTrend > smallTrend) return aBig - bBig;
+          if (smallTrend > bigTrend) return bBig - aBig;
           return b.total - a.total;
         });
       } else if (strategy === 'expert') {
-        // 专家技巧综合策略（排列三专用）
         var posHistory = [];
         for (var i = 0; i < history.length; i++) {
           if (history[i].length > pos) posHistory.push(history[i][pos]);
         }
         var lastVal = last[pos];
 
-        // 技巧1：形态判断 - 近5期组三/组六走势
-        var zu3Count = 0;
+        var zu3CountLocal = 0;
         for (var i = 0; i < Math.min(5, history.length); i++) {
           var h = history[i];
           if (h.length >= 3) {
             var s = new Set(h);
-            if (s.size === 2) zu3Count++;
+            if (s.size === 2) zu3CountLocal++;
           }
         }
-        var zu3Hot = zu3Count >= 2; // 近5期组三出现2次以上
+        var zu3HotLocal = zu3CountLocal >= 2;
 
-        // 技巧2：和值区间 - 计算近3期和值趋势
-        var recentSums = [];
+        var recentSumsLocal = [];
         for (var i = 0; i < Math.min(3, history.length); i++) {
-          recentSums.push(history[i][0] + history[i][1] + history[i][2]);
+          recentSumsLocal.push(history[i][0] + history[i][1] + history[i][2]);
         }
-        var avgRecentSum = recentSums.reduce(function(a,b){return a+b;}, 0) / recentSums.length;
-        var sumLow = avgRecentSum < 10;
-        var sumHigh = avgRecentSum > 18;
+        var avgRecentSumLocal = recentSumsLocal.reduce(function(a,b){return a+b;}, 0) / recentSumsLocal.length;
+        var sumLow = avgRecentSumLocal < 10;
+        var sumHigh = avgRecentSumLocal > 18;
 
-        // 技巧3：012路统计 - 近5期各位置012路分布
         var roadCounts = [0, 0, 0];
         for (var i = 0; i < Math.min(5, posHistory.length); i++) {
           roadCounts[posHistory[i] % 3]++;
@@ -1054,53 +1128,44 @@ function renderPL3Recommend_V2(last, history) {
           if (roadCounts[r] >= 3) hotRoad = r;
         }
 
-        // 技巧4：冷热号区间划分（近30期等效）
         var freqMap = {};
         for (var i = 0; i < 10; i++) freqMap[i] = 0;
         var sampleLen = Math.min(posHistory.length, 30);
         for (var i = 0; i < sampleLen; i++) freqMap[posHistory[i]]++;
-        var hotThreshold = Math.ceil(sampleLen * 0.27); // >=27%为热号
-        var coldThreshold = Math.floor(sampleLen * 0.13); // <=13%为冷号
+        var hotThreshold = Math.ceil(sampleLen * 0.27);
+        var coldThreshold = Math.floor(sampleLen * 0.13);
 
-        // 综合评分
         scores.sort(function(a, b) {
-          var aScore = bScore = 0;
+          var aScore = 0, bScore = 0;
           var n = a.num, m = b.num;
 
-          // 基础分：原评分权重
           aScore += a.total * 0.3;
           bScore += b.total * 0.3;
 
-          // 和值区间加分
-          if (sumLow && n <= 4) aScore += 3; // 和值偏低时小号加分
-          if (sumHigh && n >= 5) aScore += 3; // 和值偏高时大号加分
+          if (sumLow && n <= 4) aScore += 3;
+          if (sumHigh && n >= 5) aScore += 3;
           if (sumLow && m <= 4) bScore += 3;
           if (sumHigh && m >= 5) bScore += 3;
 
-          // 012路回补加分
           if (coldRoad >= 0 && n % 3 === coldRoad) aScore += 4;
           if (coldRoad >= 0 && m % 3 === coldRoad) bScore += 4;
-          // 热路适度降温
           if (hotRoad >= 0 && n % 3 === hotRoad) aScore -= 1;
           if (hotRoad >= 0 && m % 3 === hotRoad) bScore -= 1;
 
-          // 冷热搭配：热号位置优先选温号/冷号
           var aHot = freqMap[n] >= hotThreshold ? 2 : (freqMap[n] <= coldThreshold ? 0 : 1);
           var bHot = freqMap[m] >= hotThreshold ? 2 : (freqMap[m] <= coldThreshold ? 0 : 1);
-          // 如果该位置近2期都是热号，倾向选温号/冷号
           var posRecentHot = 0;
           for (var i = 0; i < Math.min(2, posHistory.length); i++) {
             if (freqMap[posHistory[i]] >= hotThreshold) posRecentHot++;
           }
           if (posRecentHot >= 2) {
-            aScore += (2 - aHot) * 2; // 温号/冷号加分
+            aScore += (2 - aHot) * 2;
             bScore += (2 - bHot) * 2;
           } else {
-            aScore += aHot * 1; // 热号适度加分
+            aScore += aHot * 1;
             bScore += bHot * 1;
           }
 
-          // 邻号关联
           if (Math.abs(n - lastVal) === 1) aScore += 2;
           if (Math.abs(m - lastVal) === 1) bScore += 2;
 
@@ -1111,23 +1176,133 @@ function renderPL3Recommend_V2(last, history) {
       }
       picks.push(scores[0].num);
     }
+
+    // 策略9-12在逐位置选择后可能被覆盖
+    if (strategy === 'sum') {
+      var candidates = allCandidates.slice();
+      candidates.sort(function(a, b) {
+        var sa = sum(a), sb = sum(b);
+        var scoreA = 0, scoreB = 0;
+        if (avgRecentSum < 10) {
+          scoreA = sa;
+          scoreB = sb;
+        } else if (avgRecentSum > 18) {
+          scoreA = -sa;
+          scoreB = -sb;
+        } else {
+          scoreA = -Math.abs(sa - 14);
+          scoreB = -Math.abs(sb - 14);
+        }
+        var baseA = getPosScore(a[0], 0) + getPosScore(a[1], 1) + getPosScore(a[2], 2);
+        var baseB = getPosScore(b[0], 0) + getPosScore(b[1], 1) + getPosScore(b[2], 2);
+        scoreA += baseA * 0.2;
+        scoreB += baseB * 0.2;
+        return scoreB - scoreA;
+      });
+      picks = candidates[0];
+    } else if (strategy === 'span') {
+      var candidates = allCandidates.slice();
+      candidates.sort(function(a, b) {
+        var sa = span(a), sb = span(b);
+        var scoreA = 0, scoreB = 0;
+        scoreA = -Math.abs(sa - 5);
+        scoreB = -Math.abs(sb - 5);
+        if (avgRecentSpan < 3) {
+          scoreA += sa * 0.5;
+          scoreB += sb * 0.5;
+        } else if (avgRecentSpan > 7) {
+          scoreA -= sa * 0.5;
+          scoreB -= sb * 0.5;
+        }
+        var baseA = getPosScore(a[0], 0) + getPosScore(a[1], 1) + getPosScore(a[2], 2);
+        var baseB = getPosScore(b[0], 0) + getPosScore(b[1], 1) + getPosScore(b[2], 2);
+        scoreA += baseA * 0.2;
+        scoreB += baseB * 0.2;
+        return scoreB - scoreA;
+      });
+      picks = candidates[0];
+    } else if (strategy === 'zu3') {
+      var zu3Candidates = [];
+      var allNums = [];
+      for (var pos = 0; pos < 3; pos++) {
+        for (var i = 0; i < posTop5[pos].length; i++) {
+          if (allNums.indexOf(posTop5[pos][i].num) < 0) allNums.push(posTop5[pos][i].num);
+        }
+      }
+      for (var i = 0; i < allNums.length; i++) {
+        for (var j = 0; j < allNums.length; j++) {
+          if (i === j) continue;
+          var a = allNums[i], b = allNums[j];
+          var forms = [[a, a, b], [a, b, a], [b, a, a]];
+          for (var f = 0; f < forms.length; f++) {
+            zu3Candidates.push(forms[f]);
+          }
+        }
+      }
+      var zu3Unique = [];
+      var zu3Seen = {};
+      for (var i = 0; i < zu3Candidates.length; i++) {
+        var key = zu3Candidates[i].join(',');
+        if (!zu3Seen[key]) {
+          zu3Seen[key] = true;
+          zu3Unique.push(zu3Candidates[i]);
+        }
+      }
+      zu3Unique.sort(function(a, b) {
+        var baseA = getPosScore(a[0], 0) + getPosScore(a[1], 1) + getPosScore(a[2], 2);
+        var baseB = getPosScore(b[0], 0) + getPosScore(b[1], 1) + getPosScore(b[2], 2);
+        if (zu3Hot) { baseA += 5; baseB += 5; }
+        return baseB - baseA;
+      });
+      picks = zu3Unique.length ? zu3Unique[0] : [posTop3[0][0].num, posTop3[0][0].num, posTop3[1][0].num];
+    } else if (strategy === 'lianhao') {
+      var candidates = allCandidates.slice();
+      candidates.sort(function(a, b) {
+        var scoreA = 0, scoreB = 0;
+        if (hasLianhao(a)) scoreA += 10;
+        if (hasLianhao(b)) scoreB += 10;
+        var baseA = getPosScore(a[0], 0) + getPosScore(a[1], 1) + getPosScore(a[2], 2);
+        var baseB = getPosScore(b[0], 0) + getPosScore(b[1], 1) + getPosScore(b[2], 2);
+        scoreA += baseA * 0.3;
+        scoreB += baseB * 0.3;
+        return scoreB - scoreA;
+      });
+      picks = candidates[0];
+    }
+
     return picks;
   }
 
-  // 生成备选方案：从各位置Top3中交叉组合
   function genCrossAlts(base, strategy) {
+    if (strategy === 'zu3') {
+      var alts = [];
+      for (var i = 0; i < 3; i++) {
+        for (var j = 1; j < posTop3[i].length; j++) {
+          var alt = base.slice();
+          alt[i] = posTop3[i][j].num;
+          if (!isBaozi(alt) && isZu3(alt)) {
+            alts.push(alt);
+          }
+        }
+      }
+      var unique = [];
+      var seen = {};
+      for (var i = 0; i < alts.length; i++) {
+        var key = alts[i].join(',');
+        if (!seen[key] && key !== base.join(',')) {
+          seen[key] = true;
+          unique.push(alts[i]);
+        }
+      }
+      return unique.slice(0, 3);
+    }
+
     var alts = [];
-    // 方案A：百位换第2，其他不变
     alts.push([posTop3[0][1].num, base[1], base[2]]);
-    // 方案B：十位换第2，其他不变
     alts.push([base[0], posTop3[1][1].num, base[2]]);
-    // 方案C：个位换第2，其他不变
     alts.push([base[0], base[1], posTop3[2][1].num]);
-    // 方案D：百位第2 + 十位第2
     alts.push([posTop3[0][1].num, posTop3[1][1].num, base[2]]);
-    // 方案E：十位第2 + 个位第2
     alts.push([base[0], posTop3[1][1].num, posTop3[2][1].num]);
-    // 去重
     var unique = [];
     var seen = {};
     for (var i = 0; i < alts.length; i++) {
@@ -1147,11 +1322,15 @@ function renderPL3Recommend_V2(last, history) {
     { key: 'coldhot', name: '冷热搭配', desc: '冷号位置补热号，热号位置补冷号' },
     { key: 'oddeven', name: '奇偶均衡', desc: '根据近期奇偶趋势反向选择' },
     { key: 'bigsmall', name: '大小交替', desc: '根据近期大小趋势反向选择' },
-    { key: 'expert', name: '专家技巧综合', desc: '融合形态判断·和值区间·冷热搭配·组三组六·012路' }
+    { key: 'expert', name: '专家技巧综合', desc: '融合形态判断·和值区间·冷热搭配·组三组六·012路' },
+    { key: 'sum', name: '和值导向', desc: '分析和值走势，使和值回归黄金区间(10-18)' },
+    { key: 'span', name: '跨度导向', desc: '分析跨度走势，使跨度回归黄金区间(3-7)' },
+    { key: 'zu3', name: '组三对子', desc: '判断组三热度，生成AAB形态组三号码' },
+    { key: 'lianhao', name: '连号追踪', desc: '优先选择包含连号的组合' }
   ];
 
-  var html = '<div style="margin-bottom:1rem"><strong>V2 十维评分推荐（含7套策略组合）</strong></div>';
-  html += '<div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.8rem">基于加权频率·遗漏回补·邻号关联·冷热交替·奇偶趋势·大小趋势 六维评分体系</div>';
+  var html = '<div style="margin-bottom:1rem"><strong>V3 多维评分推荐（含11套策略组合）</strong></div>';
+  html += '<div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.8rem">基于加权频率·遗漏回补·邻号关联·冷热交替·奇偶趋势·大小趋势·和值导向·跨度导向·组三对子·连号追踪 十维评分体系</div>';
 
   for (var s = 0; s < strategies.length; s++) {
     var strat = strategies[s];
@@ -1169,20 +1348,25 @@ function renderPL3Recommend_V2(last, history) {
       var oddCount = nums.filter(function(x) { return x % 2 === 1; }).length;
       var bigCount = nums.filter(function(x) { return x >= 5; }).length;
       var isBase = r === 0;
-      html += '<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.2rem">';
+      var lianhao = hasLianhao(nums) ? '连号' : '无连号';
+      var repeat = hasRepeat(last, nums) ? '有重号' : '无重号';
+      var zu3Mark = isBaozi(nums) ? '豹子' : (isZu3(nums) ? '组三' : '组六');
+      var roads = get012lu(nums);
+      var roadStr = roads[0] + ':' + roads[1] + ':' + roads[2];
+
+      html += '<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.2rem;flex-wrap:wrap">';
       html += '<span style="font-size:0.72rem;color:var(--muted);min-width:40px">' + (isBase ? '主推' : '备选' + r) + '</span>';
       html += '<div style="display:flex;gap:0.3rem">';
       for (var i = 0; i < nums.length; i++) {
         html += '<div class="ball ' + (isBase ? 'gold' : 'red') + '" style="width:32px;height:32px;font-size:0.8rem">' + nums[i] + '</div>';
       }
       html += '</div>';
-      html += '<span style="font-size:0.7rem;color:var(--muted);margin-left:auto">和' + sum(nums) + '·跨' + span(nums) + '·奇' + oddCount + '·大' + bigCount + '</span>';
+      html += '<span style="font-size:0.7rem;color:var(--muted);margin-left:auto">和' + sum(nums) + '·跨' + span(nums) + '·奇' + oddCount + '·大' + bigCount + '·' + zu3Mark + '·' + lianhao + '·' + repeat + '·012(' + roadStr + ')</span>';
       html += '</div>';
     }
     html += '</div>';
   }
 
-  // Top 10 score detail table
   html += '<div style="margin-top:1.5rem"><strong>各位置评分详情 Top10</strong></div>';
   var posNames = ['百位', '十位', '个位'];
   for (var pos = 0; pos < 3; pos++) {
@@ -1203,6 +1387,7 @@ function renderPL3Recommend_V2(last, history) {
 
   document.getElementById('pl3-recommend').innerHTML = html;
 }
+
 
 // ==================== 排列五分析 ====================
 
@@ -1811,6 +1996,46 @@ function scorePL5Position(pos, last, history) {
 
 function renderPL5Recommend_V2(last, history) {
   var posScores = scorePL5Numbers(last, history);
+  var pl3PosScores = scorePL3Numbers(last.slice(0, 3), history.map(function(h){ return h.slice(0,3); }));
+
+  // 获取各位置Top5，用于生成候选组合
+  var posTop5 = [];
+  for (var pos = 0; pos < 5; pos++) {
+    posTop5.push(posScores[pos].slice().sort(function(a, b) { return b.total - a.total; }).slice(0, 5));
+  }
+
+  // 获取各位置Top3，用于生成备选
+  var posTop3 = [];
+  for (var pos = 0; pos < 5; pos++) {
+    posTop3.push(posScores[pos].slice().sort(function(a, b) { return b.total - a.total; }).slice(0, 3));
+  }
+
+  function getPosScore(num, pos) {
+    for (var i = 0; i < posScores[pos].length; i++) {
+      if (posScores[pos][i].num === num) return posScores[pos][i].total;
+    }
+    return 0;
+  }
+
+  // 生成所有交叉组合（Top5）
+  function genAllCandidates() {
+    var candidates = [];
+    function gen(pos, current) {
+      if (pos === 5) {
+        candidates.push(current.slice());
+        return;
+      }
+      for (var i = 0; i < posTop5[pos].length; i++) {
+        current.push(posTop5[pos][i].num);
+        gen(pos + 1, current);
+        current.pop();
+      }
+    }
+    gen(0, []);
+    return candidates;
+  }
+
+  var allCandidates = genAllCandidates();
 
   function pickByStrategy(strategy) {
     var picks = [];
@@ -1834,7 +2059,6 @@ function renderPL5Recommend_V2(last, history) {
         });
       } else if (strategy === 'formula') {
         scores.sort(function(a, b) {
-          // 优先选择未被公式命中的号码
           var aKilled = a.reasons.some(function(r){ return r.indexOf('公式杀号') >= 0; }) ? 1 : 0;
           var bKilled = b.reasons.some(function(r){ return r.indexOf('公式杀号') >= 0; }) ? 1 : 0;
           if (aKilled !== bKilled) return aKilled - bKilled;
@@ -1845,72 +2069,196 @@ function renderPL5Recommend_V2(last, history) {
       }
       picks.push(scores[0].num);
     }
+
+    if (strategy === 'sum') {
+      var candidates = allCandidates.slice();
+      candidates.sort(function(a, b) {
+        var sa = sum(a), sb = sum(b);
+        var scoreA = -Math.abs(sa - 29.5);
+        var scoreB = -Math.abs(sb - 29.5);
+        var baseA = getPosScore(a[0],0)+getPosScore(a[1],1)+getPosScore(a[2],2)+getPosScore(a[3],3)+getPosScore(a[4],4);
+        var baseB = getPosScore(b[0],0)+getPosScore(b[1],1)+getPosScore(b[2],2)+getPosScore(b[3],3)+getPosScore(b[4],4);
+        scoreA += baseA * 0.15;
+        scoreB += baseB * 0.15;
+        return scoreB - scoreA;
+      });
+      picks = candidates[0];
+    } else if (strategy === 'oddeven') {
+      var candidates = allCandidates.slice();
+      candidates.sort(function(a, b) {
+        var oddA = a.filter(function(x){return x%2===1;}).length;
+        var oddB = b.filter(function(x){return x%2===1;}).length;
+        var scoreA = 0, scoreB = 0;
+        var distA = Math.min(Math.abs(oddA-2), Math.abs(oddA-3));
+        var distB = Math.min(Math.abs(oddB-2), Math.abs(oddB-3));
+        scoreA = -distA * 5;
+        scoreB = -distB * 5;
+        var baseA = getPosScore(a[0],0)+getPosScore(a[1],1)+getPosScore(a[2],2)+getPosScore(a[3],3)+getPosScore(a[4],4);
+        var baseB = getPosScore(b[0],0)+getPosScore(b[1],1)+getPosScore(b[2],2)+getPosScore(b[3],3)+getPosScore(b[4],4);
+        scoreA += baseA * 0.15;
+        scoreB += baseB * 0.15;
+        return scoreB - scoreA;
+      });
+      picks = candidates[0];
+    } else if (strategy === 'bigsmall') {
+      var candidates = allCandidates.slice();
+      candidates.sort(function(a, b) {
+        var bigA = a.filter(function(x){return x>=5;}).length;
+        var bigB = b.filter(function(x){return x>=5;}).length;
+        var scoreA = 0, scoreB = 0;
+        var distA = Math.min(Math.abs(bigA-2), Math.abs(bigA-3));
+        var distB = Math.min(Math.abs(bigB-2), Math.abs(bigB-3));
+        scoreA = -distA * 5;
+        scoreB = -distB * 5;
+        var baseA = getPosScore(a[0],0)+getPosScore(a[1],1)+getPosScore(a[2],2)+getPosScore(a[3],3)+getPosScore(a[4],4);
+        var baseB = getPosScore(b[0],0)+getPosScore(b[1],1)+getPosScore(b[2],2)+getPosScore(b[3],3)+getPosScore(b[4],4);
+        scoreA += baseA * 0.15;
+        scoreB += baseB * 0.15;
+        return scoreB - scoreA;
+      });
+      picks = candidates[0];
+    } else if (strategy === 'lianhao') {
+      var candidates = allCandidates.slice();
+      candidates.sort(function(a, b) {
+        var scoreA = 0, scoreB = 0;
+        if (hasLianhao(a)) scoreA += 10;
+        if (hasLianhao(b)) scoreB += 10;
+        var baseA = getPosScore(a[0],0)+getPosScore(a[1],1)+getPosScore(a[2],2)+getPosScore(a[3],3)+getPosScore(a[4],4);
+        var baseB = getPosScore(b[0],0)+getPosScore(b[1],1)+getPosScore(b[2],2)+getPosScore(b[3],3)+getPosScore(b[4],4);
+        scoreA += baseA * 0.2;
+        scoreB += baseB * 0.2;
+        return scoreB - scoreA;
+      });
+      picks = candidates[0];
+    } else if (strategy === '012lu') {
+      var candidates = allCandidates.slice();
+      candidates.sort(function(a, b) {
+        var ra = get012lu(a);
+        var rb = get012lu(b);
+        var hasAllA = ra[0]>0 && ra[1]>0 && ra[2]>0 ? 1 : 0;
+        var hasAllB = rb[0]>0 && rb[1]>0 && rb[2]>0 ? 1 : 0;
+        var scoreA = hasAllA * 10;
+        var scoreB = hasAllB * 10;
+        var baseA = getPosScore(a[0],0)+getPosScore(a[1],1)+getPosScore(a[2],2)+getPosScore(a[3],3)+getPosScore(a[4],4);
+        var baseB = getPosScore(b[0],0)+getPosScore(b[1],1)+getPosScore(b[2],2)+getPosScore(b[3],3)+getPosScore(b[4],4);
+        scoreA += baseA * 0.2;
+        scoreB += baseB * 0.2;
+        return scoreB - scoreA;
+      });
+      picks = candidates[0];
+    } else if (strategy === 'shiyi') {
+      picks = [];
+      for (var pos = 0; pos < 3; pos++) {
+        var scores = pl3PosScores[pos].slice().sort(function(a, b) { return b.total - a.total; });
+        picks.push(scores[0].num);
+      }
+      for (var pos = 3; pos < 5; pos++) {
+        var scores = posScores[pos].slice().sort(function(a, b) { return b.total - a.total; });
+        picks.push(scores[0].num);
+      }
+    }
+
     return picks;
   }
 
-  function genAlt(picks) {
+  function genAlt(picks, strategy) {
     var alts = [];
     for (var pos = 0; pos < 5; pos++) {
-      var scores = posScores[pos].slice();
-      scores.sort(function(a, b) { return b.total - a.total; });
-      var idx = 0;
-      for (var i = 0; i < scores.length; i++) {
-        if (scores[i].num === picks[pos]) {
-          idx = i;
-          break;
+      var alt = picks.slice();
+      if (strategy === 'shiyi' && pos < 3) {
+        var scores = pl3PosScores[pos].slice().sort(function(a, b) { return b.total - a.total; });
+        for (var i = 1; i < scores.length; i++) {
+          if (scores[i].num !== alt[pos]) {
+            alt[pos] = scores[i].num;
+            break;
+          }
+        }
+      } else {
+        var scores = posScores[pos].slice().sort(function(a, b) { return b.total - a.total; });
+        for (var i = 1; i < scores.length; i++) {
+          if (scores[i].num !== alt[pos]) {
+            alt[pos] = scores[i].num;
+            break;
+          }
         }
       }
-      var alt = picks.slice();
-      alt[pos] = scores[(idx + 1) % scores.length].num;
       alts.push(alt);
     }
-    return alts;
+    var unique = [];
+    var seen = {};
+    for (var i = 0; i < alts.length; i++) {
+      var key = alts[i].join(',');
+      if (!seen[key] && key !== picks.join(',')) {
+        seen[key] = true;
+        unique.push(alts[i]);
+      }
+    }
+    return unique.slice(0, 3);
   }
 
   var strategies = [
-    { key: 'hot', name: '热号优先' },
-    { key: 'miss', name: '遗漏回补' },
-    { key: 'neighbor', name: '邻号追踪' },
-    { key: 'formula', name: '公式杀号排除' },
-    { key: 'balanced', name: '混合平衡' }
+    { key: 'hot', name: '热号优先', desc: '各位置选评分最高的号码' },
+    { key: 'miss', name: '遗漏回补', desc: '优先选遗漏值高的冷号' },
+    { key: 'neighbor', name: '邻号追踪', desc: '优先选上期邻号' },
+    { key: 'formula', name: '公式杀号排除', desc: '排除被公式命中的杀号' },
+    { key: 'sum', name: '和值黄金区', desc: '使和值落在25-34黄金区间' },
+    { key: 'oddeven', name: '奇偶均衡', desc: '追求3奇2偶或2奇3偶' },
+    { key: 'bigsmall', name: '大小均衡', desc: '追求3大2小或2大3小' },
+    { key: 'lianhao', name: '连号优选', desc: '优先选择包含连号的组合' },
+    { key: '012lu', name: '012路全含', desc: '优先选择三路都有的组合' },
+    { key: 'shiyi', name: '一石二鸟', desc: '前三位用排三最高评分，后两位独立评分' }
   ];
 
-  var html = '<div style="margin-bottom:1rem"><strong>V2 十维评分推荐（含4套专用选号公式）</strong></div>';
-  html += '<div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.5rem">公式来源：尾数相杀法(82%) · 对位差杀(93%) · 跨位和值杀(92%) · 三期跨度杀 · 奇偶反向</div>';
+  var html = '<div style="margin-bottom:1rem"><strong>V3 多维评分推荐（含10套策略组合）</strong></div>';
+  html += '<div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.8rem">基于加权频率·遗漏回补·邻号关联·公式杀号·和值黄金区·奇偶均衡·大小均衡·连号优选·012路全含·一石二鸟 十维评分体系</div>';
 
   for (var s = 0; s < strategies.length; s++) {
     var strat = strategies[s];
     var base = pickByStrategy(strat.key);
-    var alts = genAlt(base);
-    var recs = [base, alts[0], alts[1]];
+    var alts = genAlt(base, strat.key);
+    var recs = [base].concat(alts);
 
-    html += '<div style="margin-bottom:1.25rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">策略: ' + strat.name + '</div>';
+    html += '<div style="margin-bottom:1.25rem;padding:0.6rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem">';
+    html += '<span style="font-weight:700;color:var(--accent);font-size:0.85rem">策略' + (s+1) + '：' + strat.name + '</span>';
+    html += '<span style="font-size:0.72rem;color:var(--muted)">' + strat.desc + '</span>';
+    html += '</div>';
     for (var r = 0; r < recs.length; r++) {
       var nums = recs[r];
-      html += '<div class="ball-row" style="margin-bottom:0.3rem">';
+      var oddCount = nums.filter(function(x) { return x % 2 === 1; }).length;
+      var bigCount = nums.filter(function(x) { return x >= 5; }).length;
+      var isBase = r === 0;
+      var lianhao = hasLianhao(nums) ? '有连号' : '无连号';
+      var repeat = hasRepeat(last, nums) ? '有重号' : '无重号';
+      var roads = get012lu(nums);
+      var roadStr = roads[0] + ':' + roads[1] + ':' + roads[2];
+      var sumZone = getPL5SumZone(sum(nums));
+
+      html += '<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.2rem;flex-wrap:wrap">';
+      html += '<span style="font-size:0.72rem;color:var(--muted);min-width:40px">' + (isBase ? '主推' : '备选' + r) + '</span>';
+      html += '<div style="display:flex;gap:0.3rem">';
       for (var i = 0; i < nums.length; i++) {
-        html += '<div class="ball red">' + nums[i] + '</div>';
+        html += '<div class="ball ' + (isBase ? 'gold' : 'red') + '" style="width:32px;height:32px;font-size:0.8rem">' + nums[i] + '</div>';
       }
       html += '</div>';
-      html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem">和值: ' + sum(nums) + ' | 跨度: ' + span(nums) + '</div>';
+      html += '<span style="font-size:0.7rem;color:var(--muted);margin-left:auto">和' + sum(nums) + '(' + sumZone + ')·跨' + span(nums) + '·奇' + oddCount + '·大' + bigCount + '·' + lianhao + '·' + repeat + '·012(' + roadStr + ')</span>';
+      html += '</div>';
     }
     html += '</div>';
   }
 
-  // Top 10 score detail table
-  html += '<div style="margin-top:1rem"><strong>各位置评分详情 Top10</strong></div>';
+  html += '<div style="margin-top:1.5rem"><strong>各位置评分详情 Top10</strong></div>';
   var posNames = ['万位', '千位', '百位', '十位', '个位'];
   for (var pos = 0; pos < 5; pos++) {
-    html += '<div style="margin-top:0.75rem;font-size:0.82rem;color:var(--muted)">' + posNames[pos] + '</div>';
-    html += '<table style="width:100%;font-size:0.78rem;border-collapse:collapse;margin-top:0.25rem">';
-    html += '<thead><tr style="background:var(--bg3)"><th style="padding:4px;border:1px solid var(--border)">号码</th><th style="padding:4px;border:1px solid var(--border)">评分</th><th style="padding:4px;border:1px solid var(--border)">标签</th></tr></thead><tbody>';
+    html += '<div style="margin-top:0.75rem;font-size:0.85rem;color:var(--ink);font-weight:600">' + posNames[pos] + '号码评分</div>';
+    html += '<table style="width:100%;font-size:0.78rem;border-collapse:collapse;margin-top:0.25rem;margin-bottom:1rem">';
+    html += '<thead><tr style="background:var(--bg3)"><th style="padding:4px;border:1px solid var(--rule)">号码</th><th style="padding:4px;border:1px solid var(--rule)">评分</th><th style="padding:4px;border:1px solid var(--rule)">标签</th></tr></thead><tbody>';
     var sorted = posScores[pos].slice().sort(function(a, b) { return b.total - a.total; });
     for (var i = 0; i < Math.min(10, sorted.length); i++) {
       var sc = sorted[i];
-      html += '<tr><td style="padding:4px;border:1px solid var(--border);text-align:center">' + sc.num + '</td>';
-      html += '<td style="padding:4px;border:1px solid var(--border);text-align:center">' + sc.total.toFixed(1) + '</td>';
-      html += '<td style="padding:4px;border:1px solid var(--border)">' + sc.reasons.join('，') + '</td></tr>';
+      html += '<tr><td style="padding:4px;border:1px solid var(--rule);text-align:center;font-weight:700">' + sc.num + '</td>';
+      html += '<td style="padding:4px;border:1px solid var(--rule);text-align:center">' + sc.total.toFixed(1) + '</td>';
+      html += '<td style="padding:4px;border:1px solid var(--rule);color:var(--muted)">' + sc.reasons.join('，') + '</td></tr>';
     }
     html += '</tbody></table>';
   }
@@ -1919,6 +2267,7 @@ function renderPL5Recommend_V2(last, history) {
 
   document.getElementById('pl5-recommend').innerHTML = html;
 }
+
 
 // ==================== 排列三/排列五 复盘函数 ====================
 
