@@ -1797,7 +1797,6 @@ function reviewPL5() {
 
 // ==================== 排列三/排列五 图表渲染 ====================
 
-(function() {
   var style = getComputedStyle(document.documentElement);
   var accent = style.getPropertyValue('--accent').trim();
   var accent2 = style.getPropertyValue('--accent2').trim();
@@ -2404,5 +2403,3 @@ function runPL5Backtest() {
   html += '</div>';
   document.getElementById('pl5-backtest-results').innerHTML = html;
 }
-
-})();
