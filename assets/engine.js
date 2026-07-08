@@ -1548,7 +1548,7 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   }
 
   function genStrategy3() {
-    // 马尔可夫转移+跨彩种：从mkScore高且跨彩种分高的池选
+    // 跨彩种周期驱动：从mkScore高且跨彩种分高的池选
     var mkPool = frontScores.filter(function(s){return s.mkScore>0.35 || (s.crossLotteryScore||0) >= 0.6;}).map(function(s){return s.num;});
     // 补充一些中位号码增加多样性
     var midPool = frontScores.slice(8,18).map(function(s){return s.num;});
@@ -1742,12 +1742,11 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   });
 
   var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V5 增强模型推荐</h3>';
-  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·共现矩阵·马尔可夫转移·尾数分散·区间偏移·连号历史·邻号·奇偶回归·大小均衡·稳定性·斜连号·冷热交替·AC值·集中度惩罚 十五维评分体系（含上期特征动态回归）</p>';
+  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·共现矩阵·尾数分散·区间偏移·连号历史·邻号·奇偶回归·大小均衡·稳定性·斜连号·冷热交替·AC值·集中度惩罚 十四维评分体系（含上期特征动态回归）</p>';
 
   var strategies = [
     {name:'严格约束优化', desc:'从Top20热号中遍历所有组合，通过硬性约束（和值/跨度/区间/奇偶/大小/尾数/连号/AC值/斜连号）筛选最高分', combos:s1},
     {name:'热号+冷号双轨', desc:'2热+2温+1冷，后区冷热交替，实现冷热均衡', combos:s2},
-    {name:'马尔可夫转移驱动', desc:'优先选mkScore高且跨彩种分高的号码，辅以中位号码增加多样性', combos:s3},
     {name:'共现聚类+邻号扩展', desc:'以Top1为种子聚类扩展，引入上期邻号增加命中概率', combos:s4},
     {name:'区间偏移+尾数分散', desc:'强制区间平衡+尾数分散，后区选大遗漏号码', combos:s5}
   ];
@@ -2648,12 +2647,11 @@ function renderSSQRecommend(last, allReds, allBlues) {
 
   var strategies = [
     {name:'严格约束优化', desc:'在Top14热号中遍历所有组合，通过硬性约束（和值/跨度/区间/奇偶/大小/尾数/连号）筛选最高分', combos:s1},
-    {name:'热号+遗漏双轨', desc:'前4球从Top8热号抽取，后2球从遗漏百分位>70%的冷号补充', combos:s2},
-    {name:'马尔可夫转移驱动', desc:'优先选择p(B→A) > p(A→A)的号码（冷转热概率高），辅以遗漏百分位', combos:s3}
+    {name:'热号+遗漏双轨', desc:'前4球从Top8热号抽取，后2球从遗漏百分位>70%的冷号补充', combos:s2}
   ];
 
   var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V2 严谨模型推荐</h3>';
-  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·马尔可夫转移·区间回补·尾数分散·奇偶回归·大小均衡·邻号·连号历史·冷热交替·共现矩阵·稳定性 十二维评分体系（含上期特征动态回归）</p>';
+  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·区间回补·尾数分散·奇偶回归·大小均衡·邻号·连号历史·冷热交替·共现矩阵·稳定性 十一维评分体系（含上期特征动态回归）</p>';
 
   strategies.forEach(function(st,i){
     html += '<div class="strategy-box" style="margin:12px 0;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--bg2)">';
@@ -4097,7 +4095,6 @@ function generateKL8Picks_V2(scores, history, playType) {
   return [
     {name:'区间均衡+热号', picks:genStrategy1(playType)},
     {name:'冷号优先+遗漏', picks:genStrategy2(playType)},
-    {name:'周期+马尔可夫', picks:genStrategy3(playType)},
     {name:'重号优选', picks:genStrategy4(playType)},
     {name:'专家技巧综合', picks:genStrategy5(playType)}
   ];
@@ -4186,7 +4183,7 @@ function renderKL8AllPlayTypes_V2(last, history) {
   }
 
   function genStrategy3(playType) {
-    // 马尔可夫+周期驱动：以周期评分排序
+    // 周期驱动：以周期评分排序
     var cycleSorted = scores.slice().sort(function(a,b){
       var ca = cycleAnalysis(a.num, history);
       var cb = cycleAnalysis(b.num, history);
@@ -4215,7 +4212,7 @@ function renderKL8AllPlayTypes_V2(last, history) {
     var zoneCounts = [0,0,0,0];
     picks.forEach(function(n){ var z=n<=20?0:n<=40?1:n<=60?2:3; zoneCounts[z]++; });
     var hybridSorted = scores.slice().filter(function(s){ return last.indexOf(s.num) < 0; }).sort(function(a,b){
-      // 综合评分：频率30% + 遗漏回补25% + 区间评分20% + 马尔可夫15% + 稳定性10%
+      // 综合评分：频率30% + 遗漏回补25% + 区间评分20% + 周期驱动15% + 稳定性10%
       var aHybrid = a.wf*0.30 + a.mp*0.25 + a.zoneScore*0.20 + a.mkScore*0.15 + (a.stability||0)*0.10;
       var bHybrid = b.wf*0.30 + b.mp*0.25 + b.zoneScore*0.20 + b.mkScore*0.15 + (b.stability||0)*0.10;
       return bHybrid - aHybrid;
@@ -4360,7 +4357,7 @@ function renderKL8AllPlayTypes_V2(last, history) {
   }
 
   var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V2 全玩法推荐模型</h3>';
-  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·马尔可夫转移·区间均衡·奇偶均衡·大小均衡·尾数分散·连号历史·稳定性 十维评分体系 + 专家技巧综合策略（冷热搭配·重号均衡·四区分散·尾数错开）</p>';
+  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·区间均衡·奇偶均衡·大小均衡·尾数分散·连号历史·稳定性 九维评分体系 + 专家技巧综合策略（冷热搭配·重号均衡·四区分散·尾数错开）</p>';
 
   var playTypeNames = ['一','二','三','四','五','六','七','八','九','十'];
 
@@ -4374,7 +4371,6 @@ function renderKL8AllPlayTypes_V2(last, history) {
     var strategies = [
       {name:'区间均衡+热号', picks:s1, q:qualityScoreKL8(s1)},
       {name:'冷号优先+遗漏', picks:s2, q:qualityScoreKL8(s2)},
-      {name:'周期+马尔可夫', picks:s3, q:qualityScoreKL8(s3)},
       {name:'重号优选', picks:s4, q:qualityScoreKL8(s4)},
       {name:'专家技巧综合', picks:s5, q:qualityScoreKL8(s5)}
     ];
@@ -5526,7 +5522,7 @@ function renderDLTProbAnalysis() {
   // Tab2: 前区Top15评分
   var top15 = frontScores.slice(0, 15);
   var html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
-  html += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">号码</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">频率</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏%位</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">马尔可夫</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">邻号</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">斜连</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">总评分</th></tr></thead><tbody>';
+  html += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">号码</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">频率</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏%位</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">周期驱动</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">邻号</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">斜连</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">总评分</th></tr></thead><tbody>';
   top15.forEach(function(s){
     html += '<tr><td style="padding:6px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:var(--accent4)">'+pad(s.num)+'</td>';
     html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:var(--ink)">'+(s.wf*100).toFixed(1)+'%</td>';
@@ -6020,7 +6016,7 @@ function renderSSQProbAnalysis() {
   // Tab2: 红球Top15评分表
   var top15 = redScores.slice(0, 15);
   var html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
-  html += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">号码</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">频率</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏%位</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">马尔可夫</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">邻号</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">连号</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">总评分</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">理由</th></tr></thead><tbody>';
+  html += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">号码</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">频率</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">遗漏%位</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">周期驱动</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">邻号</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">连号</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">总评分</th><th style="padding:6px;border:1px solid var(--rule);color:var(--ink)">理由</th></tr></thead><tbody>';
   top15.forEach(function(s){
     var reason = [];
     if (s.wf > 0.2) reason.push('高频');
@@ -6529,7 +6525,7 @@ function spinKL8Review() {
   // 生成选五和选十的推荐并计算命中
   var playTypes = [5, 10];
   var playTypeNames = {5:'选五', 10:'选十'};
-  var strategyNames = ['区间均衡+热号', '冷号优先+遗漏', '周期+马尔可夫', '重号优选', '专家技巧综合'];
+  var strategyNames = ['区间均衡+热号', '冷号优先+遗漏', '重号优选', '专家技巧综合'];
 
   // 将策略推荐也保存到Tab7
   var allPlayTypeRecs = {};
@@ -6538,7 +6534,6 @@ function spinKL8Review() {
     allPlayTypeRecs[pt] = [
       {name: '区间均衡+热号', picks: genStrategy1(pt)},
       {name: '冷号优先+遗漏', picks: genStrategy2(pt)},
-      {name: '周期+马尔可夫', picks: genStrategy3(pt)},
       {name: '重号优选', picks: genStrategy4(pt)},
       {name: '专家技巧综合', picks: genStrategy5(pt)}
     ];
@@ -6719,7 +6714,6 @@ function learnFromHistory() {
   var strategyToWeights = {
     '区间均衡+热号': ['zoneScore', 'wf'],
     '冷号优先+遗漏': ['lastMissScore', 'mpScore'],
-    '周期+马尔可夫': ['cycleScore', 'mkScore'],
     '重号优选': ['neighborScore']
   };
 
@@ -6793,7 +6787,7 @@ function renderKL8LearningReport() {
   // 当前权重
   html += '<div style="color:var(--muted);margin-bottom:0.3rem">当前评分权重（根据历史命中率自动优化）：</div>';
   var weightNames = {
-    wf: '热号频率', mpScore: '遗漏百分位', mkScore: '马尔可夫',
+    wf: '热号频率', mpScore: '遗漏百分位', mkScore: '周期驱动',
     zoneScore: '区间均衡', neighborScore: '重号邻号', oddEvenScore: '奇偶均衡',
     bigSmallScore: '大小均衡', lastMissScore: '遗漏回补', tailScore: '尾数分散',
     stability: '稳定性', consecutiveScore: '连号历史', maScore: '移动平均',
@@ -7131,7 +7125,7 @@ function runDLTBacktest() {
   html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">命中号码维度特征分析</div>';
   html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
   html += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule)">维度</th><th style="padding:6px;border:1px solid var(--rule)">命中平均得分</th><th style="padding:6px;border:1px solid var(--rule)">有效性</th></tr></thead><tbody>';
-  var dimNames = { wf:'频率', mpScore:'遗漏回补', mkScore:'马尔可夫', zoneScore:'区间', neighborScore:'邻号', diagonalScore:'斜连', pairScore:'连号', hotColdAltScore:'冷热交替', crossLotteryScore:'跨彩种', coScore:'共现' };
+  var dimNames = { wf:'频率', mpScore:'遗漏回补', mkScore:'周期驱动', zoneScore:'区间', neighborScore:'邻号', diagonalScore:'斜连', pairScore:'连号', hotColdAltScore:'冷热交替', crossLotteryScore:'跨彩种', coScore:'共现' };
   var sortedDims = Object.keys(dimAnalysis).sort(function(a,b){return dimAnalysis[b]-dimAnalysis[a];});
   sortedDims.forEach(function(dim){
     var val = dimAnalysis[dim];
@@ -7270,7 +7264,7 @@ function runSSQBacktest() {
   html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">命中号码维度特征分析</div>';
   html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
   html += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule)">维度</th><th style="padding:6px;border:1px solid var(--rule)">命中平均得分</th><th style="padding:6px;border:1px solid var(--rule)">有效性</th></tr></thead><tbody>';
-  var dimNames = { wf:'频率', mpScore:'遗漏回补', mkScore:'马尔可夫', zoneScore:'区间', neighborScore:'邻号', pairScore:'连号', hcScore:'冷热', coScore:'共现' };
+  var dimNames = { wf:'频率', mpScore:'遗漏回补', mkScore:'周期驱动', zoneScore:'区间', neighborScore:'邻号', pairScore:'连号', hcScore:'冷热', coScore:'共现' };
   var sortedDims = Object.keys(dimAnalysis).sort(function(a,b){return dimAnalysis[b]-dimAnalysis[a];});
   sortedDims.forEach(function(dim){
     var val = dimAnalysis[dim];
@@ -7398,7 +7392,7 @@ function runKL8Backtest() {
   html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">命中号码维度特征分析</div>';
   html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
   html += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule)">维度</th><th style="padding:6px;border:1px solid var(--rule)">命中平均得分</th><th style="padding:6px;border:1px solid var(--rule)">有效性</th></tr></thead><tbody>';
-  var dimNames = { wf:'频率', mpScore:'遗漏回补', mkScore:'马尔可夫', zoneScore:'区间', neighborScore:'邻号', oddEvenScore:'奇偶', bigSmallScore:'大小', lastMissScore:'遗漏' };
+  var dimNames = { wf:'频率', mpScore:'遗漏回补', mkScore:'周期驱动', zoneScore:'区间', neighborScore:'邻号', oddEvenScore:'奇偶', bigSmallScore:'大小', lastMissScore:'遗漏' };
   var sortedDims = Object.keys(dimAnalysis).sort(function(a,b){return dimAnalysis[b]-dimAnalysis[a];});
   sortedDims.forEach(function(dim){
     var val = dimAnalysis[dim];

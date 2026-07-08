@@ -456,7 +456,7 @@ function renderPL3ProbAnalysis(last, history) {
       html += '</tr>';
     }
     html += '</tbody></table>';
-    html += '<div style="margin-top:0.4rem;font-size:0.72rem;color:var(--muted)">评分维度：加权频率(24%)·遗漏百分位(19%)·马尔可夫转移(14%)·邻号关联(14%)·近期趋势·稳定性(10%)·冷热交替(10%)·大小交替(5%)·形态·012路·均值回归</div>';
+    html += '<div style="margin-top:0.4rem;font-size:0.72rem;color:var(--muted)">评分维度：加权频率(24%)·遗漏百分位(19%)·邻号关联(14%)·近期趋势·稳定性(10%)·冷热交替(10%)·大小交替(5%)·形态·012路·均值回归</div>';
     container.innerHTML = html;
   }
 
@@ -834,7 +834,7 @@ function scorePL3Position(pos, last, history) {
     // 3. markov transition (14%)
     var mp = markovProb(n, [posHistory]);
     var markovScore = Math.min(14, mp * 14 * 10);
-    if (mp > 0.15) score.reasons.push('马尔可夫强关联');
+    if (mp > 0.15) score.reasons.push('周期驱动强关联');
     score.total += markovScore;
 
     // 4. neighbor association (14%)
@@ -971,13 +971,6 @@ function renderPL3Recommend_V2(last, history) {
         scores.sort(function(a, b) {
           var ma = a.reasons.indexOf('遗漏回补') >= 0 ? 1 : 0;
           var mb = b.reasons.indexOf('遗漏回补') >= 0 ? 1 : 0;
-          if (mb !== ma) return mb - ma;
-          return b.total - a.total;
-        });
-      } else if (strategy === 'markov') {
-        scores.sort(function(a, b) {
-          var ma = a.reasons.indexOf('马尔可夫强关联') >= 0 ? 1 : 0;
-          var mb = b.reasons.indexOf('马尔可夫强关联') >= 0 ? 1 : 0;
           if (mb !== ma) return mb - ma;
           return b.total - a.total;
         });
@@ -1150,7 +1143,6 @@ function renderPL3Recommend_V2(last, history) {
   var strategies = [
     { key: 'hot', name: '热号优先', desc: '各位置选评分最高的号码' },
     { key: 'miss', name: '遗漏回补', desc: '优先选遗漏值高的冷号' },
-    { key: 'markov', name: '马尔可夫转移', desc: '基于转移概率选号' },
     { key: 'neighbor', name: '邻号追踪', desc: '优先选上期邻号' },
     { key: 'coldhot', name: '冷热搭配', desc: '冷号位置补热号，热号位置补冷号' },
     { key: 'oddeven', name: '奇偶均衡', desc: '根据近期奇偶趋势反向选择' },
@@ -1159,7 +1151,7 @@ function renderPL3Recommend_V2(last, history) {
   ];
 
   var html = '<div style="margin-bottom:1rem"><strong>V2 十维评分推荐（含7套策略组合）</strong></div>';
-  html += '<div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.8rem">基于加权频率·遗漏回补·马尔可夫转移·邻号关联·冷热交替·奇偶趋势·大小趋势 七维评分体系</div>';
+  html += '<div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.8rem">基于加权频率·遗漏回补·邻号关联·冷热交替·奇偶趋势·大小趋势 六维评分体系</div>';
 
   for (var s = 0; s < strategies.length; s++) {
     var strat = strategies[s];
@@ -1670,7 +1662,7 @@ function scorePL5Position(pos, last, history) {
     // 3. markov transition (12%)
     var mp = markovProb(n, [posHistory]);
     var markovScore = Math.min(12, mp * 12 * 10);
-    if (mp > 0.15) score.reasons.push('马尔可夫强关联');
+    if (mp > 0.15) score.reasons.push('周期驱动强关联');
     score.total += markovScore;
 
     // 4. neighbor association (12%)
@@ -1833,13 +1825,6 @@ function renderPL5Recommend_V2(last, history) {
           if (mb !== ma) return mb - ma;
           return b.total - a.total;
         });
-      } else if (strategy === 'markov') {
-        scores.sort(function(a, b) {
-          var ma = a.reasons.indexOf('马尔可夫强关联') >= 0 ? 1 : 0;
-          var mb = b.reasons.indexOf('马尔可夫强关联') >= 0 ? 1 : 0;
-          if (mb !== ma) return mb - ma;
-          return b.total - a.total;
-        });
       } else if (strategy === 'neighbor') {
         scores.sort(function(a, b) {
           var ma = a.reasons.indexOf('邻号关联') >= 0 ? 1 : 0;
@@ -1885,7 +1870,6 @@ function renderPL5Recommend_V2(last, history) {
   var strategies = [
     { key: 'hot', name: '热号优先' },
     { key: 'miss', name: '遗漏回补' },
-    { key: 'markov', name: '马尔可夫转移' },
     { key: 'neighbor', name: '邻号追踪' },
     { key: 'formula', name: '公式杀号排除' },
     { key: 'balanced', name: '混合平衡' }

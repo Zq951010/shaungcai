@@ -1,7 +1,7 @@
 /**
  * 智能预测引擎 v2.0
  * 基于多模型融合的彩票号码预测
- * 算法：马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合
+ * 算法：共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合
  */
 
 // ==================== 工具函数 ====================
@@ -1060,7 +1060,7 @@ function renderSmartRecommendations() {
     var lastDraw = { front: lastParts[0].split(',').map(Number), back: lastParts[1].split(',').map(Number) };
     var recs = smartRecommendDLT(dltSampleHistory, lastDraw);
 
-    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
     html += danmaExplainHTML();
 
     for (var i = 0; i < recs.length; i++) {
@@ -1128,7 +1128,7 @@ function renderSmartRecommendations() {
     var lastDraw = { red: lastParts[0].split(',').map(Number), blue: parseInt(lastParts[1], 10) };
     var recs = smartRecommendSSQ(ssqSampleHistory, lastDraw);
 
-    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
     html += danmaExplainHTML();
 
     for (var i = 0; i < recs.length; i++) {
@@ -1182,7 +1182,7 @@ function renderSmartRecommendations() {
     var lastDraw = kl8SampleHistory[0].split(',').map(Number).sort(function(a, b) { return a - b; });
     var recs = smartRecommendKL8(kl8SampleHistory, lastDraw);
 
-    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
     html += danmaExplainHTML();
 
     for (var i = 0; i < recs.length; i++) {
@@ -1232,7 +1232,7 @@ function renderSmartRecommendations() {
     var lastDraw = PL3_HISTORY[0].numbers;
     var recs = smartRecommendPL3(PL3_HISTORY, lastDraw);
 
-    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
     html += danmaExplainHTML();
 
     for (var i = 0; i < recs.length; i++) {
@@ -1282,7 +1282,7 @@ function renderSmartRecommendations() {
     var lastDraw = PL5_HISTORY[0].numbers;
     var recs = smartRecommendPL5(PL5_HISTORY, lastDraw);
 
-    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于马尔可夫转移 + 共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
+    var html = '<div style="margin-bottom:0.5rem;color:var(--muted);font-size:0.82rem">基于共现关联 + 位置模式 + 趋势动量 + 贝叶斯融合（胆拖模式）</div>';
     html += danmaExplainHTML();
 
     for (var i = 0; i < recs.length; i++) {
