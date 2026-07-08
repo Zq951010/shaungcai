@@ -5815,6 +5815,10 @@ function renderDLTTrendChart(history) {
     }
   }
 
+  // 按从旧到新（26046 → 26075）顺序排列
+  history = history.slice().reverse();
+  metaRows = metaRows.slice().reverse();
+
   var frontMiss = {};
   for (var n = 1; n <= 35; n++) frontMiss[n] = 0;
   var backMiss = {};
@@ -5883,8 +5887,8 @@ function renderDLTTrendChart(history) {
       '<td style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #eee;background:#fafafa">' + zoneRatio + '</td>' +
       '<td style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #eee;background:#fafafa">' + oddEvenRatio + '</td>';
 
-    // 最近3期高亮
-    var rowBg = i < 3 ? 'background:#fff8f0;' : '';
+    // 最近3期高亮（表格底部3行=最新3期）
+    var rowBg = i >= history.length - 3 ? 'background:#fff8f0;' : '';
 
     rowsHtml += '<tr style="' + rowBg + '">' +
       '<td style="padding:3px 5px;text-align:center;font-size:0.7rem;border:1px solid #eee;font-weight:600;white-space:nowrap;background:#fafafa;position:sticky;left:0;z-index:1">' + (meta.period || '') + '</td>' +
