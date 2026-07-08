@@ -3145,6 +3145,11 @@ function analyzeKL8() {
 
   var last = history[0];
 
+  // 先用当期开奖号码验证之前保存的预测（验证的是基于上一期数据生成的预测）
+  if (typeof verifyKL8Predictions === 'function') {
+    try { verifyKL8Predictions(last); } catch(e) { console.log('verifyKL8Predictions error:', e.message); }
+  }
+
   document.getElementById('kl8-empty').style.display = 'none';
   document.getElementById('kl8-results').style.display = 'block';
 
@@ -4147,11 +4152,8 @@ function renderKL8AllPlayTypes_V2(last, history) {
     }
   }
 
-  // 自动保存预测记录到localStorage
+  // 自动保存预测记录到localStorage（预测基于当前历史数据，待下期开奖后验证）
   saveKL8AllPredictions(last, allPlayTypeRecs);
-
-  // 如果当天已有开奖号码，自动验证之前的预测
-  verifyKL8Predictions(last);
 
   html += '<h4 style="margin-top:16px;color:var(--ink)">📊 Top15 号码评分详情</h4>';
   html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:var(--bg3)">';
@@ -6266,21 +6268,25 @@ function saveKL8AllPredictions(lastDraw, allRecs) {
 // 根据实际开奖号码验证预测
 function verifyKL8Predictions(actualDraw) {
   var history = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
-  var today = new Date().toISOString().slice(0,10);
+  var sortedActual = actualDraw.slice().sort(function(a,b){return a-b;});
   var updated = false;
   for (var i = 0; i < history.length; i++) {
     var rec = history[i];
-    // 同一天预测、当天开奖才验证
-    if (rec.date === today && !rec.verified) {
-      rec.actualDraw = actualDraw.slice().sort(function(a,b){return a-b;});
-      rec.verified = true;
-      // 计算每个策略的命中数
-      for (var j = 0; j < rec.strategies.length; j++) {
-        var picks = rec.strategies[j].picks;
-        rec.strategies[j].hits = picks.filter(function(n){ return actualDraw.indexOf(n) >= 0; }).length;
-        rec.strategies[j].hitNums = picks.filter(function(n){ return actualDraw.indexOf(n) >= 0; });
+    // 验证条件：未验证，且开奖号码与预测基准不同（避免用当期验证当期）
+    if (!rec.verified) {
+      var lastDrawStr = rec.lastDraw.slice().sort(function(a,b){return a-b;}).join(',');
+      var actualStr = sortedActual.join(',');
+      if (lastDrawStr !== actualStr) {
+        rec.actualDraw = sortedActual;
+        rec.verified = true;
+        // 计算每个策略的命中数
+        for (var j = 0; j < rec.strategies.length; j++) {
+          var picks = rec.strategies[j].picks;
+          rec.strategies[j].hits = picks.filter(function(n){ return actualDraw.indexOf(n) >= 0; }).length;
+          rec.strategies[j].hitNums = picks.filter(function(n){ return actualDraw.indexOf(n) >= 0; });
+        }
+        updated = true;
       }
-      updated = true;
     }
   }
   if (updated) {
