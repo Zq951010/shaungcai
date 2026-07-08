@@ -69,6 +69,7 @@ function analyzePL3() {
   renderPL3Tail(history);
   renderPL3Miss(history);
   renderPL3Recommend_V2(last, history);
+  try { renderPL3ProbAnalysis(last, history); } catch(e) { console.log('renderPL3ProbAnalysis error:', e.message); }
 
   document.getElementById('pl3-results').scrollIntoView({ behavior: 'smooth' });
 }
@@ -427,6 +428,126 @@ function scorePL3Numbers(last, history) {
     posScores[pos] = scorePL3Position(pos, last, history);
   }
   return posScores;
+}
+
+// ==================== 排列三 大模型统计概率渲染 ====================
+
+function renderPL3ProbAnalysis(last, history) {
+  var posScores = scorePL3Numbers(last, history);
+  var posNames = ['百位', '十位', '个位'];
+  var posIds = ['pl3-prob-hundreds', 'pl3-prob-tens', 'pl3-prob-ones'];
+
+  for (var pos = 0; pos < 3; pos++) {
+    var sorted = posScores[pos].slice().sort(function(a, b) { return b.total - a.total; });
+    var container = document.getElementById(posIds[pos]);
+    if (!container) continue;
+
+    var html = '<table style="width:100%;font-size:0.8rem;border-collapse:collapse">';
+    html += '<thead><tr style="background:var(--bg3)"><th style="padding:4px 6px;border:1px solid var(--rule)">号码</th><th style="padding:4px 6px;border:1px solid var(--rule)">综合评分</th><th style="padding:4px 6px;border:1px solid var(--rule)">频率</th><th style="padding:4px 6px;border:1px solid var(--rule)">遗漏</th><th style="padding:4px 6px;border:1px solid var(--rule)">特征标签</th></tr></thead><tbody>';
+    for (var i = 0; i < sorted.length; i++) {
+      var sc = sorted[i];
+      var isTop = i < 3;
+      html += '<tr style="' + (isTop ? 'background:var(--bg3);font-weight:600' : '') + '">';
+      html += '<td style="padding:4px 6px;border:1px solid var(--rule);text-align:center"><span class="ball red" style="width:26px;height:26px;font-size:0.7rem;display:inline-block">' + sc.num + '</span></td>';
+      html += '<td style="padding:4px 6px;border:1px solid var(--rule);text-align:center;color:' + (isTop ? 'var(--accent3)' : 'var(--ink)') + ';font-weight:700">' + sc.total.toFixed(1) + '</td>';
+      html += '<td style="padding:4px 6px;border:1px solid var(--rule);text-align:center">' + (sc.freqScore ? sc.freqScore.toFixed(1) : '-') + '</td>';
+      html += '<td style="padding:4px 6px;border:1px solid var(--rule);text-align:center">' + (sc.missScore ? sc.missScore.toFixed(1) : '-') + '</td>';
+      html += '<td style="padding:4px 6px;border:1px solid var(--rule);font-size:0.72rem;color:var(--muted)">' + (sc.reasons ? sc.reasons.join('，') : '') + '</td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    html += '<div style="margin-top:0.4rem;font-size:0.72rem;color:var(--muted)">评分维度：加权频率(24%)·遗漏百分位(19%)·马尔可夫转移(14%)·邻号关联(14%)·近期趋势·稳定性(10%)·冷热交替(10%)·大小交替(5%)·形态·012路·均值回归</div>';
+    container.innerHTML = html;
+  }
+
+  // 上期重号分析
+  var repeatContainer = document.getElementById('pl3-prob-repeat');
+  if (repeatContainer) {
+    var html = '<div style="padding:0.5rem 0">';
+    for (var pos = 0; pos < 3; pos++) {
+      var lastVal = last[pos];
+      var scores = posScores[pos].slice().sort(function(a, b) { return b.total - a.total; });
+      var sameScore = null;
+      for (var i = 0; i < scores.length; i++) {
+        if (scores[i].num === lastVal) { sameScore = scores[i]; break; }
+      }
+      var rank = sameScore ? (posScores[pos].slice().sort(function(a,b){return b.total-a.total;}).indexOf(sameScore) + 1) : '-';
+      html += '<div style="display:flex;align-items:center;gap:0.8rem;padding:0.4rem 0;border-bottom:1px solid var(--rule)">';
+      html += '<span style="font-weight:600;color:var(--ink);min-width:40px">' + posNames[pos] + '</span>';
+      html += '<span class="ball red" style="width:28px;height:28px;font-size:0.75rem;display:inline-block">' + lastVal + '</span>';
+      html += '<span style="font-size:0.8rem;color:var(--muted)">评分：<strong style="color:var(--ink)">' + (sameScore ? sameScore.total.toFixed(1) : '-') + '</strong>　排名：<strong style="color:' + (rank <= 3 ? 'var(--accent3)' : 'var(--ink)') + '">' + rank + '/10</strong></span>';
+      if (sameScore && sameScore.repeatScore >= 7) {
+        html += '<span style="background:var(--accent);color:#000;padding:1px 6px;border-radius:4px;font-size:0.7rem">邻号关联强</span>';
+      }
+      html += '</div>';
+    }
+    // 重号概率评估
+    var repeatProb = 0;
+    for (var pos = 0; pos < 3; pos++) {
+      var lastVal = last[pos];
+      for (var i = 0; i < history.length; i++) {
+        if (i === 0) continue;
+        if (history[i][pos] === lastVal) repeatProb++;
+      }
+    }
+    var totalPosCheck = (history.length - 1) * 3;
+    var repeatRate = totalPosCheck > 0 ? (repeatProb / totalPosCheck * 100).toFixed(1) : '0';
+    html += '<div style="margin-top:0.5rem;padding:0.4rem 0.6rem;background:var(--bg3);border-radius:6px;font-size:0.8rem">';
+    html += '<span style="color:var(--muted)">历史重号概率：</span><strong style="color:var(--accent)">' + repeatRate + '%</strong>';
+    html += '<span style="color:var(--muted);margin-left:1rem">建议：每个位置保留' + (parseFloat(repeatRate) > 20 ? '1-2个重号' : '0-1个重号') + '</span>';
+    html += '</div>';
+    html += '</div>';
+    repeatContainer.innerHTML = html;
+  }
+
+  // 和值/跨度分析
+  var sumspanContainer = document.getElementById('pl3-prob-sumspan');
+  if (sumspanContainer) {
+    var sums = history.map(function(h) { return sum(h); });
+    var spans = history.map(function(h) { return span(h); });
+    var lastSum = sums[0];
+    var avgSum = Math.round(avg(sums));
+    var lastSp = spans[0];
+    var avgSp = Math.round(avg(spans));
+
+    var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8rem">';
+
+    // 和值分析
+    html += '<div style="padding:0.6rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<div style="font-weight:600;color:var(--ink);margin-bottom:0.3rem">和值分析</div>';
+    html += '<div style="font-size:0.8rem">';
+    html += '<div>上期和值：<strong style="color:var(--accent)">' + lastSum + '</strong></div>';
+    html += '<div>平均和值：<strong>' + avgSum + '</strong></div>';
+    html += '<div>和值范围：' + min(sums) + ' ~ ' + max(sums) + '</div>';
+    var sumDiff = lastSum - avgSum;
+    var sumTrend = sumDiff > 5 ? '偏高，下期可能回落' : sumDiff < -5 ? '偏低，下期可能回升' : '正常波动范围';
+    html += '<div style="color:var(--muted)">趋势：' + sumTrend + '</div>';
+    // 和值出现频率Top5
+    var sumFreq = {};
+    for (var i = 0; i < sums.length; i++) sumFreq[sums[i]] = (sumFreq[sums[i]] || 0) + 1;
+    var sumSorted = Object.keys(sumFreq).sort(function(a,b){ return sumFreq[b] - sumFreq[a]; }).slice(0, 5);
+    html += '<div style="margin-top:0.3rem;color:var(--muted);font-size:0.75rem">高频和值：' + sumSorted.map(function(s){ return s + '(' + sumFreq[s] + '次)'; }).join('，') + '</div>';
+    html += '</div></div>';
+
+    // 跨度分析
+    html += '<div style="padding:0.6rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<div style="font-weight:600;color:var(--ink);margin-bottom:0.3rem">跨度分析</div>';
+    html += '<div style="font-size:0.8rem">';
+    html += '<div>上期跨度：<strong style="color:var(--accent)">' + lastSp + '</strong></div>';
+    html += '<div>平均跨度：<strong>' + avgSp + '</strong></div>';
+    html += '<div>跨度范围：' + min(spans) + ' ~ ' + max(spans) + '</div>';
+    var spDiff = lastSp - avgSp;
+    var spTrend = spDiff > 2 ? '偏大，下期可能缩小' : spDiff < -2 ? '偏小，下期可能扩大' : '正常范围';
+    html += '<div style="color:var(--muted)">趋势：' + spTrend + '</div>';
+    var spFreq = {};
+    for (var i = 0; i < spans.length; i++) spFreq[spans[i]] = (spFreq[spans[i]] || 0) + 1;
+    var spSorted = Object.keys(spFreq).sort(function(a,b){ return spFreq[b] - spFreq[a]; }).slice(0, 5);
+    html += '<div style="margin-top:0.3rem;color:var(--muted);font-size:0.75rem">高频跨度：' + spSorted.map(function(s){ return s + '(' + spFreq[s] + '次)'; }).join('，') + '</div>';
+    html += '</div></div>';
+
+    html += '</div>';
+    sumspanContainer.innerHTML = html;
+  }
 }
 
 function weightedFreq(num, history, halfLife) {
