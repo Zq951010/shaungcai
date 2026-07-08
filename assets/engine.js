@@ -289,6 +289,80 @@ function renderDLTHistoryTable() {
   document.getElementById('dlt-history-table-wrap').style.display = 'block';
 }
 
+function addDLTInputRow() {
+  var tbody = document.querySelector('#dlt-input-table tbody');
+  if (!tbody) return;
+  var rowCount = tbody.children.length;
+  var tr = document.createElement('tr');
+  tr.setAttribute('data-row', rowCount);
+  tr.innerHTML = '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted)">' + (rowCount + 1) + '</td>' +
+    '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td>' +
+    '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td>' +
+    '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td>';
+  tbody.appendChild(tr);
+  // 绑定输入事件同步到textarea
+  var frontInput = tr.querySelector('.dlt-input-front');
+  var backInput = tr.querySelector('.dlt-input-back');
+  if (frontInput) frontInput.addEventListener('blur', syncDLTInputToTextarea);
+  if (backInput) backInput.addEventListener('blur', syncDLTInputToTextarea);
+}
+
+function removeDLTInputRow(btn) {
+  var tbody = document.querySelector('#dlt-input-table tbody');
+  if (!tbody) return;
+  var tr = btn.closest('tr');
+  if (tr) tr.remove();
+  // 重新编号
+  var rows = tbody.querySelectorAll('tr');
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].setAttribute('data-row', i);
+    var numCell = rows[i].querySelector('td:first-child');
+    if (numCell) numCell.textContent = i + 1;
+  }
+  syncDLTInputToTextarea();
+}
+
+function syncDLTInputToTextarea() {
+  var tbody = document.querySelector('#dlt-input-table tbody');
+  if (!tbody) return;
+  var lines = [];
+  var rows = tbody.querySelectorAll('tr');
+  for (var i = 0; i < rows.length; i++) {
+    var front = rows[i].querySelector('.dlt-input-front');
+    var back = rows[i].querySelector('.dlt-input-back');
+    var frontVal = front ? front.value.trim() : '';
+    var backVal = back ? back.value.trim() : '';
+    if (frontVal && backVal) {
+      lines.push(frontVal + '|' + backVal);
+    }
+  }
+  document.getElementById('dlt-history').value = lines.join('\n');
+}
+
+function fillDLTInputTable(dataLines) {
+  var tbody = document.querySelector('#dlt-input-table tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  for (var i = 0; i < dataLines.length; i++) {
+    var parts = dataLines[i].split('|');
+    var front = parts[0] || '';
+    var back = parts[1] || '';
+    var tr = document.createElement('tr');
+    tr.setAttribute('data-row', i);
+    tr.innerHTML = '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted)">' + (i + 1) + '</td>' +
+      '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" value="' + front + '" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td>' +
+      '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" value="' + back + '" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td>' +
+      '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td>';
+    tbody.appendChild(tr);
+    // 绑定blur事件
+    var frontInput = tr.querySelector('.dlt-input-front');
+    var backInput = tr.querySelector('.dlt-input-back');
+    if (frontInput) frontInput.addEventListener('blur', syncDLTInputToTextarea);
+    if (backInput) backInput.addEventListener('blur', syncDLTInputToTextarea);
+  }
+  syncDLTInputToTextarea();
+}
+
 function loadDLTSample() {
   var last = dltSampleHistory[0];
   var parts = last.split('|');
@@ -302,6 +376,8 @@ function loadDLTSample() {
   var reviewBack = document.getElementById('dlt-review-blue');
   if (reviewNums) reviewNums.value = sampleFront;
   if (reviewBack) reviewBack.value = sampleBack;
+  // 填充表格输入
+  fillDLTInputTable(dltSampleHistory);
   // 渲染历史开奖表格
   renderDLTHistoryTable();
 }
@@ -313,6 +389,19 @@ function clearDLT() {
   document.getElementById('dlt-results').style.display = 'none';
   document.getElementById('dlt-empty').style.display = 'block';
   document.getElementById('dlt-history-table-wrap').style.display = 'none';
+  // 清空表格输入
+  var tbody = document.querySelector('#dlt-input-table tbody');
+  if (tbody) {
+    tbody.innerHTML = '<tr data-row="0"><td style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted)">1</td><td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td><td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td><td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td></tr>';
+    // 绑定blur事件
+    var firstRow = tbody.querySelector('tr');
+    if (firstRow) {
+      var fi = firstRow.querySelector('.dlt-input-front');
+      var bi = firstRow.querySelector('.dlt-input-back');
+      if (fi) fi.addEventListener('blur', syncDLTInputToTextarea);
+      if (bi) bi.addEventListener('blur', syncDLTInputToTextarea);
+    }
+  }
 }
 
 function analyzeDLT() {
