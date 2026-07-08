@@ -3954,11 +3954,152 @@ function generateKL8Picks_V2(scores, history, playType) {
     return picks;
   }
 
+  function genStrategy5(pt) {
+    // S5专家技巧综合策略：冷热6:4 + 重号2-3个 + 奇偶均衡 + 大小均衡 + 四区分散 + 尾数错开 + 遗漏回补 + 连号
+    var picks = [];
+    var used = {};
+
+    // 统计冷热号
+    var hotNums = scores.filter(function(s){ return s.wf > 0.20; }).map(function(s){ return s.num; });
+    var warmNums = scores.filter(function(s){ return s.wf > 0.08 && s.wf <= 0.20; }).map(function(s){ return s.num; });
+    var coldNums = scores.filter(function(s){ return s.wf <= 0.08 && s.lastMissScore > 0.5; }).map(function(s){ return s.num; });
+
+    // 1. 重号均衡：选2-3个上期重号（选十）或1-2个（选五）
+    var repeatCount = pt >= 10 ? 3 : 2;
+    var repeatCandidates = scores.filter(function(s){ return last.indexOf(s.num) >= 0 && s.totalScore > 0.5; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+    for (var i = 0; i < repeatCandidates.length && picks.length < repeatCount; i++) {
+      var n = repeatCandidates[i].num;
+      if (!used[n]) { picks.push(n); used[n] = true; }
+    }
+
+    // 2. 遗漏回补：选1-2个遗漏7-13期的号码
+    var missCandidates = scores.filter(function(s){ return s.lastMissScore >= 0.55 && s.lastMissScore <= 0.85 && !used[s.num]; }).sort(function(a,b){ return b.lastMissScore - a.lastMissScore; });
+    for (var i = 0; i < missCandidates.length && picks.length < pt * 0.25; i++) {
+      var n = missCandidates[i].num;
+      if (!used[n]) { picks.push(n); used[n] = true; }
+    }
+
+    // 3. 冷热搭配：热号60% + 温号/冷号40%
+    var hotTarget = Math.ceil(pt * 0.5); // 热号
+    var warmTarget = Math.ceil(pt * 0.25); // 温号
+    var coldTarget = pt - hotTarget - warmTarget; // 冷号
+
+    for (var i = 0; i < hotNums.length && picks.length < hotTarget; i++) {
+      if (!used[hotNums[i]]) { picks.push(hotNums[i]); used[hotNums[i]] = true; }
+    }
+    for (var i = 0; i < warmNums.length && picks.length < hotTarget + warmTarget; i++) {
+      if (!used[warmNums[i]]) { picks.push(warmNums[i]); used[warmNums[i]] = true; }
+    }
+    for (var i = 0; i < coldNums.length && picks.length < pt; i++) {
+      if (!used[coldNums[i]]) { picks.push(coldNums[i]); used[coldNums[i]] = true; }
+    }
+
+    // 4. 四区分散：确保每区至少1个
+    var zoneCounts = [0,0,0,0];
+    picks.forEach(function(n){ var z=n<=20?0:n<=40?1:n<=60?2:3; zoneCounts[z]++; });
+    for (var z = 0; z < 4; z++) {
+      if (zoneCounts[z] === 0) {
+        var zoneCandidates = scores.filter(function(s){ var sz=s.num<=20?0:s.num<=40?1:s.num<=60?2:3; return sz===z && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (zoneCandidates.length > 0) {
+          var n = zoneCandidates[0].num;
+          // 找一个已选的同区号码替换，或者添加
+          if (picks.length >= pt) {
+            // 找最多那个区的一个号码替换
+            var maxZ = zoneCounts.indexOf(Math.max.apply(null, zoneCounts));
+            if (maxZ !== z && zoneCounts[maxZ] > 1) {
+              for (var ri = 0; ri < picks.length; ri++) {
+                var rz = picks[ri]<=20?0:picks[ri]<=40?1:picks[ri]<=60?2:3;
+                if (rz === maxZ) { used[picks[ri]] = false; picks[ri] = n; used[n] = true; break; }
+              }
+            }
+          } else {
+            picks.push(n); used[n] = true;
+          }
+          zoneCounts[z]++;
+        }
+      }
+    }
+
+    // 5. 奇偶均衡
+    var oddCount = picks.filter(function(n){ return n%2===1; }).length;
+    var evenCount = picks.length - oddCount;
+    var targetOdd = Math.round(picks.length * 0.5); // 目标奇数数量
+    if (Math.abs(oddCount - evenCount) > 2 && picks.length >= pt * 0.8) {
+      if (oddCount > evenCount + 2) {
+        // 奇数太多，替换为奇偶比更均衡的
+        var oddPicks = picks.filter(function(n){ return n%2===1; });
+        var evenCandidates = scores.filter(function(s){ return s.num%2===0 && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (evenCandidates.length > 0 && oddPicks.length > 0) {
+          used[oddPicks[0]] = false;
+          picks[picks.indexOf(oddPicks[0])] = evenCandidates[0].num;
+          used[evenCandidates[0].num] = true;
+        }
+      } else if (evenCount > oddCount + 2) {
+        var evenPicks = picks.filter(function(n){ return n%2===0; });
+        var oddCandidates = scores.filter(function(s){ return s.num%2===1 && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (oddCandidates.length > 0 && evenPicks.length > 0) {
+          used[evenPicks[0]] = false;
+          picks[picks.indexOf(evenPicks[0])] = oddCandidates[0].num;
+          used[oddCandidates[0].num] = true;
+        }
+      }
+    }
+
+    // 6. 大小均衡
+    var smallCount = picks.filter(function(n){ return n <= 40; }).length;
+    var bigCount = picks.length - smallCount;
+    if (Math.abs(smallCount - bigCount) > 2 && picks.length >= pt * 0.8) {
+      if (smallCount > bigCount + 2) {
+        var smallPicks = picks.filter(function(n){ return n <= 40; });
+        var bigCandidates = scores.filter(function(s){ return s.num > 40 && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (bigCandidates.length > 0 && smallPicks.length > 0) {
+          used[smallPicks[0]] = false;
+          picks[picks.indexOf(smallPicks[0])] = bigCandidates[0].num;
+          used[bigCandidates[0].num] = true;
+        }
+      } else if (bigCount > smallCount + 2) {
+        var bigPicks = picks.filter(function(n){ return n > 40; });
+        var smallCandidates = scores.filter(function(s){ return s.num <= 40 && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (smallCandidates.length > 0 && bigPicks.length > 0) {
+          used[bigPicks[0]] = false;
+          picks[picks.indexOf(bigPicks[0])] = smallCandidates[0].num;
+          used[smallCandidates[0].num] = true;
+        }
+      }
+    }
+
+    // 7. 尾数错开：避免3个以上同尾数
+    var tailCounts = {};
+    picks.forEach(function(n){ var t=n%10; tailCounts[t]=(tailCounts[t]||0)+1; });
+    for (var t in tailCounts) {
+      if (tailCounts[t] >= 3) {
+        var sameTail = picks.filter(function(n){ return n%10===parseInt(t); }).sort(function(a,b){ return scores.find(function(s){return s.num===a;}).totalScore - scores.find(function(s){return s.num===b;}).totalScore; });
+        var replaceCandidates = scores.filter(function(s){ return s.num%10!==parseInt(t) && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (replaceCandidates.length > 0 && sameTail.length > 0) {
+          used[sameTail[0]] = false;
+          picks[picks.indexOf(sameTail[0])] = replaceCandidates[0].num;
+          used[replaceCandidates[0].num] = true;
+          tailCounts[t]--; tailCounts[replaceCandidates[0].num%10] = (tailCounts[replaceCandidates[0].num%10]||0)+1;
+        }
+      }
+    }
+
+    // 8. 补足到pt个
+    for (var i = 0; i < scores.length && picks.length < pt; i++) {
+      var n = scores[i].num;
+      if (!used[n]) { picks.push(n); used[n] = true; }
+    }
+
+    picks.sort(function(a,b){return a-b;});
+    return picks;
+  }
+
   return [
     {name:'区间均衡+热号', picks:genStrategy1(playType)},
     {name:'冷号优先+遗漏', picks:genStrategy2(playType)},
     {name:'周期+马尔可夫', picks:genStrategy3(playType)},
-    {name:'重号优选', picks:genStrategy4(playType)}
+    {name:'重号优选', picks:genStrategy4(playType)},
+    {name:'专家技巧综合', picks:genStrategy5(playType)}
   ];
 }
 
@@ -4102,8 +4243,124 @@ function renderKL8AllPlayTypes_V2(last, history) {
     return picks;
   }
 
+  function genStrategy5(playType) {
+    // S5专家技巧综合策略：冷热6:4 + 重号2-3个 + 奇偶均衡 + 大小均衡 + 四区分散 + 尾数错开 + 遗漏回补
+    var pt = playType;
+    var picks = [];
+    var used = {};
+    var hotNums = scores.filter(function(s){ return s.wf > 0.20; }).map(function(s){ return s.num; });
+    var warmNums = scores.filter(function(s){ return s.wf > 0.08 && s.wf <= 0.20; }).map(function(s){ return s.num; });
+    var coldNums = scores.filter(function(s){ return s.wf <= 0.08 && s.lastMissScore > 0.5; }).map(function(s){ return s.num; });
+    var repeatCount = pt >= 10 ? 3 : 2;
+    var repeatCandidates = scores.filter(function(s){ return last.indexOf(s.num) >= 0 && s.totalScore > 0.5; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+    for (var i = 0; i < repeatCandidates.length && picks.length < repeatCount; i++) {
+      var n = repeatCandidates[i].num;
+      if (!used[n]) { picks.push(n); used[n] = true; }
+    }
+    var missCandidates = scores.filter(function(s){ return s.lastMissScore >= 0.55 && s.lastMissScore <= 0.85 && !used[s.num]; }).sort(function(a,b){ return b.lastMissScore - a.lastMissScore; });
+    for (var i = 0; i < missCandidates.length && picks.length < pt * 0.25; i++) {
+      var n = missCandidates[i].num;
+      if (!used[n]) { picks.push(n); used[n] = true; }
+    }
+    var hotTarget = Math.ceil(pt * 0.5);
+    var warmTarget = Math.ceil(pt * 0.25);
+    for (var i = 0; i < hotNums.length && picks.length < hotTarget; i++) {
+      if (!used[hotNums[i]]) { picks.push(hotNums[i]); used[hotNums[i]] = true; }
+    }
+    for (var i = 0; i < warmNums.length && picks.length < hotTarget + warmTarget; i++) {
+      if (!used[warmNums[i]]) { picks.push(warmNums[i]); used[warmNums[i]] = true; }
+    }
+    for (var i = 0; i < coldNums.length && picks.length < pt; i++) {
+      if (!used[coldNums[i]]) { picks.push(coldNums[i]); used[coldNums[i]] = true; }
+    }
+    var zoneCounts = [0,0,0,0];
+    picks.forEach(function(n){ var z=n<=20?0:n<=40?1:n<=60?2:3; zoneCounts[z]++; });
+    for (var z = 0; z < 4; z++) {
+      if (zoneCounts[z] === 0) {
+        var zoneCandidates = scores.filter(function(s){ var sz=s.num<=20?0:s.num<=40?1:s.num<=60?2:3; return sz===z && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (zoneCandidates.length > 0) {
+          var n = zoneCandidates[0].num;
+          if (picks.length >= pt) {
+            var maxZ = zoneCounts.indexOf(Math.max.apply(null, zoneCounts));
+            if (maxZ !== z && zoneCounts[maxZ] > 1) {
+              for (var ri = 0; ri < picks.length; ri++) {
+                var rz = picks[ri]<=20?0:picks[ri]<=40?1:picks[ri]<=60?2:3;
+                if (rz === maxZ) { used[picks[ri]] = false; picks[ri] = n; used[n] = true; break; }
+              }
+            }
+          } else {
+            picks.push(n); used[n] = true;
+          }
+          zoneCounts[z]++;
+        }
+      }
+    }
+    var oddCount = picks.filter(function(n){ return n%2===1; }).length;
+    var evenCount = picks.length - oddCount;
+    if (Math.abs(oddCount - evenCount) > 2 && picks.length >= pt * 0.8) {
+      if (oddCount > evenCount + 2) {
+        var oddPicks = picks.filter(function(n){ return n%2===1; });
+        var evenCandidates = scores.filter(function(s){ return s.num%2===0 && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (evenCandidates.length > 0 && oddPicks.length > 0) {
+          used[oddPicks[0]] = false;
+          picks[picks.indexOf(oddPicks[0])] = evenCandidates[0].num;
+          used[evenCandidates[0].num] = true;
+        }
+      } else if (evenCount > oddCount + 2) {
+        var evenPicks = picks.filter(function(n){ return n%2===0; });
+        var oddCandidates = scores.filter(function(s){ return s.num%2===1 && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (oddCandidates.length > 0 && evenPicks.length > 0) {
+          used[evenPicks[0]] = false;
+          picks[picks.indexOf(evenPicks[0])] = oddCandidates[0].num;
+          used[oddCandidates[0].num] = true;
+        }
+      }
+    }
+    var smallCount = picks.filter(function(n){ return n <= 40; }).length;
+    var bigCount = picks.length - smallCount;
+    if (Math.abs(smallCount - bigCount) > 2 && picks.length >= pt * 0.8) {
+      if (smallCount > bigCount + 2) {
+        var smallPicks = picks.filter(function(n){ return n <= 40; });
+        var bigCandidates = scores.filter(function(s){ return s.num > 40 && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (bigCandidates.length > 0 && smallPicks.length > 0) {
+          used[smallPicks[0]] = false;
+          picks[picks.indexOf(smallPicks[0])] = bigCandidates[0].num;
+          used[bigCandidates[0].num] = true;
+        }
+      } else if (bigCount > smallCount + 2) {
+        var bigPicks = picks.filter(function(n){ return n > 40; });
+        var smallCandidates = scores.filter(function(s){ return s.num <= 40 && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (smallCandidates.length > 0 && bigPicks.length > 0) {
+          used[bigPicks[0]] = false;
+          picks[picks.indexOf(bigPicks[0])] = smallCandidates[0].num;
+          used[smallCandidates[0].num] = true;
+        }
+      }
+    }
+    var tailCounts = {};
+    picks.forEach(function(n){ var t=n%10; tailCounts[t]=(tailCounts[t]||0)+1; });
+    for (var t in tailCounts) {
+      if (tailCounts[t] >= 3) {
+        var sameTail = picks.filter(function(n){ return n%10===parseInt(t); }).sort(function(a,b){ return (scores.find(function(s){return s.num===a;})||{totalScore:0}).totalScore - (scores.find(function(s){return s.num===b;})||{totalScore:0}).totalScore; });
+        var replaceCandidates = scores.filter(function(s){ return s.num%10!==parseInt(t) && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (replaceCandidates.length > 0 && sameTail.length > 0) {
+          used[sameTail[0]] = false;
+          picks[picks.indexOf(sameTail[0])] = replaceCandidates[0].num;
+          used[replaceCandidates[0].num] = true;
+          tailCounts[t]--; tailCounts[replaceCandidates[0].num%10] = (tailCounts[replaceCandidates[0].num%10]||0)+1;
+        }
+      }
+    }
+    for (var i = 0; i < scores.length && picks.length < pt; i++) {
+      var n = scores[i].num;
+      if (!used[n]) { picks.push(n); used[n] = true; }
+    }
+    picks.sort(function(a,b){return a-b;});
+    return picks;
+  }
+
   var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V2 全玩法推荐模型</h3>';
-  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·马尔可夫转移·区间均衡·奇偶均衡·大小均衡·尾数分散·连号历史·稳定性 十维评分体系（含上期特征动态回归）</p>';
+  html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·马尔可夫转移·区间均衡·奇偶均衡·大小均衡·尾数分散·连号历史·稳定性 十维评分体系 + 专家技巧综合策略（冷热搭配·重号均衡·四区分散·尾数错开）</p>';
 
   var playTypeNames = ['一','二','三','四','五','六','七','八','九','十'];
 
@@ -4113,11 +4370,13 @@ function renderKL8AllPlayTypes_V2(last, history) {
     var s2 = genStrategy2(pt);
     var s3 = genStrategy3(pt);
     var s4 = genStrategy4(pt);
+    var s5 = genStrategy5(pt);
     var strategies = [
       {name:'区间均衡+热号', picks:s1, q:qualityScoreKL8(s1)},
       {name:'冷号优先+遗漏', picks:s2, q:qualityScoreKL8(s2)},
       {name:'周期+马尔可夫', picks:s3, q:qualityScoreKL8(s3)},
-      {name:'重号优选', picks:s4, q:qualityScoreKL8(s4)}
+      {name:'重号优选', picks:s4, q:qualityScoreKL8(s4)},
+      {name:'专家技巧综合', picks:s5, q:qualityScoreKL8(s5)}
     ];
     allPlayTypeRecs[pt] = strategies;
 
@@ -6149,6 +6408,120 @@ function spinKL8Review() {
     return picks;
   }
 
+  function genStrategy5(pt) {
+    var picks = [];
+    var used = {};
+    var hotNums = scores.filter(function(s){ return s.wf > 0.20; }).map(function(s){ return s.num; });
+    var warmNums = scores.filter(function(s){ return s.wf > 0.08 && s.wf <= 0.20; }).map(function(s){ return s.num; });
+    var coldNums = scores.filter(function(s){ return s.wf <= 0.08 && s.lastMissScore > 0.5; }).map(function(s){ return s.num; });
+    var repeatCount = pt >= 10 ? 3 : 2;
+    var repeatCandidates = scores.filter(function(s){ return last.indexOf(s.num) >= 0 && s.totalScore > 0.5; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+    for (var i = 0; i < repeatCandidates.length && picks.length < repeatCount; i++) {
+      var n = repeatCandidates[i].num;
+      if (!used[n]) { picks.push(n); used[n] = true; }
+    }
+    var missCandidates = scores.filter(function(s){ return s.lastMissScore >= 0.55 && s.lastMissScore <= 0.85 && !used[s.num]; }).sort(function(a,b){ return b.lastMissScore - a.lastMissScore; });
+    for (var i = 0; i < missCandidates.length && picks.length < pt * 0.25; i++) {
+      var n = missCandidates[i].num;
+      if (!used[n]) { picks.push(n); used[n] = true; }
+    }
+    var hotTarget = Math.ceil(pt * 0.5);
+    var warmTarget = Math.ceil(pt * 0.25);
+    for (var i = 0; i < hotNums.length && picks.length < hotTarget; i++) {
+      if (!used[hotNums[i]]) { picks.push(hotNums[i]); used[hotNums[i]] = true; }
+    }
+    for (var i = 0; i < warmNums.length && picks.length < hotTarget + warmTarget; i++) {
+      if (!used[warmNums[i]]) { picks.push(warmNums[i]); used[warmNums[i]] = true; }
+    }
+    for (var i = 0; i < coldNums.length && picks.length < pt; i++) {
+      if (!used[coldNums[i]]) { picks.push(coldNums[i]); used[coldNums[i]] = true; }
+    }
+    var zoneCounts = [0,0,0,0];
+    picks.forEach(function(n){ var z=n<=20?0:n<=40?1:n<=60?2:3; zoneCounts[z]++; });
+    for (var z = 0; z < 4; z++) {
+      if (zoneCounts[z] === 0) {
+        var zoneCandidates = scores.filter(function(s){ var sz=s.num<=20?0:s.num<=40?1:s.num<=60?2:3; return sz===z && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (zoneCandidates.length > 0) {
+          var n = zoneCandidates[0].num;
+          if (picks.length >= pt) {
+            var maxZ = zoneCounts.indexOf(Math.max.apply(null, zoneCounts));
+            if (maxZ !== z && zoneCounts[maxZ] > 1) {
+              for (var ri = 0; ri < picks.length; ri++) {
+                var rz = picks[ri]<=20?0:picks[ri]<=40?1:picks[ri]<=60?2:3;
+                if (rz === maxZ) { used[picks[ri]] = false; picks[ri] = n; used[n] = true; break; }
+              }
+            }
+          } else {
+            picks.push(n); used[n] = true;
+          }
+          zoneCounts[z]++;
+        }
+      }
+    }
+    var oddCount = picks.filter(function(n){ return n%2===1; }).length;
+    var evenCount = picks.length - oddCount;
+    if (Math.abs(oddCount - evenCount) > 2 && picks.length >= pt * 0.8) {
+      if (oddCount > evenCount + 2) {
+        var oddPicks = picks.filter(function(n){ return n%2===1; });
+        var evenCandidates = scores.filter(function(s){ return s.num%2===0 && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (evenCandidates.length > 0 && oddPicks.length > 0) {
+          used[oddPicks[0]] = false;
+          picks[picks.indexOf(oddPicks[0])] = evenCandidates[0].num;
+          used[evenCandidates[0].num] = true;
+        }
+      } else if (evenCount > oddCount + 2) {
+        var evenPicks = picks.filter(function(n){ return n%2===0; });
+        var oddCandidates = scores.filter(function(s){ return s.num%2===1 && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (oddCandidates.length > 0 && evenPicks.length > 0) {
+          used[evenPicks[0]] = false;
+          picks[picks.indexOf(evenPicks[0])] = oddCandidates[0].num;
+          used[oddCandidates[0].num] = true;
+        }
+      }
+    }
+    var smallCount = picks.filter(function(n){ return n <= 40; }).length;
+    var bigCount = picks.length - smallCount;
+    if (Math.abs(smallCount - bigCount) > 2 && picks.length >= pt * 0.8) {
+      if (smallCount > bigCount + 2) {
+        var smallPicks = picks.filter(function(n){ return n <= 40; });
+        var bigCandidates = scores.filter(function(s){ return s.num > 40 && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (bigCandidates.length > 0 && smallPicks.length > 0) {
+          used[smallPicks[0]] = false;
+          picks[picks.indexOf(smallPicks[0])] = bigCandidates[0].num;
+          used[bigCandidates[0].num] = true;
+        }
+      } else if (bigCount > smallCount + 2) {
+        var bigPicks = picks.filter(function(n){ return n > 40; });
+        var smallCandidates = scores.filter(function(s){ return s.num <= 40 && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (smallCandidates.length > 0 && bigPicks.length > 0) {
+          used[bigPicks[0]] = false;
+          picks[picks.indexOf(bigPicks[0])] = smallCandidates[0].num;
+          used[smallCandidates[0].num] = true;
+        }
+      }
+    }
+    var tailCounts = {};
+    picks.forEach(function(n){ var t=n%10; tailCounts[t]=(tailCounts[t]||0)+1; });
+    for (var t in tailCounts) {
+      if (tailCounts[t] >= 3) {
+        var sameTail = picks.filter(function(n){ return n%10===parseInt(t); }).sort(function(a,b){ return (scores.find(function(s){return s.num===a;})||{totalScore:0}).totalScore - (scores.find(function(s){return s.num===b;})||{totalScore:0}).totalScore; });
+        var replaceCandidates = scores.filter(function(s){ return s.num%10!==parseInt(t) && !used[s.num]; }).sort(function(a,b){ return b.totalScore - a.totalScore; });
+        if (replaceCandidates.length > 0 && sameTail.length > 0) {
+          used[sameTail[0]] = false;
+          picks[picks.indexOf(sameTail[0])] = replaceCandidates[0].num;
+          used[replaceCandidates[0].num] = true;
+          tailCounts[t]--; tailCounts[replaceCandidates[0].num%10] = (tailCounts[replaceCandidates[0].num%10]||0)+1;
+        }
+      }
+    }
+    for (var i = 0; i < scores.length && picks.length < pt; i++) {
+      var n = scores[i].num;
+      if (!used[n]) { picks.push(n); used[n] = true; }
+    }
+    picks.sort(function(a,b){return a-b;});
+    return picks;
+  }
+
   function hitCount(picks, actual) {
     return picks.filter(function(n){ return actual.indexOf(n) >= 0; }).length;
   }
@@ -6156,7 +6529,7 @@ function spinKL8Review() {
   // 生成选五和选十的推荐并计算命中
   var playTypes = [5, 10];
   var playTypeNames = {5:'选五', 10:'选十'};
-  var strategyNames = ['区间均衡+热号', '冷号优先+遗漏', '周期+马尔可夫', '重号优选'];
+  var strategyNames = ['区间均衡+热号', '冷号优先+遗漏', '周期+马尔可夫', '重号优选', '专家技巧综合'];
 
   // 将策略推荐也保存到Tab7
   var allPlayTypeRecs = {};
@@ -6166,7 +6539,8 @@ function spinKL8Review() {
       {name: '区间均衡+热号', picks: genStrategy1(pt)},
       {name: '冷号优先+遗漏', picks: genStrategy2(pt)},
       {name: '周期+马尔可夫', picks: genStrategy3(pt)},
-      {name: '重号优选', picks: genStrategy4(pt)}
+      {name: '重号优选', picks: genStrategy4(pt)},
+      {name: '专家技巧综合', picks: genStrategy5(pt)}
     ];
   }
   if (typeof saveKL8AllPredictions === 'function') {
