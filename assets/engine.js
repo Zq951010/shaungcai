@@ -5763,7 +5763,27 @@ function renderDLTDual() {
 }
 
 function renderDLTTrendChart(history) {
-  if (!history || history.length === 0) return;
+  if (!history || history.length === 0) {
+    // 独立调用时自动解析数据
+    var frontStr = document.getElementById('dlt-front').value;
+    var backStr = document.getElementById('dlt-back').value;
+    var historyStr = document.getElementById('dlt-history').value;
+    var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+    var hist = [];
+    for (var i = 0; i < lines.length; i++) {
+      var parts = lines[i].split('|');
+      var f = parseNums(parts[0]);
+      var b = parseNums(parts[1] || '');
+      if (f.length >= 5 && b.length >= 2) {
+        hist.push({ front: f.slice(0, 5).sort(function(a,b){return a-b}), back: b.slice(0, 2).sort(function(a,b){return a-b}) });
+      }
+    }
+    if (hist.length === 0 || hist.length < 2) {
+      document.getElementById('dlt-trend-chart').innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted)">暂无数据，请先点击"加载示例数据"或输入开奖号码后点击"开始分析"</div>';
+      return;
+    }
+    history = hist;
+  }
 
   // 从表格读取期号/日期元数据
   var tbody = document.querySelector('#dlt-input-table tbody');
