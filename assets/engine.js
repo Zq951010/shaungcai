@@ -490,6 +490,110 @@ function fillSSQInputTable(dataLines, metaData) {
   syncSSQInputToTextarea();
 }
 
+function addKL8InputRow() {
+  var tbody = document.querySelector('#kl8-input-table tbody');
+  if (!tbody) return;
+  var rowCount = tbody.children.length;
+  var prevDateStr = '';
+  if (rowCount > 0) {
+    var lastRow = tbody.children[rowCount - 1];
+    var dateInput = lastRow.querySelector('.kl8-input-date');
+    if (dateInput) prevDateStr = dateInput.value.trim();
+  }
+  var prevDate = new Date(2026, 6, 8);
+  if (prevDateStr) {
+    var parts = prevDateStr.split('-');
+    if (parts.length === 3) prevDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+  }
+  var newDate = new Date(prevDate);
+  newDate.setDate(newDate.getDate() - 1);
+  var dateStr = newDate.getFullYear() + '-' + String(newDate.getMonth()+1).padStart(2,'0') + '-' + String(newDate.getDate()).padStart(2,'0');
+  var weekday = DLT_WEEK_NAMES[newDate.getDay()];
+
+  var tr = document.createElement('tr');
+  tr.setAttribute('data-row', rowCount);
+  tr.innerHTML = '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="kl8-input-period" placeholder="期号" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--ink);font-weight:600"></td>' +
+    '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="kl8-input-date" placeholder="YYYY-MM-DD" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--muted)" value="' + dateStr + '"></td>' +
+    '<td class="kl8-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">' + weekday + '</td>' +
+    '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="kl8-input-nums" placeholder="如: 05,10,12,19,20,26,27,30,35,38,44,45,46,47,49,54,56,61,72,77" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px"></td>' +
+    '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeKL8InputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td>';
+  tbody.appendChild(tr);
+  var periodInput = tr.querySelector('.kl8-input-period');
+  var dateInput = tr.querySelector('.kl8-input-date');
+  var numsInput = tr.querySelector('.kl8-input-nums');
+  if (periodInput) periodInput.addEventListener('blur', syncKL8InputToTextarea);
+  if (dateInput) dateInput.addEventListener('blur', function() { updateKL8RowWeekday(this); syncKL8InputToTextarea(); });
+  if (numsInput) numsInput.addEventListener('blur', syncKL8InputToTextarea);
+}
+
+function updateKL8RowWeekday(dateInput) {
+  var tr = dateInput.closest('tr');
+  if (!tr) return;
+  var dateStr = dateInput.value.trim();
+  if (!dateStr) return;
+  var parts = dateStr.split('-');
+  if (parts.length !== 3) return;
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+  if (isNaN(d.getTime())) return;
+  var weekdayCell = tr.querySelector('.kl8-weekday');
+  if (weekdayCell) weekdayCell.textContent = DLT_WEEK_NAMES[d.getDay()];
+}
+
+function removeKL8InputRow(btn) {
+  var tbody = document.querySelector('#kl8-input-table tbody');
+  if (!tbody) return;
+  var tr = btn.closest('tr');
+  if (tr) tr.remove();
+  var rows = tbody.querySelectorAll('tr');
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].setAttribute('data-row', i);
+  }
+  syncKL8InputToTextarea();
+}
+
+function syncKL8InputToTextarea() {
+  var tbody = document.querySelector('#kl8-input-table tbody');
+  if (!tbody) return;
+  var lines = [];
+  var rows = tbody.querySelectorAll('tr');
+  for (var i = 0; i < rows.length; i++) {
+    var nums = rows[i].querySelector('.kl8-input-nums');
+    var numsVal = nums ? nums.value.trim() : '';
+    if (numsVal) {
+      lines.push(numsVal);
+    }
+  }
+  document.getElementById('kl8-history').value = lines.join('\n');
+}
+
+function fillKL8InputTable(dataLines, metaData) {
+  var tbody = document.querySelector('#kl8-input-table tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  for (var i = 0; i < dataLines.length; i++) {
+    var nums = dataLines[i] || '';
+    var meta = metaData && metaData[i] ? metaData[i] : null;
+    var periodVal = meta ? meta.period : '';
+    var dateVal = meta ? meta.date : '';
+    var weekdayVal = meta ? meta.weekday : '';
+    var tr = document.createElement('tr');
+    tr.setAttribute('data-row', i);
+    tr.innerHTML = '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="kl8-input-period" placeholder="期号" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--ink);font-weight:600" value="' + periodVal + '"></td>' +
+      '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="kl8-input-date" placeholder="YYYY-MM-DD" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--muted)" value="' + dateVal + '"></td>' +
+      '<td class="kl8-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">' + weekdayVal + '</td>' +
+      '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="kl8-input-nums" value="' + nums + '" placeholder="如: 05,10,12,19,20,26,27,30,35,38,44,45,46,47,49,54,56,61,72,77" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px"></td>' +
+      '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeKL8InputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td>';
+    tbody.appendChild(tr);
+    var periodInput = tr.querySelector('.kl8-input-period');
+    var dateInput = tr.querySelector('.kl8-input-date');
+    var numsInput = tr.querySelector('.kl8-input-nums');
+    if (periodInput) periodInput.addEventListener('blur', syncKL8InputToTextarea);
+    if (dateInput) dateInput.addEventListener('blur', function() { updateKL8RowWeekday(this); syncKL8InputToTextarea(); });
+    if (numsInput) numsInput.addEventListener('blur', syncKL8InputToTextarea);
+  }
+  syncKL8InputToTextarea();
+}
+
 function loadDLTSample() {
   var last = dltSampleHistory[0];
   var parts = last.split('|');
@@ -3363,63 +3467,91 @@ function renderSSQTail(allReds) {
 var KL8_ZONES = [[1,20],[21,40],[41,60],[61,80]];
 
 var kl8SampleHistory = [
-  '05,10,12,19,20,26,27,30,35,38,44,45,46,47,49,54,56,61,72,77',
-  '11,15,16,20,33,35,37,39,42,46,49,50,54,56,61,62,71,73,76,79',
-  '07,08,14,21,22,26,29,33,36,39,40,57,59,63,64,67,70,72,73,76',
-  '09,15,16,21,27,32,33,34,36,38,39,44,45,54,60,67,77,78,79,80',
-  '02,07,11,13,18,21,23,25,30,31,48,53,54,55,61,62,69,76,77,80',
-  '01,03,05,08,09,12,19,24,27,30,32,47,51,52,59,64,67,74,75,80',
-  '04,05,11,16,17,19,20,26,37,44,46,47,51,55,61,63,66,68,70,75',
-  '01,02,08,13,16,18,19,30,33,37,39,40,56,57,63,69,71,73,76,78',
-  '02,04,06,09,13,26,32,36,38,41,44,47,56,58,60,69,72,76,78,80',
-  '04,05,08,12,22,23,26,27,35,39,47,50,56,58,60,61,66,70,71,77',
-  '05,11,12,15,20,23,28,29,37,38,45,49,51,55,63,64,65,69,77,79',
-  '01,03,06,08,14,18,29,38,39,42,44,46,49,51,57,58,61,75,77,80',
-  '02,05,09,11,16,17,19,27,39,48,49,54,62,63,66,69,70,71,73,76',
-  '07,10,11,12,17,18,24,27,30,31,32,34,42,49,54,59,64,65,71,72',
-  '07,10,12,13,17,18,26,29,33,38,41,47,50,54,56,57,58,62,68,73',
-  '01,07,17,19,20,21,22,23,35,37,43,44,49,51,53,59,66,71,77,78',
-  '01,03,13,16,18,25,32,35,37,44,45,47,58,59,60,63,66,68,72,75',
-  '03,04,06,10,12,21,24,36,37,38,41,42,44,45,49,52,70,73,77,78',
-  '07,08,12,18,19,23,24,27,53,54,56,57,59,60,62,70,74,77,78,79',
-  '02,04,10,12,13,17,23,30,31,33,37,43,47,55,58,62,65,72,75,77',
-  '01,02,07,11,17,18,26,28,30,38,41,42,43,54,59,62,69,71,74,79',
-  '03,06,07,10,11,12,14,17,22,24,28,35,37,38,45,50,52,67,77,79',
-  '04,07,09,10,14,27,38,39,40,43,44,45,48,50,54,56,66,70,77,78',
-  '02,04,05,15,19,24,27,29,32,33,36,38,50,52,60,64,66,69,74,75',
-  '03,04,12,24,27,30,34,50,53,55,61,63,65,69,70,72,74,75,76,77',
-  '02,03,07,11,14,23,30,31,34,38,39,41,47,51,52,60,63,68,72,78',
-  '02,04,10,14,18,21,26,35,39,40,41,48,50,53,57,59,65,73,75,76',
-  '06,09,10,20,21,28,33,38,48,49,52,54,57,64,66,70,72,74,75,77',
-  '01,03,11,12,16,18,23,24,31,35,37,39,40,54,61,64,65,69,71,79',
-  '02,06,07,09,10,11,14,19,22,23,26,30,36,40,41,44,47,51,53,60',
-  '02,06,08,10,11,14,19,22,26,30,31,33,47,53,56,62,63,73,76,77',
-  '04,08,09,13,14,15,16,17,18,23,28,39,47,48,53,56,63,66,77,79',
-  '02,06,11,14,17,20,24,33,35,40,42,45,49,50,51,52,57,60,64,75',
-  '08,13,20,23,24,27,29,37,42,48,49,50,51,57,59,60,64,65,67,77',
-  '06,12,19,20,21,22,27,30,31,32,34,42,51,54,57,66,70,71,72,75',
-  '01,06,09,16,18,19,21,26,27,29,55,58,59,60,62,66,73,74,76,80',
-  '08,09,11,12,13,16,18,19,32,37,38,40,42,53,56,57,63,68,77,78',
-  '07,19,25,28,32,33,36,38,43,44,46,50,55,61,65,70,71,72,73,79'
+  '05,10,12,19,20,26,27,30,35,38,44,45,46,47,49,54,56,61,72,77',  // 2026178 2026-07-07 二
+  '11,15,16,20,33,35,37,39,42,46,49,50,54,56,61,62,71,73,76,79',  // 2026177 2026-07-06 一
+  '07,08,14,21,22,26,29,33,36,39,40,57,59,63,64,67,70,72,73,76',  // 2026176 2026-07-05 日
+  '09,15,16,21,27,32,33,34,36,38,39,44,45,54,60,67,77,78,79,80',  // 2026175 2026-07-04 六
+  '02,07,11,13,18,21,23,25,30,31,48,53,54,55,61,62,69,76,77,80',  // 2026174 2026-07-03 五
+  '01,03,05,08,09,12,19,24,27,30,32,47,51,52,59,64,67,74,75,80',  // 2026173 2026-07-02 四
+  '04,05,11,16,17,19,20,26,37,44,46,47,51,55,61,63,66,68,70,75',  // 2026172 2026-07-01 三
+  '06,08,11,16,20,22,23,30,31,33,38,39,41,44,53,54,55,62,63,79',  // 2026171 2026-06-30 二
+  '02,03,07,09,16,20,21,23,24,25,27,33,35,36,41,43,49,51,57,65',  // 2026170 2026-06-29 一
+  '04,05,06,18,21,25,26,27,31,33,37,39,40,43,52,56,58,61,62,73',  // 2026169 2026-06-28 日
+  '02,06,08,09,20,21,24,25,31,33,42,44,46,48,55,61,64,66,72,77',  // 2026168 2026-06-27 六
+  '01,03,12,13,15,16,17,22,24,28,33,34,35,40,45,47,54,66,68,74',  // 2026167 2026-06-26 五
+  '02,08,14,16,17,24,25,27,30,31,41,48,50,55,61,70,71,73,76,79',  // 2026166 2026-06-25 四
+  '01,09,10,12,26,31,33,35,39,42,46,48,49,57,61,64,65,66,67,74',  // 2026165 2026-06-24 三
+  '01,03,04,05,13,17,19,25,30,34,38,46,56,58,59,60,63,69,76,80',  // 2026164 2026-06-23 二
+  '08,09,11,14,18,22,28,35,37,40,41,42,45,50,54,58,70,71,73,74',  // 2026163 2026-06-22 一
+  '01,02,08,13,16,18,19,30,33,37,39,40,56,57,63,69,71,73,76,78',  // 2026162 2026-06-21 日
+  '02,14,15,23,28,30,35,39,43,44,49,50,51,53,57,60,62,69,74,76',  // 2026161 2026-06-20 六
+  '02,04,06,09,13,26,32,36,38,41,44,47,56,58,60,69,72,76,78,80',  // 2026160 2026-06-19 五
+  '04,05,08,12,22,23,26,27,35,39,47,50,56,58,60,61,66,70,71,77',  // 2026159 2026-06-18 四
+  '05,11,12,15,20,23,28,29,37,38,45,49,51,55,63,64,65,69,77,79',  // 2026158 2026-06-17 三
+  '01,03,06,08,14,18,29,38,39,42,44,46,49,51,57,58,61,75,77,80',  // 2026157 2026-06-16 二
+  '02,05,09,11,16,17,19,27,39,48,49,54,62,63,66,69,70,71,73,76',  // 2026156 2026-06-15 一
+  '07,10,11,12,17,18,24,27,30,31,32,34,42,49,54,59,64,65,71,72',  // 2026155 2026-06-14 日
+  '07,10,12,13,17,18,26,29,33,38,41,47,50,54,56,57,58,62,68,73',  // 2026154 2026-06-13 六
+  '01,07,17,19,20,21,22,23,35,37,43,44,49,51,53,59,66,71,77,78',  // 2026153 2026-06-12 五
+  '01,03,13,16,18,25,32,35,37,44,45,47,58,59,60,63,66,68,72,75',  // 2026152 2026-06-11 四
+  '03,04,06,10,12,21,24,36,37,38,41,42,44,45,49,52,70,73,77,78',  // 2026151 2026-06-10 三
+  '07,08,12,18,19,23,24,27,53,54,56,57,59,60,62,70,74,77,78,79',  // 2026150 2026-06-09 二
+  '02,04,10,12,13,17,23,30,31,33,37,43,47,55,58,62,65,72,75,77'   // 2026149 2026-06-08 一
+];
+
+var kl8SampleMeta = [
+  {period:'2026178', date:'2026-07-07', weekday:'二'},
+  {period:'2026177', date:'2026-07-06', weekday:'一'},
+  {period:'2026176', date:'2026-07-05', weekday:'日'},
+  {period:'2026175', date:'2026-07-04', weekday:'六'},
+  {period:'2026174', date:'2026-07-03', weekday:'五'},
+  {period:'2026173', date:'2026-07-02', weekday:'四'},
+  {period:'2026172', date:'2026-07-01', weekday:'三'},
+  {period:'2026171', date:'2026-06-30', weekday:'二'},
+  {period:'2026170', date:'2026-06-29', weekday:'一'},
+  {period:'2026169', date:'2026-06-28', weekday:'日'},
+  {period:'2026168', date:'2026-06-27', weekday:'六'},
+  {period:'2026167', date:'2026-06-26', weekday:'五'},
+  {period:'2026166', date:'2026-06-25', weekday:'四'},
+  {period:'2026165', date:'2026-06-24', weekday:'三'},
+  {period:'2026164', date:'2026-06-23', weekday:'二'},
+  {period:'2026163', date:'2026-06-22', weekday:'一'},
+  {period:'2026162', date:'2026-06-21', weekday:'日'},
+  {period:'2026161', date:'2026-06-20', weekday:'六'},
+  {period:'2026160', date:'2026-06-19', weekday:'五'},
+  {period:'2026159', date:'2026-06-18', weekday:'四'},
+  {period:'2026158', date:'2026-06-17', weekday:'三'},
+  {period:'2026157', date:'2026-06-16', weekday:'二'},
+  {period:'2026156', date:'2026-06-15', weekday:'一'},
+  {period:'2026155', date:'2026-06-14', weekday:'日'},
+  {period:'2026154', date:'2026-06-13', weekday:'六'},
+  {period:'2026153', date:'2026-06-12', weekday:'五'},
+  {period:'2026152', date:'2026-06-11', weekday:'四'},
+  {period:'2026151', date:'2026-06-10', weekday:'三'},
+  {period:'2026150', date:'2026-06-09', weekday:'二'},
+  {period:'2026149', date:'2026-06-08', weekday:'一'}
 ];
 
 function loadKL8Sample() {
   var last = kl8SampleHistory[0];
   document.getElementById('kl8-numbers').value = last;
   document.getElementById('kl8-history').value = kl8SampleHistory.join('\n');
-  // 填充复盘输入框默认值
   var reviewNums = document.getElementById('kl8-review-numbers');
   if (reviewNums) reviewNums.value = last;
+  fillKL8InputTable(kl8SampleHistory, kl8SampleMeta);
 }
 
 function clearKL8() {
   document.getElementById('kl8-numbers').value = '';
   document.getElementById('kl8-history').value = '';
+  var tbody = document.querySelector('#kl8-input-table tbody');
+  if (tbody) tbody.innerHTML = '';
   document.getElementById('kl8-results').style.display = 'none';
   document.getElementById('kl8-empty').style.display = 'block';
 }
 
 function analyzeKL8() {
+  syncKL8InputToTextarea();
   var numsStr = document.getElementById('kl8-numbers').value;
   var historyStr = document.getElementById('kl8-history').value;
 

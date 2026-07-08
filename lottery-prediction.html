@@ -1130,9 +1130,35 @@ tr:hover td { background: var(--bg3); }
       <label>开奖号码：</label>
       <input type="text" id="kl8-numbers" placeholder="如: 03,08,15,22,27,31,35,42,48,55,61,66,70,73,75,77,78,79,80,01" style="width:500px">
     </div>
-    <div class="input-row" style="margin-top:0.5rem">
-      <label>近N期数据：</label>
-      <textarea id="kl8-history" placeholder="粘贴多期数据，每行一期，20个号码逗号分隔&#10;例如:&#10;03,08,15,22,27,31,35,42,48,55,61,66,70,73,75,77,78,79,80,01&#10;05,12,19,25,30,33,38,44,50,57,63,68,71,74,76,78,79,80,02,04" rows="4"></textarea>
+    <!-- 隐藏的textarea用于数据同步 -->
+    <textarea id="kl8-history" style="display:none"></textarea>
+
+    <div class="input-row" style="margin-top:0.5rem;align-items:flex-start">
+      <label style="margin-top:0.5rem">近N期数据：</label>
+      <div style="flex:1;overflow-x:auto">
+        <table id="kl8-input-table" style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-bottom:0.5rem;min-width:700px">
+          <thead>
+            <tr style="background:var(--bg3)">
+              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:65px">期号</th>
+              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:100px">日期</th>
+              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:40px">星期</th>
+              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center">开奖号码（20个）</th>
+              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:40px">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr data-row="0">
+              <td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="kl8-input-period" onblur="syncKL8InputToTextarea()" placeholder="期号" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--accent);font-weight:600" value="预测"></td>
+              <td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="kl8-input-date" onblur="syncKL8InputToTextarea()" placeholder="YYYY-MM-DD" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--muted)" value="2026-07-08"></td>
+              <td class="kl8-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">二</td>
+              <td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="kl8-input-nums" onblur="syncKL8InputToTextarea()" placeholder="如: 05,10,12,19,20,26,27,30,35,38,44,45,46,47,49,54,56,61,72,77" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px"></td>
+              <td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeKL8InputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <button type="button" class="btn btn-secondary" onclick="addKL8InputRow()" style="font-size:0.75rem;padding:4px 12px">+ 添加一期</button>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem">提示：请按<strong>从新到旧</strong>顺序填写。第一行为下期预测（今日未开奖），下方为历史已开奖数据。期号请填写真实期号如 2026178</div>
+      </div>
     </div>
     <div class="input-row" style="margin-top:0.75rem">
       <button class="btn btn-primary" onclick="analyzeKL8()">开始分析</button>
@@ -1690,9 +1716,9 @@ tr:hover td { background: var(--bg3); }
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
 <script src="assets/engine.js?v=2026070819"></script>
-<script src="assets/engine.js?v=2026070820"></script>
-<script src="assets/pl-engine.js?v=2026070820"></script>
-<script src="assets/auto-review.js?v=2026070820"></script>
+<script src="assets/engine.js?v=2026070821"></script>
+<script src="assets/pl-engine.js?v=2026070821"></script>
+<script src="assets/auto-review.js?v=2026070821"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)
