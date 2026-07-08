@@ -744,7 +744,7 @@ tr:hover td { background: var(--bg3); }
           </thead>
           <tbody>
             <tr data-row="0">
-              <td class="dlt-period" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--ink);font-weight:600;white-space:nowrap;font-size:0.8rem">26081</td>
+              <td class="dlt-period" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--accent);font-weight:600;white-space:nowrap;font-size:0.8rem">预测</td>
               <td class="dlt-date" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">2026-07-08</td>
               <td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">三</td>
               <td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" onblur="syncDLTInputToTextarea()" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td>
@@ -754,7 +754,7 @@ tr:hover td { background: var(--bg3); }
           </tbody>
         </table>
         <button type="button" class="btn btn-secondary" onclick="addDLTInputRow()" style="font-size:0.75rem;padding:4px 12px">+ 添加一期</button>
-        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem">提示：在表格中输入每期的前区（5个号码）和后区（2个号码），号码用逗号分隔</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem">提示：第一行为<strong style="color:var(--accent)">下期预测</strong>（今日尚未开奖），下方为历史已开奖数据。号码用逗号分隔</div>
       </div>
     </div>
     <div class="input-row" style="margin-top:0.75rem">
@@ -1681,10 +1681,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026070814"></script>
-<script src="assets/pl-data.js?v=2026070814"></script>
-<script src="assets/pl-engine.js?v=2026070814"></script>
-<script src="assets/auto-review.js?v=2026070814"></script>
+<script src="assets/engine.js?v=2026070815"></script>
+<script src="assets/pl-data.js?v=2026070815"></script>
+<script src="assets/pl-engine.js?v=2026070815"></script>
+<script src="assets/auto-review.js?v=2026070815"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)

@@ -314,9 +314,9 @@ function addDLTInputRow() {
   }
   var newPeriod = prevPeriod - 1;
   var prevDateStr = '';
-  var prevRow = tbody.children[0];
-  if (prevRow) {
-    var dateCell = prevRow.querySelector('.dlt-date');
+  if (rowCount > 0) {
+    var lastRow2 = tbody.children[rowCount - 1];
+    var dateCell = lastRow2.querySelector('.dlt-date');
     if (dateCell) prevDateStr = dateCell.textContent;
   }
   if (prevDateStr) {
@@ -442,7 +442,7 @@ function clearDLT() {
   // 清空表格输入
   var tbody = document.querySelector('#dlt-input-table tbody');
   if (tbody) {
-    tbody.innerHTML = '<tr data-row="0"><td class="dlt-period" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--ink);font-weight:600;white-space:nowrap;font-size:0.8rem">26081</td><td class="dlt-date" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">2026-07-08</td><td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">三</td><td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td><td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td><td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td></tr>';
+    tbody.innerHTML = '<tr data-row="0"><td class="dlt-period" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--accent);font-weight:600;white-space:nowrap;font-size:0.8rem">预测</td><td class="dlt-date" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">2026-07-08</td><td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">三</td><td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td><td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td><td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td></tr>';
     var firstRow = tbody.querySelector('tr');
     if (firstRow) {
       var fi = firstRow.querySelector('.dlt-input-front');
