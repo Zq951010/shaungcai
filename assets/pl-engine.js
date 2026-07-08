@@ -2231,9 +2231,14 @@ function spinPL3Lottery() {
       var scores = posScores[p];
       var totalW = 0, weights = [];
       for (var d = 0; d <= 9; d++) {
-        var w = (scores[d] ? scores[d].totalScore : 0) + 0.5;
+        var w = (scores[d] ? scores[d].total : 0) + 0.5;
         weights.push(w);
         totalW += w;
+      }
+      // 兜底：如果权重异常，随机选号
+      if (!totalW || isNaN(totalW)) {
+        picks.push(Math.floor(Math.random() * 10));
+        continue;
       }
       var rnd = Math.random() * totalW;
       var cum = 0;
