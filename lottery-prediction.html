@@ -734,8 +734,8 @@ tr:hover td { background: var(--bg3); }
         <table id="dlt-input-table" style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-bottom:0.5rem;min-width:600px">
           <thead>
             <tr style="background:var(--bg3)">
-              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:55px">期号</th>
-              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:90px">日期</th>
+              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:65px">期号</th>
+              <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:100px">日期</th>
               <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:40px">星期</th>
               <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center">前区号码</th>
               <th style="padding:6px 8px;border:1px solid var(--rule);text-align:center;width:120px">后区号码</th>
@@ -744,8 +744,8 @@ tr:hover td { background: var(--bg3); }
           </thead>
           <tbody>
             <tr data-row="0">
-              <td class="dlt-period" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--accent);font-weight:600;white-space:nowrap;font-size:0.8rem">预测</td>
-              <td class="dlt-date" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">2026-07-08</td>
+              <td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="dlt-input-period" onblur="syncDLTInputToTextarea()" placeholder="期号" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--accent);font-weight:600" value="预测"></td>
+              <td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="dlt-input-date" onblur="syncDLTInputToTextarea()" placeholder="YYYY-MM-DD" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--muted)" value="2026-07-08"></td>
               <td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">三</td>
               <td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" onblur="syncDLTInputToTextarea()" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td>
               <td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" onblur="syncDLTInputToTextarea()" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td>
@@ -754,34 +754,13 @@ tr:hover td { background: var(--bg3); }
           </tbody>
         </table>
         <button type="button" class="btn btn-secondary" onclick="addDLTInputRow()" style="font-size:0.75rem;padding:4px 12px">+ 添加一期</button>
-        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem">提示：第一行为<strong style="color:var(--accent)">下期预测</strong>（今日尚未开奖），下方为历史已开奖数据。号码用逗号分隔</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.3rem">提示：请按<strong>从新到旧</strong>顺序填写。第一行为下期预测（今日未开奖），下方为历史已开奖数据。期号请填写真实期号如 26081</div>
       </div>
     </div>
     <div class="input-row" style="margin-top:0.75rem">
       <button class="btn btn-primary" onclick="analyzeDLT()">开始分析</button>
       <button class="btn btn-secondary" onclick="loadDLTSample()">加载示例数据</button>
       <button class="btn btn-secondary" onclick="clearDLT()">清空</button>
-    </div>
-  </div>
-
-  <!-- 历史开奖数据表格展示 -->
-  <div id="dlt-history-table-wrap" style="display:none;margin-bottom:1rem">
-    <div class="card">
-      <div class="card-title"><span class="icon">&#128200;</span> 超级大乐透历史开奖</div>
-      <div style="overflow-x:auto">
-        <table id="dlt-history-table" style="width:100%;border-collapse:collapse;font-size:0.85rem">
-          <thead>
-            <tr style="background:var(--bg3)">
-              <th style="padding:8px 10px;border:1px solid var(--rule);text-align:center;white-space:nowrap">期号</th>
-              <th style="padding:8px 10px;border:1px solid var(--rule);text-align:center;white-space:nowrap">开奖日期</th>
-              <th style="padding:8px 10px;border:1px solid var(--rule);text-align:center;white-space:nowrap">星期</th>
-              <th style="padding:8px 10px;border:1px solid var(--rule);text-align:center">前区</th>
-              <th style="padding:8px 10px;border:1px solid var(--rule);text-align:center">后区</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
     </div>
   </div>
 
@@ -1681,10 +1660,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026070815"></script>
-<script src="assets/pl-data.js?v=2026070815"></script>
-<script src="assets/pl-engine.js?v=2026070815"></script>
-<script src="assets/auto-review.js?v=2026070815"></script>
+<script src="assets/engine.js?v=2026070816"></script>
+<script src="assets/pl-data.js?v=2026070816"></script>
+<script src="assets/pl-engine.js?v=2026070816"></script>
+<script src="assets/auto-review.js?v=2026070816"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)

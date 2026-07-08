@@ -228,119 +228,60 @@ var dltSampleHistory = [
   '08,17,21,33,35|06,07'
 ];
 
-// 大乐透期号计算：2026年第一期：2026-01-01是周四，第一期是2026-01-03(周六) = 26001
-var DLT_DRAW_DAYS = [1, 3, 6]; // 周一、三、六
+// 星期名称
 var DLT_WEEK_NAMES = ['日', '一', '二', '三', '四', '五', '六'];
-var DLT_FIRST_DRAW = new Date(2026, 0, 3); // 2026-01-03 Saturday
-
-function calcDLTPeriodNum(date) {
-  var count = 0;
-  var d = new Date(DLT_FIRST_DRAW);
-  while (d <= date) {
-    count++;
-    d.setDate(d.getDate() + 1);
-    while (DLT_DRAW_DAYS.indexOf(d.getDay()) < 0) d.setDate(d.getDate() + 1);
-  }
-  return 26000 + count;
-}
-
-function renderDLTHistoryTable() {
-  var historyStr = document.getElementById('dlt-history').value;
-  var lines = historyStr.trim().split('\n').filter(function(l) { return l.trim(); });
-  if (lines.length === 0) {
-    document.getElementById('dlt-history-table-wrap').style.display = 'none';
-    return;
-  }
-
-  var tbody = document.querySelector('#dlt-history-table tbody');
-  if (!tbody) return;
-
-  var today = new Date(2026, 6, 8); // 2026-07-08
-  var lastDrawDate = new Date(today);
-  while (DLT_DRAW_DAYS.indexOf(lastDrawDate.getDay()) < 0) {
-    lastDrawDate.setDate(lastDrawDate.getDate() - 1);
-  }
-
-  var html = '';
-  for (var i = 0; i < lines.length; i++) {
-    var parts = lines[i].split('|');
-    if (parts.length < 2) continue;
-    var frontNums = parts[0].split(',').filter(function(n){return n.trim();});
-    var backNums = parts[1].split(',').filter(function(n){return n.trim();});
-
-    // 倒推日期
-    var drawDate = new Date(lastDrawDate);
-    var steps = i;
-    while (steps > 0) {
-      drawDate.setDate(drawDate.getDate() - 1);
-      if (DLT_DRAW_DAYS.indexOf(drawDate.getDay()) >= 0) steps--;
-    }
-    var dateStr = drawDate.getFullYear() + '-' + String(drawDate.getMonth()+1).padStart(2,'0') + '-' + String(drawDate.getDate()).padStart(2,'0');
-    var weekday = DLT_WEEK_NAMES[drawDate.getDay()];
-    var periodNum = calcDLTPeriodNum(drawDate);
-
-    html += '<tr style="border-bottom:1px solid var(--rule)">';
-    html += '<td style="padding:8px 10px;text-align:center;color:var(--ink);font-weight:600;white-space:nowrap">' + periodNum + '</td>';
-    html += '<td style="padding:8px 10px;text-align:center;color:var(--muted);white-space:nowrap">' + dateStr + '</td>';
-    html += '<td style="padding:8px 10px;text-align:center;color:var(--muted);white-space:nowrap">' + weekday + '</td>';
-    html += '<td style="padding:8px 10px;text-align:center">';
-    for (var j = 0; j < frontNums.length; j++) {
-      html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;background:#4a90d9;color:#fff;font-size:0.75rem;font-weight:600;margin:1px">' + frontNums[j] + '</span>';
-    }
-    html += '</td>';
-    html += '<td style="padding:8px 10px;text-align:center">';
-    for (var j = 0; j < backNums.length; j++) {
-      html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;background:#f5a623;color:#fff;font-size:0.75rem;font-weight:600;margin:1px">' + backNums[j] + '</span>';
-    }
-    html += '</td>';
-    html += '</tr>';
-  }
-
-  tbody.innerHTML = html;
-  document.getElementById('dlt-history-table-wrap').style.display = 'block';
-}
 
 function addDLTInputRow() {
   var tbody = document.querySelector('#dlt-input-table tbody');
   if (!tbody) return;
   var rowCount = tbody.children.length;
-  // 倒推上一期的期号/日期/星期
-  var prevPeriod = 26081;
-  var prevDate = new Date(2026, 6, 8); // 2026-07-08
-  if (rowCount > 0) {
-    var lastRow = tbody.children[rowCount - 1];
-    var periodCell = lastRow.querySelector('.dlt-period');
-    if (periodCell) prevPeriod = parseInt(periodCell.textContent) || 26081;
-  }
-  var newPeriod = prevPeriod - 1;
+  // 读取上一行的日期来推算
   var prevDateStr = '';
   if (rowCount > 0) {
-    var lastRow2 = tbody.children[rowCount - 1];
-    var dateCell = lastRow2.querySelector('.dlt-date');
-    if (dateCell) prevDateStr = dateCell.textContent;
+    var lastRow = tbody.children[rowCount - 1];
+    var dateInput = lastRow.querySelector('.dlt-input-date');
+    if (dateInput) prevDateStr = dateInput.value.trim();
   }
+  var prevDate = new Date(2026, 6, 8);
   if (prevDateStr) {
     var parts = prevDateStr.split('-');
-    prevDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+    if (parts.length === 3) prevDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
   }
   var newDate = new Date(prevDate);
-  do { newDate.setDate(newDate.getDate() - 1); } while (DLT_DRAW_DAYS.indexOf(newDate.getDay()) < 0);
+  newDate.setDate(newDate.getDate() - 1);
   var dateStr = newDate.getFullYear() + '-' + String(newDate.getMonth()+1).padStart(2,'0') + '-' + String(newDate.getDate()).padStart(2,'0');
   var weekday = DLT_WEEK_NAMES[newDate.getDay()];
 
   var tr = document.createElement('tr');
   tr.setAttribute('data-row', rowCount);
-  tr.innerHTML = '<td class="dlt-period" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--ink);font-weight:600;white-space:nowrap;font-size:0.8rem">' + newPeriod + '</td>' +
-    '<td class="dlt-date" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">' + dateStr + '</td>' +
+  tr.innerHTML = '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="dlt-input-period" placeholder="期号" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--ink);font-weight:600"></td>' +
+    '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="dlt-input-date" placeholder="YYYY-MM-DD" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--muted)" value="' + dateStr + '"></td>' +
     '<td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">' + weekday + '</td>' +
     '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td>' +
     '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td>' +
     '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td>';
   tbody.appendChild(tr);
+  var periodInput = tr.querySelector('.dlt-input-period');
+  var dateInput = tr.querySelector('.dlt-input-date');
   var frontInput = tr.querySelector('.dlt-input-front');
   var backInput = tr.querySelector('.dlt-input-back');
+  if (periodInput) periodInput.addEventListener('blur', syncDLTInputToTextarea);
+  if (dateInput) dateInput.addEventListener('blur', function() { updateDLTRowWeekday(this); syncDLTInputToTextarea(); });
   if (frontInput) frontInput.addEventListener('blur', syncDLTInputToTextarea);
   if (backInput) backInput.addEventListener('blur', syncDLTInputToTextarea);
+}
+
+function updateDLTRowWeekday(dateInput) {
+  var tr = dateInput.closest('tr');
+  if (!tr) return;
+  var dateStr = dateInput.value.trim();
+  if (!dateStr) return;
+  var parts = dateStr.split('-');
+  if (parts.length !== 3) return;
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+  if (isNaN(d.getTime())) return;
+  var weekdayCell = tr.querySelector('.dlt-weekday');
+  if (weekdayCell) weekdayCell.textContent = DLT_WEEK_NAMES[d.getDay()];
 }
 
 function removeDLTInputRow(btn) {
@@ -348,12 +289,9 @@ function removeDLTInputRow(btn) {
   if (!tbody) return;
   var tr = btn.closest('tr');
   if (tr) tr.remove();
-  // 重新编号
   var rows = tbody.querySelectorAll('tr');
   for (var i = 0; i < rows.length; i++) {
     rows[i].setAttribute('data-row', i);
-    var numCell = rows[i].querySelector('td:first-child');
-    if (numCell) numCell.textContent = i + 1;
   }
   syncDLTInputToTextarea();
 }
@@ -379,34 +317,25 @@ function fillDLTInputTable(dataLines) {
   var tbody = document.querySelector('#dlt-input-table tbody');
   if (!tbody) return;
   tbody.innerHTML = '';
-
   for (var i = 0; i < dataLines.length; i++) {
     var parts = dataLines[i].split('|');
     var front = parts[0] || '';
     var back = parts[1] || '';
-
-    // 计算日期（从最新一期倒推）
-    var steps = i;
-    var drawDate = new Date(2026, 6, 8);
-    do {
-      drawDate.setDate(drawDate.getDate() - 1);
-      if (DLT_DRAW_DAYS.indexOf(drawDate.getDay()) >= 0) steps--;
-    } while (steps > 0);
-    var dateStr = drawDate.getFullYear() + '-' + String(drawDate.getMonth()+1).padStart(2,'0') + '-' + String(drawDate.getDate()).padStart(2,'0');
-    var weekday = DLT_WEEK_NAMES[drawDate.getDay()];
-    var periodNum = calcDLTPeriodNum(drawDate);
-
     var tr = document.createElement('tr');
     tr.setAttribute('data-row', i);
-    tr.innerHTML = '<td class="dlt-period" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--ink);font-weight:600;white-space:nowrap;font-size:0.8rem">' + periodNum + '</td>' +
-      '<td class="dlt-date" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">' + dateStr + '</td>' +
-      '<td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">' + weekday + '</td>' +
+    tr.innerHTML = '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="dlt-input-period" placeholder="期号" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--ink);font-weight:600"></td>' +
+      '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="dlt-input-date" placeholder="YYYY-MM-DD" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--muted)"></td>' +
+      '<td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem"></td>' +
       '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" value="' + front + '" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td>' +
       '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" value="' + back + '" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td>' +
       '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td>';
     tbody.appendChild(tr);
+    var periodInput = tr.querySelector('.dlt-input-period');
+    var dateInput = tr.querySelector('.dlt-input-date');
     var frontInput = tr.querySelector('.dlt-input-front');
     var backInput = tr.querySelector('.dlt-input-back');
+    if (periodInput) periodInput.addEventListener('blur', syncDLTInputToTextarea);
+    if (dateInput) dateInput.addEventListener('blur', function() { updateDLTRowWeekday(this); syncDLTInputToTextarea(); });
     if (frontInput) frontInput.addEventListener('blur', syncDLTInputToTextarea);
     if (backInput) backInput.addEventListener('blur', syncDLTInputToTextarea);
   }
@@ -419,17 +348,13 @@ function loadDLTSample() {
   document.getElementById('dlt-front').value = parts[0];
   document.getElementById('dlt-back').value = parts[1];
   document.getElementById('dlt-history').value = dltSampleHistory.join('\n');
-  // 填充复盘输入框默认值（兼容旧版复盘输入框）
   var sampleFront = parts[0].split(',').slice(0,5).join(',');
   var sampleBack = parts[1].split(',').slice(0,2).join(',');
   var reviewNums = document.getElementById('dlt-review-numbers');
   var reviewBack = document.getElementById('dlt-review-blue');
   if (reviewNums) reviewNums.value = sampleFront;
   if (reviewBack) reviewBack.value = sampleBack;
-  // 填充表格输入
   fillDLTInputTable(dltSampleHistory);
-  // 渲染历史开奖表格
-  renderDLTHistoryTable();
 }
 
 function clearDLT() {
@@ -438,18 +363,9 @@ function clearDLT() {
   document.getElementById('dlt-history').value = '';
   document.getElementById('dlt-results').style.display = 'none';
   document.getElementById('dlt-empty').style.display = 'block';
-  document.getElementById('dlt-history-table-wrap').style.display = 'none';
-  // 清空表格输入
   var tbody = document.querySelector('#dlt-input-table tbody');
   if (tbody) {
-    tbody.innerHTML = '<tr data-row="0"><td class="dlt-period" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--accent);font-weight:600;white-space:nowrap;font-size:0.8rem">预测</td><td class="dlt-date" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">2026-07-08</td><td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">三</td><td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td><td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td><td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td></tr>';
-    var firstRow = tbody.querySelector('tr');
-    if (firstRow) {
-      var fi = firstRow.querySelector('.dlt-input-front');
-      var bi = firstRow.querySelector('.dlt-input-back');
-      if (fi) fi.addEventListener('blur', syncDLTInputToTextarea);
-      if (bi) bi.addEventListener('blur', syncDLTInputToTextarea);
-    }
+    tbody.innerHTML = '<tr data-row="0"><td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="dlt-input-period" onblur="syncDLTInputToTextarea()" placeholder="期号" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--accent);font-weight:600" value="预测"></td><td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="dlt-input-date" onblur="updateDLTRowWeekday(this);syncDLTInputToTextarea()" placeholder="YYYY-MM-DD" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--muted)" value="2026-07-08"></td><td class="dlt-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">三</td><td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-front" onblur="syncDLTInputToTextarea()" placeholder="如: 03,15,22,28,35" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td><td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="dlt-input-back" onblur="syncDLTInputToTextarea()" placeholder="如: 04,09" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td><td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeDLTInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td></tr>';
   }
 }
 
@@ -476,9 +392,6 @@ function analyzeDLT() {
       history.push({ front: f.slice(0, 5).sort(function(a,b){return a-b}), back: b.slice(0, 2).sort(function(a,b){return a-b}) });
     }
   }
-
-  // 渲染历史开奖表格
-  renderDLTHistoryTable();
 
   // If no history parsed but we have last numbers, use them as single entry
   if (history.length === 0 && lastFront.length >= 5 && lastBack.length >= 2) {
