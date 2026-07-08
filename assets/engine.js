@@ -376,6 +376,120 @@ function fillDLTInputTable(dataLines, metaData) {
   syncDLTInputToTextarea();
 }
 
+function addSSQInputRow() {
+  var tbody = document.querySelector('#ssq-input-table tbody');
+  if (!tbody) return;
+  var rowCount = tbody.children.length;
+  var prevDateStr = '';
+  if (rowCount > 0) {
+    var lastRow = tbody.children[rowCount - 1];
+    var dateInput = lastRow.querySelector('.ssq-input-date');
+    if (dateInput) prevDateStr = dateInput.value.trim();
+  }
+  var prevDate = new Date(2026, 6, 8);
+  if (prevDateStr) {
+    var parts = prevDateStr.split('-');
+    if (parts.length === 3) prevDate = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+  }
+  var newDate = new Date(prevDate);
+  newDate.setDate(newDate.getDate() - 1);
+  var dateStr = newDate.getFullYear() + '-' + String(newDate.getMonth()+1).padStart(2,'0') + '-' + String(newDate.getDate()).padStart(2,'0');
+  var weekday = DLT_WEEK_NAMES[newDate.getDay()];
+
+  var tr = document.createElement('tr');
+  tr.setAttribute('data-row', rowCount);
+  tr.innerHTML = '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="ssq-input-period" placeholder="期号" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--ink);font-weight:600"></td>' +
+    '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="ssq-input-date" placeholder="YYYY-MM-DD" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--muted)" value="' + dateStr + '"></td>' +
+    '<td class="ssq-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">' + weekday + '</td>' +
+    '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="ssq-input-red" placeholder="如: 02,08,15,21,27,32" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td>' +
+    '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="ssq-input-blue" placeholder="如: 07" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td>' +
+    '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeSSQInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td>';
+  tbody.appendChild(tr);
+  var periodInput = tr.querySelector('.ssq-input-period');
+  var dateInput = tr.querySelector('.ssq-input-date');
+  var redInput = tr.querySelector('.ssq-input-red');
+  var blueInput = tr.querySelector('.ssq-input-blue');
+  if (periodInput) periodInput.addEventListener('blur', syncSSQInputToTextarea);
+  if (dateInput) dateInput.addEventListener('blur', function() { updateSSQRowWeekday(this); syncSSQInputToTextarea(); });
+  if (redInput) redInput.addEventListener('blur', syncSSQInputToTextarea);
+  if (blueInput) blueInput.addEventListener('blur', syncSSQInputToTextarea);
+}
+
+function updateSSQRowWeekday(dateInput) {
+  var tr = dateInput.closest('tr');
+  if (!tr) return;
+  var dateStr = dateInput.value.trim();
+  if (!dateStr) return;
+  var parts = dateStr.split('-');
+  if (parts.length !== 3) return;
+  var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
+  if (isNaN(d.getTime())) return;
+  var weekdayCell = tr.querySelector('.ssq-weekday');
+  if (weekdayCell) weekdayCell.textContent = DLT_WEEK_NAMES[d.getDay()];
+}
+
+function removeSSQInputRow(btn) {
+  var tbody = document.querySelector('#ssq-input-table tbody');
+  if (!tbody) return;
+  var tr = btn.closest('tr');
+  if (tr) tr.remove();
+  var rows = tbody.querySelectorAll('tr');
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].setAttribute('data-row', i);
+  }
+  syncSSQInputToTextarea();
+}
+
+function syncSSQInputToTextarea() {
+  var tbody = document.querySelector('#ssq-input-table tbody');
+  if (!tbody) return;
+  var lines = [];
+  var rows = tbody.querySelectorAll('tr');
+  for (var i = 0; i < rows.length; i++) {
+    var red = rows[i].querySelector('.ssq-input-red');
+    var blue = rows[i].querySelector('.ssq-input-blue');
+    var redVal = red ? red.value.trim() : '';
+    var blueVal = blue ? blue.value.trim() : '';
+    if (redVal && blueVal) {
+      lines.push(redVal + '|' + blueVal);
+    }
+  }
+  document.getElementById('ssq-history').value = lines.join('\n');
+}
+
+function fillSSQInputTable(dataLines, metaData) {
+  var tbody = document.querySelector('#ssq-input-table tbody');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  for (var i = 0; i < dataLines.length; i++) {
+    var parts = dataLines[i].split('|');
+    var red = parts[0] || '';
+    var blue = parts[1] || '';
+    var meta = metaData && metaData[i] ? metaData[i] : null;
+    var periodVal = meta ? meta.period : '';
+    var dateVal = meta ? meta.date : '';
+    var weekdayVal = meta ? meta.weekday : '';
+    var tr = document.createElement('tr');
+    tr.setAttribute('data-row', i);
+    tr.innerHTML = '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="ssq-input-period" placeholder="期号" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--ink);font-weight:600" value="' + periodVal + '"></td>' +
+      '<td style="padding:2px 4px;border:1px solid var(--rule);text-align:center"><input type="text" class="ssq-input-date" placeholder="YYYY-MM-DD" style="width:100%;border:none;background:transparent;font-size:0.8rem;padding:4px;text-align:center;color:var(--muted)" value="' + dateVal + '"></td>' +
+      '<td class="ssq-weekday" style="padding:6px 8px;border:1px solid var(--rule);text-align:center;color:var(--muted);white-space:nowrap;font-size:0.8rem">' + weekdayVal + '</td>' +
+      '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="ssq-input-red" value="' + red + '" placeholder="如: 02,08,15,21,27,32" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px"></td>' +
+      '<td style="padding:6px 8px;border:1px solid var(--rule)"><input type="text" class="ssq-input-blue" value="' + blue + '" placeholder="如: 07" style="width:100%;border:none;background:transparent;font-size:0.85rem;padding:4px;text-align:center"></td>' +
+      '<td style="padding:6px 8px;border:1px solid var(--rule);text-align:center"><button type="button" onclick="removeSSQInputRow(this)" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:1rem">&times;</button></td>';
+    tbody.appendChild(tr);
+    var periodInput = tr.querySelector('.ssq-input-period');
+    var dateInput = tr.querySelector('.ssq-input-date');
+    var redInput = tr.querySelector('.ssq-input-red');
+    var blueInput = tr.querySelector('.ssq-input-blue');
+    if (periodInput) periodInput.addEventListener('blur', syncSSQInputToTextarea);
+    if (dateInput) dateInput.addEventListener('blur', function() { updateSSQRowWeekday(this); syncSSQInputToTextarea(); });
+    if (redInput) redInput.addEventListener('blur', syncSSQInputToTextarea);
+    if (blueInput) blueInput.addEventListener('blur', syncSSQInputToTextarea);
+  }
+  syncSSQInputToTextarea();
+}
+
 function loadDLTSample() {
   var last = dltSampleHistory[0];
   var parts = last.split('|');
@@ -2043,39 +2157,69 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
 var SSQ_ZONES = [[1,11],[12,22],[23,33]];
 
 var ssqSampleHistory = [
-  '01,04,05,14,18,25|04',
-  '01,03,19,20,24,25|07',
-  '08,12,18,21,24,30|01',
-  '03,06,08,14,26,27|08',
-  '03,05,16,18,29,32|04',
-  '04,19,27,29,30,32|13',
-  '05,11,21,23,24,29|16',
-  '07,08,16,24,30,32|02',
-  '01,09,15,18,29,33|15',
-  '02,08,25,28,30,31|02',
-  '02,04,07,14,28,29|09',
-  '01,04,05,15,23,28|07',
-  '07,09,10,16,22,27|11',
-  '08,16,26,28,29,30|15',
-  '01,04,07,21,29,30|01',
-  '01,10,22,24,28,30|07',
-  '10,19,21,22,31,33|05',
-  '04,11,24,25,32,33|13',
-  '13,20,25,29,30,33|02',
-  '01,02,03,08,13,14|02',
-  '01,03,11,22,26,31|11',
-  '09,14,15,16,29,30|10',
-  '06,09,25,27,28,30|03',
-  '03,04,14,15,18,20|02',
-  '09,15,18,24,28,33|01',
-  '07,16,21,24,27,30|07',
-  '02,09,10,24,31,33|16',
-  '04,11,15,17,24,30|15',
-  '02,14,17,18,22,30|01',
-  '06,09,14,16,25,32|16',
-  '02,07,12,19,24,31|10',
-  '02,08,10,17,19,24|13',
-  '03,04,14,22,23,33|04'
+  '01,04,05,14,18,25|04',  // 2026077 2026-07-07 二
+  '01,03,19,20,24,25|07',  // 2026076 2026-07-05 日
+  '08,12,18,21,24,30|01',  // 2026075 2026-07-02 四
+  '02,23,24,26,28,32|04',  // 2026074 2026-06-30 二
+  '09,10,13,16,19,21|08',  // 2026073 2026-06-28 日
+  '07,08,12,15,17,21|01',  // 2026072 2026-06-25 四
+  '03,08,19,25,31,33|05',  // 2026071 2026-06-23 二
+  '03,06,08,14,26,27|08',  // 2026070 2026-06-21 日
+  '12,14,16,17,18,32|08',  // 2026069 2026-06-18 四
+  '03,05,16,18,29,32|04',  // 2026068 2026-06-16 二
+  '04,19,27,29,30,32|13',  // 2026067 2026-06-14 日
+  '05,11,21,23,24,29|16',  // 2026066 2026-06-11 四
+  '07,08,16,24,30,32|02',  // 2026065 2026-06-09 二
+  '01,09,15,18,29,33|15',  // 2026064 2026-06-07 日
+  '02,08,25,28,30,31|02',  // 2026063 2026-06-04 四
+  '02,04,07,14,28,29|09',  // 2026062 2026-06-02 二
+  '01,04,05,15,23,28|07',  // 2026061 2026-05-31 日
+  '07,09,10,16,22,27|11',  // 2026060 2026-05-28 四
+  '08,16,26,28,29,30|15',  // 2026059 2026-05-26 二
+  '01,04,07,21,29,30|01',  // 2026058 2026-05-24 日
+  '01,10,22,24,28,30|07',  // 2026057 2026-05-21 四
+  '10,19,21,22,31,33|05',  // 2026056 2026-05-19 二
+  '04,11,24,25,32,33|13',  // 2026055 2026-05-17 日
+  '13,20,25,29,30,33|02',  // 2026054 2026-05-14 四
+  '01,02,03,08,13,14|02',  // 2026053 2026-05-12 二
+  '01,03,11,22,26,31|11',  // 2026052 2026-05-10 日
+  '09,14,15,16,29,30|10',  // 2026051 2026-05-07 四
+  '06,09,25,27,28,30|03',  // 2026050 2026-05-05 二
+  '03,04,14,15,18,20|02',  // 2026049 2026-05-03 日
+  '09,15,18,24,28,33|01'   // 2026048 2026-04-30 四
+];
+
+var ssqSampleMeta = [
+  {period:'2026077', date:'2026-07-07', weekday:'二'},
+  {period:'2026076', date:'2026-07-05', weekday:'日'},
+  {period:'2026075', date:'2026-07-02', weekday:'四'},
+  {period:'2026074', date:'2026-06-30', weekday:'二'},
+  {period:'2026073', date:'2026-06-28', weekday:'日'},
+  {period:'2026072', date:'2026-06-25', weekday:'四'},
+  {period:'2026071', date:'2026-06-23', weekday:'二'},
+  {period:'2026070', date:'2026-06-21', weekday:'日'},
+  {period:'2026069', date:'2026-06-18', weekday:'四'},
+  {period:'2026068', date:'2026-06-16', weekday:'二'},
+  {period:'2026067', date:'2026-06-14', weekday:'日'},
+  {period:'2026066', date:'2026-06-11', weekday:'四'},
+  {period:'2026065', date:'2026-06-09', weekday:'二'},
+  {period:'2026064', date:'2026-06-07', weekday:'日'},
+  {period:'2026063', date:'2026-06-04', weekday:'四'},
+  {period:'2026062', date:'2026-06-02', weekday:'二'},
+  {period:'2026061', date:'2026-05-31', weekday:'日'},
+  {period:'2026060', date:'2026-05-28', weekday:'四'},
+  {period:'2026059', date:'2026-05-26', weekday:'二'},
+  {period:'2026058', date:'2026-05-24', weekday:'日'},
+  {period:'2026057', date:'2026-05-21', weekday:'四'},
+  {period:'2026056', date:'2026-05-19', weekday:'二'},
+  {period:'2026055', date:'2026-05-17', weekday:'日'},
+  {period:'2026054', date:'2026-05-14', weekday:'四'},
+  {period:'2026053', date:'2026-05-12', weekday:'二'},
+  {period:'2026052', date:'2026-05-10', weekday:'日'},
+  {period:'2026051', date:'2026-05-07', weekday:'四'},
+  {period:'2026050', date:'2026-05-05', weekday:'二'},
+  {period:'2026049', date:'2026-05-03', weekday:'日'},
+  {period:'2026048', date:'2026-04-30', weekday:'四'}
 ];
 
 function loadSSQSample() {
@@ -2084,23 +2228,26 @@ function loadSSQSample() {
   document.getElementById('ssq-red').value = parts[0];
   document.getElementById('ssq-blue').value = parts[1];
   document.getElementById('ssq-history').value = ssqSampleHistory.join('\n');
-  // 填充复盘输入框默认值（兼容旧版复盘输入框）
   var sampleRed = parts[0].split(',').slice(0,6).join(',');
   var reviewNums = document.getElementById('ssq-review-numbers');
   var reviewBlue = document.getElementById('ssq-review-blue');
   if (reviewNums) reviewNums.value = sampleRed;
   if (reviewBlue) reviewBlue.value = parts[1];
+  fillSSQInputTable(ssqSampleHistory, ssqSampleMeta);
 }
 
 function clearSSQ() {
   document.getElementById('ssq-red').value = '';
   document.getElementById('ssq-blue').value = '';
   document.getElementById('ssq-history').value = '';
+  var tbody = document.querySelector('#ssq-input-table tbody');
+  if (tbody) tbody.innerHTML = '';
   document.getElementById('ssq-results').style.display = 'none';
   document.getElementById('ssq-empty').style.display = 'block';
 }
 
 function analyzeSSQ() {
+  syncSSQInputToTextarea();
   var redStr = document.getElementById('ssq-red').value;
   var blueStr = document.getElementById('ssq-blue').value;
   var historyStr = document.getElementById('ssq-history').value;
