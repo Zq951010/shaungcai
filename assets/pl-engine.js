@@ -829,6 +829,16 @@ function scorePL3Position(pos, last, history) {
 
 function renderPL3Recommend_V2(last, history) {
   var posScores = scorePL3Numbers(last, history);
+  if (!posScores || posScores.length !== 3) {
+    document.getElementById('pl3-recommend').innerHTML = '<div style="color:var(--muted);padding:1rem">评分数据加载失败，请检查历史数据格式。</div>';
+    return;
+  }
+
+  // 获取各位置Top3号码，用于生成多样化推荐
+  var posTop3 = [];
+  for (var pos = 0; pos < 3; pos++) {
+    posTop3.push(posScores[pos].slice().sort(function(a, b) { return b.total - a.total; }).slice(0, 3));
+  }
 
   function pickByStrategy(strategy) {
     var picks = [];
@@ -857,12 +867,38 @@ function renderPL3Recommend_V2(last, history) {
           if (mb !== ma) return mb - ma;
           return b.total - a.total;
         });
-      } else if (strategy === 'formula') {
+      } else if (strategy === 'coldhot') {
+        // 冷热搭配：热号位置选冷号，冷号位置选热号
         scores.sort(function(a, b) {
-          // 优先选择未被公式命中的号码
-          var aKilled = a.reasons.some(function(r){ return r.indexOf('公式杀号') >= 0; }) ? 1 : 0;
-          var bKilled = b.reasons.some(function(r){ return r.indexOf('公式杀号') >= 0; }) ? 1 : 0;
-          if (aKilled !== bKilled) return aKilled - bKilled;
+          var aHot = a.reasons.indexOf('高频热号') >= 0 || a.reasons.indexOf('热持续') >= 0 ? 1 : 0;
+          var bHot = b.reasons.indexOf('高频热号') >= 0 || b.reasons.indexOf('热持续') >= 0 ? 1 : 0;
+          if (aHot !== bHot) return aHot - bHot; // 冷号优先
+          return b.total - a.total;
+        });
+      } else if (strategy === 'oddeven') {
+        // 奇偶均衡：当前奇多则选偶，偶多则选奇
+        var oddTrend = 0, evenTrend = 0;
+        for (var i = 0; i < Math.min(3, history.length); i++) {
+          if (history[i][pos] % 2 === 1) oddTrend++; else evenTrend++;
+        }
+        scores.sort(function(a, b) {
+          var aOdd = a.num % 2 === 1 ? 1 : 0;
+          var bOdd = b.num % 2 === 1 ? 1 : 0;
+          if (oddTrend > evenTrend) return aOdd - bOdd; // 偶数优先
+          if (evenTrend > oddTrend) return bOdd - aOdd; // 奇数优先
+          return b.total - a.total;
+        });
+      } else if (strategy === 'bigsmall') {
+        // 大小交替
+        var bigTrend = 0, smallTrend = 0;
+        for (var i = 0; i < Math.min(3, history.length); i++) {
+          if (history[i][pos] >= 5) bigTrend++; else smallTrend++;
+        }
+        scores.sort(function(a, b) {
+          var aBig = a.num >= 5 ? 1 : 0;
+          var bBig = b.num >= 5 ? 1 : 0;
+          if (bigTrend > smallTrend) return aBig - bBig; // 小号优先
+          if (smallTrend > bigTrend) return bBig - aBig; // 大号优先
           return b.total - a.total;
         });
       } else {
@@ -873,71 +909,87 @@ function renderPL3Recommend_V2(last, history) {
     return picks;
   }
 
-  function genAlt(picks) {
+  // 生成备选方案：从各位置Top3中交叉组合
+  function genCrossAlts(base, strategy) {
     var alts = [];
-    for (var pos = 0; pos < 3; pos++) {
-      var scores = posScores[pos].slice();
-      scores.sort(function(a, b) { return b.total - a.total; });
-      var idx = 0;
-      for (var i = 0; i < scores.length; i++) {
-        if (scores[i].num === picks[pos]) {
-          idx = i;
-          break;
-        }
+    // 方案A：百位换第2，其他不变
+    alts.push([posTop3[0][1].num, base[1], base[2]]);
+    // 方案B：十位换第2，其他不变
+    alts.push([base[0], posTop3[1][1].num, base[2]]);
+    // 方案C：个位换第2，其他不变
+    alts.push([base[0], base[1], posTop3[2][1].num]);
+    // 方案D：百位第2 + 十位第2
+    alts.push([posTop3[0][1].num, posTop3[1][1].num, base[2]]);
+    // 方案E：十位第2 + 个位第2
+    alts.push([base[0], posTop3[1][1].num, posTop3[2][1].num]);
+    // 去重
+    var unique = [];
+    var seen = {};
+    for (var i = 0; i < alts.length; i++) {
+      var key = alts[i].join(',');
+      if (!seen[key] && key !== base.join(',')) {
+        seen[key] = true;
+        unique.push(alts[i]);
       }
-      var alt = picks.slice();
-      alt[pos] = scores[(idx + 1) % scores.length].num;
-      alts.push(alt);
     }
-    return alts;
+    return unique.slice(0, 3);
   }
 
   var strategies = [
-    { key: 'hot', name: '热号优先' },
-    { key: 'miss', name: '遗漏回补' },
-    { key: 'markov', name: '马尔可夫转移' },
-    { key: 'neighbor', name: '邻号追踪' },
-    { key: 'balanced', name: '混合平衡' }
+    { key: 'hot', name: '热号优先', desc: '各位置选评分最高的号码' },
+    { key: 'miss', name: '遗漏回补', desc: '优先选遗漏值高的冷号' },
+    { key: 'markov', name: '马尔可夫转移', desc: '基于转移概率选号' },
+    { key: 'neighbor', name: '邻号追踪', desc: '优先选上期邻号' },
+    { key: 'coldhot', name: '冷热搭配', desc: '冷号位置补热号，热号位置补冷号' },
+    { key: 'oddeven', name: '奇偶均衡', desc: '根据近期奇偶趋势反向选择' },
+    { key: 'bigsmall', name: '大小交替', desc: '根据近期大小趋势反向选择' }
   ];
 
-  var html = '<div style="margin-bottom:1rem"><strong>V2 十维评分推荐（含4套专用选号公式）</strong></div>';
-  html += '<div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.5rem">公式来源：尾数相杀法(82%) · 对位差杀(93%) · 跨位和值杀(92%) · 三期跨度杀 · 奇偶反向</div>';
+  var html = '<div style="margin-bottom:1rem"><strong>V2 十维评分推荐（含7套策略组合）</strong></div>';
+  html += '<div style="font-size:0.78rem;color:var(--muted);margin-bottom:0.8rem">基于加权频率·遗漏回补·马尔可夫转移·邻号关联·冷热交替·奇偶趋势·大小趋势 七维评分体系</div>';
 
   for (var s = 0; s < strategies.length; s++) {
     var strat = strategies[s];
     var base = pickByStrategy(strat.key);
-    var alts = genAlt(base);
-    var recs = [base, alts[0], alts[1]];
+    var alts = genCrossAlts(base, strat.key);
+    var recs = [base].concat(alts);
 
-    html += '<div style="margin-bottom:1.25rem">';
-    html += '<div style="color:var(--muted);font-size:0.82rem;margin-bottom:0.4rem">策略: ' + strat.name + '</div>';
+    html += '<div style="margin-bottom:1.25rem;padding:0.6rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.4rem">';
+    html += '<span style="font-weight:700;color:var(--accent);font-size:0.85rem">策略' + (s+1) + '：' + strat.name + '</span>';
+    html += '<span style="font-size:0.72rem;color:var(--muted)">' + strat.desc + '</span>';
+    html += '</div>';
     for (var r = 0; r < recs.length; r++) {
       var nums = recs[r];
       var oddCount = nums.filter(function(x) { return x % 2 === 1; }).length;
       var bigCount = nums.filter(function(x) { return x >= 5; }).length;
-      html += '<div class="ball-row" style="margin-bottom:0.3rem">';
+      var isBase = r === 0;
+      html += '<div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.2rem">';
+      html += '<span style="font-size:0.72rem;color:var(--muted);min-width:40px">' + (isBase ? '主推' : '备选' + r) + '</span>';
+      html += '<div style="display:flex;gap:0.3rem">';
       for (var i = 0; i < nums.length; i++) {
-        html += '<div class="ball red">' + nums[i] + '</div>';
+        html += '<div class="ball ' + (isBase ? 'gold' : 'red') + '" style="width:32px;height:32px;font-size:0.8rem">' + nums[i] + '</div>';
       }
       html += '</div>';
-      html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.5rem">和值: ' + sum(nums) + ' | 跨度: ' + span(nums) + ' | 奇偶: ' + oddCount + ':' + (3 - oddCount) + ' | 大小: ' + bigCount + ':' + (3 - bigCount) + '</div>';
+      html += '<span style="font-size:0.7rem;color:var(--muted);margin-left:auto">和' + sum(nums) + '·跨' + span(nums) + '·奇' + oddCount + '·大' + bigCount + '</span>';
+      html += '</div>';
     }
     html += '</div>';
   }
 
   // Top 10 score detail table
-  html += '<div style="margin-top:1rem"><strong>各位置评分详情 Top10</strong></div>';
+  html += '<div style="margin-top:1.5rem"><strong>各位置评分详情 Top10</strong></div>';
   var posNames = ['百位', '十位', '个位'];
   for (var pos = 0; pos < 3; pos++) {
-    html += '<div style="margin-top:0.75rem;font-size:0.82rem;color:var(--muted)">' + posNames[pos] + '</div>';
-    html += '<table style="width:100%;font-size:0.78rem;border-collapse:collapse;margin-top:0.25rem">';
-    html += '<thead><tr style="background:var(--bg3)"><th style="padding:4px;border:1px solid var(--border)">号码</th><th style="padding:4px;border:1px solid var(--border)">评分</th><th style="padding:4px;border:1px solid var(--border)">标签</th></tr></thead><tbody>';
+    html += '<div style="margin-top:0.75rem;font-size:0.85rem;color:var(--ink);font-weight:600">' + posNames[pos] + '号码评分</div>';
+    html += '<table style="width:100%;font-size:0.78rem;border-collapse:collapse;margin-top:0.25rem;margin-bottom:1rem">';
+    html += '<thead><tr style="background:var(--bg3)"><th style="padding:4px;border:1px solid var(--rule)">号码</th><th style="padding:4px;border:1px solid var(--rule)">评分</th><th style="padding:4px;border:1px solid var(--rule)">标签</th></tr></thead><tbody>';
     var sorted = posScores[pos].slice().sort(function(a, b) { return b.total - a.total; });
     for (var i = 0; i < Math.min(10, sorted.length); i++) {
       var sc = sorted[i];
-      html += '<tr><td style="padding:4px;border:1px solid var(--border);text-align:center">' + sc.num + '</td>';
-      html += '<td style="padding:4px;border:1px solid var(--border);text-align:center">' + sc.total.toFixed(1) + '</td>';
-      html += '<td style="padding:4px;border:1px solid var(--border)">' + sc.reasons.join('，') + '</td></tr>';
+      html += '<tr><td style="padding:4px;border:1px solid var(--rule);text-align:center;font-weight:700">' + sc.num + '</td>';
+      html += '<td style="padding:4px;border:1px solid var(--rule);text-align:center">' + sc.total.toFixed(1) + '</td>';
+      html += '<td style="padding:4px;border:1px solid var(--rule);color:var(--muted)">' + sc.reasons.join('，') + '</td></tr>';
     }
     html += '</tbody></table>';
   }
@@ -2169,7 +2221,7 @@ function spinPL3Lottery() {
   if (history.length < 2) { alert('请先加载数据进行分析'); return; }
 
   var last = history[0];
-  var posScores = scorePL3Position(last, history);
+  var posScores = scorePL3Numbers(last, history);
   var results = [];
   for (var s = 0; s < 5; s++) {
     var picks = [];
