@@ -1022,6 +1022,97 @@ function renderPL3Recommend_V2(last, history) {
           if (smallTrend > bigTrend) return bBig - aBig; // 大号优先
           return b.total - a.total;
         });
+      } else if (strategy === 'expert') {
+        // 专家技巧综合策略（排列三专用）
+        var posHistory = [];
+        for (var i = 0; i < history.length; i++) {
+          if (history[i].length > pos) posHistory.push(history[i][pos]);
+        }
+        var lastVal = last[pos];
+
+        // 技巧1：形态判断 - 近5期组三/组六走势
+        var zu3Count = 0;
+        for (var i = 0; i < Math.min(5, history.length); i++) {
+          var h = history[i];
+          if (h.length >= 3) {
+            var s = new Set(h);
+            if (s.size === 2) zu3Count++;
+          }
+        }
+        var zu3Hot = zu3Count >= 2; // 近5期组三出现2次以上
+
+        // 技巧2：和值区间 - 计算近3期和值趋势
+        var recentSums = [];
+        for (var i = 0; i < Math.min(3, history.length); i++) {
+          recentSums.push(history[i][0] + history[i][1] + history[i][2]);
+        }
+        var avgRecentSum = recentSums.reduce(function(a,b){return a+b;}, 0) / recentSums.length;
+        var sumLow = avgRecentSum < 10;
+        var sumHigh = avgRecentSum > 18;
+
+        // 技巧3：012路统计 - 近5期各位置012路分布
+        var roadCounts = [0, 0, 0];
+        for (var i = 0; i < Math.min(5, posHistory.length); i++) {
+          roadCounts[posHistory[i] % 3]++;
+        }
+        var coldRoad = -1, hotRoad = -1;
+        for (var r = 0; r < 3; r++) {
+          if (roadCounts[r] === 0) coldRoad = r;
+          if (roadCounts[r] >= 3) hotRoad = r;
+        }
+
+        // 技巧4：冷热号区间划分（近30期等效）
+        var freqMap = {};
+        for (var i = 0; i < 10; i++) freqMap[i] = 0;
+        var sampleLen = Math.min(posHistory.length, 30);
+        for (var i = 0; i < sampleLen; i++) freqMap[posHistory[i]]++;
+        var hotThreshold = Math.ceil(sampleLen * 0.27); // >=27%为热号
+        var coldThreshold = Math.floor(sampleLen * 0.13); // <=13%为冷号
+
+        // 综合评分
+        scores.sort(function(a, b) {
+          var aScore = bScore = 0;
+          var n = a.num, m = b.num;
+
+          // 基础分：原评分权重
+          aScore += a.total * 0.3;
+          bScore += b.total * 0.3;
+
+          // 和值区间加分
+          if (sumLow && n <= 4) aScore += 3; // 和值偏低时小号加分
+          if (sumHigh && n >= 5) aScore += 3; // 和值偏高时大号加分
+          if (sumLow && m <= 4) bScore += 3;
+          if (sumHigh && m >= 5) bScore += 3;
+
+          // 012路回补加分
+          if (coldRoad >= 0 && n % 3 === coldRoad) aScore += 4;
+          if (coldRoad >= 0 && m % 3 === coldRoad) bScore += 4;
+          // 热路适度降温
+          if (hotRoad >= 0 && n % 3 === hotRoad) aScore -= 1;
+          if (hotRoad >= 0 && m % 3 === hotRoad) bScore -= 1;
+
+          // 冷热搭配：热号位置优先选温号/冷号
+          var aHot = freqMap[n] >= hotThreshold ? 2 : (freqMap[n] <= coldThreshold ? 0 : 1);
+          var bHot = freqMap[m] >= hotThreshold ? 2 : (freqMap[m] <= coldThreshold ? 0 : 1);
+          // 如果该位置近2期都是热号，倾向选温号/冷号
+          var posRecentHot = 0;
+          for (var i = 0; i < Math.min(2, posHistory.length); i++) {
+            if (freqMap[posHistory[i]] >= hotThreshold) posRecentHot++;
+          }
+          if (posRecentHot >= 2) {
+            aScore += (2 - aHot) * 2; // 温号/冷号加分
+            bScore += (2 - bHot) * 2;
+          } else {
+            aScore += aHot * 1; // 热号适度加分
+            bScore += bHot * 1;
+          }
+
+          // 邻号关联
+          if (Math.abs(n - lastVal) === 1) aScore += 2;
+          if (Math.abs(m - lastVal) === 1) bScore += 2;
+
+          return bScore - aScore;
+        });
       } else {
         scores.sort(function(a, b) { return b.total - a.total; });
       }
@@ -1063,7 +1154,8 @@ function renderPL3Recommend_V2(last, history) {
     { key: 'neighbor', name: '邻号追踪', desc: '优先选上期邻号' },
     { key: 'coldhot', name: '冷热搭配', desc: '冷号位置补热号，热号位置补冷号' },
     { key: 'oddeven', name: '奇偶均衡', desc: '根据近期奇偶趋势反向选择' },
-    { key: 'bigsmall', name: '大小交替', desc: '根据近期大小趋势反向选择' }
+    { key: 'bigsmall', name: '大小交替', desc: '根据近期大小趋势反向选择' },
+    { key: 'expert', name: '专家技巧综合', desc: '融合形态判断·和值区间·冷热搭配·组三组六·012路' }
   ];
 
   var html = '<div style="margin-bottom:1rem"><strong>V2 十维评分推荐（含7套策略组合）</strong></div>';
