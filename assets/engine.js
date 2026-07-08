@@ -6158,56 +6158,59 @@ function spinKL8Review() {
   var playTypeNames = {5:'选五', 10:'选十'};
   var strategyNames = ['区间均衡+热号', '冷号优先+遗漏', '周期+马尔可夫', '重号优选'];
 
-  var html = '<div style="padding:0.5rem">';
-  html += '<div style="margin-bottom:1rem;font-size:0.8rem;color:var(--muted)">当期开奖：' + actualNums.map(function(n){return pad(n);}).join(', ') + '</div>';
+  // 将策略推荐也保存到Tab7
+  var allPlayTypeRecs = {};
+  for (var pi = 0; pi < playTypes.length; pi++) {
+    var pt = playTypes[pi];
+    allPlayTypeRecs[pt] = [
+      {name: '区间均衡+热号', picks: genStrategy1(pt)},
+      {name: '冷号优先+遗漏', picks: genStrategy2(pt)},
+      {name: '周期+马尔可夫', picks: genStrategy3(pt)},
+      {name: '重号优选', picks: genStrategy4(pt)}
+    ];
+  }
+  if (typeof saveKL8AllPredictions === 'function') {
+    try { saveKL8AllPredictions(actualNums, allPlayTypeRecs); } catch(e) {}
+  }
 
-  // 机选号码复盘
-  html += '<div style="margin-bottom:1rem;font-weight:700;color:var(--ink);font-size:0.95rem">&#127922; 机选号码复盘</div>';
+  var html = '<div style="padding:0.5rem">';
+  html += '<div style="margin-bottom:1rem;padding:0.6rem;background:var(--bg3);border-radius:8px;border:1px solid var(--accent);font-size:0.8rem;color:var(--muted)">';
+  html += '<strong style="color:var(--accent)">&#128161; 说明：</strong>以下号码为<strong>预测今日开奖</strong>的推荐号码。开奖后请在<strong>Tab7 往期预测记录</strong>中查看命中验证结果。';
+  html += '</div>';
+
+  // 机选号码预测
+  html += '<div style="margin-bottom:1rem;font-weight:700;color:var(--ink);font-size:0.95rem">&#127922; 机选号码预测（待开奖）</div>';
   for (var s = 0; s < results.length; s++) {
-    var hits = results[s].filter(function(n){ return actualNums.indexOf(n) >= 0; });
     html += '<div style="padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
     html += '<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
     html += '<span style="font-weight:700;color:var(--accent);min-width:50px;font-size:0.9rem">第'+(s+1)+'注</span>';
     results[s].forEach(function(n){
       html += '<div class="ball red" style="width:30px;height:30px;font-size:0.7rem">'+pad(n)+'</div>';
     });
-    html += '<span style="margin-left:auto;background:'+(hits.length>=5?'var(--accent3)':(hits.length>=3?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">命中 '+hits.length+' 个</span>';
+    html += '<span style="margin-left:auto;background:var(--accent);color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">待开奖</span>';
     html += '</div>';
-    if (hits.length > 0) {
-      html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">命中：'+hits.map(function(n){return pad(n);}).join(', ')+'</div>';
-    }
     html += '</div>';
   }
 
-  // 策略推荐复盘
+  // 策略推荐预测
   for (var pi = 0; pi < playTypes.length; pi++) {
     var pt = playTypes[pi];
-    var s1 = genStrategy1(pt);
-    var s2 = genStrategy2(pt);
-    var s3 = genStrategy3(pt);
-    var s4 = genStrategy4(pt);
-    var strategies = [s1, s2, s3, s4];
+    var strategies = allPlayTypeRecs[pt];
 
-    html += '<div style="margin-top:1.5rem;margin-bottom:0.5rem;font-weight:700;color:var(--ink);font-size:0.95rem">&#127919; ' + playTypeNames[pt] + '玩法策略推荐复盘</div>';
+    html += '<div style="margin-top:1.5rem;margin-bottom:0.5rem;font-weight:700;color:var(--ink);font-size:0.95rem">&#127919; ' + playTypeNames[pt] + '玩法策略推荐（待开奖）</div>';
     for (var si = 0; si < strategies.length; si++) {
-      var picks = strategies[si];
-      var hits = hitCount(picks, actualNums);
+      var picks = strategies[si].picks;
       html += '<div style="padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
       html += '<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
       html += '<span style="font-weight:700;color:var(--accent);min-width:80px;font-size:0.85rem">策略'+(si+1)+'</span>';
       html += '<span style="font-size:0.75rem;color:var(--muted)">'+strategyNames[si]+'</span>';
-      html += '<span style="margin-left:auto;background:'+(hits>=Math.ceil(pt*0.4)?'var(--accent3)':(hits>=Math.ceil(pt*0.2)?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">命中 '+hits+'/'+pt+'</span>';
+      html += '<span style="margin-left:auto;background:var(--accent);color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">待开奖</span>';
       html += '</div>';
       html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-top:0.4rem">';
       picks.forEach(function(n){
-        var isHit = actualNums.indexOf(n) >= 0;
-        html += '<div class="ball '+(isHit?'gold':'red')+'" style="width:28px;height:28px;font-size:0.65rem;'+(isHit?'box-shadow:0 0 0 2px var(--accent3);':'')+'">'+pad(n)+'</div>';
+        html += '<div class="ball red" style="width:28px;height:28px;font-size:0.65rem;">'+pad(n)+'</div>';
       });
       html += '</div>';
-      if (hits > 0) {
-        var hitNums = picks.filter(function(n){ return actualNums.indexOf(n) >= 0; });
-        html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">命中：'+hitNums.map(function(n){return pad(n);}).join(', ')+'</div>';
-      }
       html += '</div>';
     }
   }
