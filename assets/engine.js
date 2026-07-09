@@ -4933,6 +4933,7 @@ function renderKL8AllPlayTypes_V2(last, history) {
   var html = '<div class="recommend-container" style="padding:12px"><h3 style="margin-top:0;color:var(--ink)">🎯 V3 全玩法推荐模型</h3>';
   html += '<p style="color:var(--muted);font-size:12px;margin-bottom:12px">基于加权频率·遗漏百分位·区间均衡·奇偶均衡·大小均衡·尾数分散·连号历史·稳定性·共现关联·012路 十维评分体系 + 五大策略（区间均衡·冷号优先·共现簇·重号优选·专家综合）</p>';
 
+  var playTypeNames = ['一','二','三','四','五','六','七','八','九','十'];
   var allPlayTypeRecs = {};
   for (var pt = 5; pt <= 10; pt++) {
     var s1 = genStrategy1(pt);
