@@ -6536,38 +6536,50 @@ function spinSSQLottery() {
   var allBlueNums = [];
   for (var n = 1; n <= 16; n++) allBlueNums.push(n);
 
+  // 生成5套7+2复式套餐票（每套7红+2蓝 = C(7,6)×C(2,1) = 14注）
   var results = [];
   for (var set = 0; set < 5; set++) {
-    var redPicks = weightedPick(allRedNums, redScores, 6);
-    var bluePicks = weightedPick(allBlueNums, blueScores, 1);
+    var redPicks = weightedPick(allRedNums, redScores, 7);
+    var bluePicks = weightedPick(allBlueNums, blueScores, 2);
     redPicks.sort(function(a,b){return a-b;});
-    results.push({ red: redPicks, blue: bluePicks[0] });
+    bluePicks.sort(function(a,b){return a-b;});
+    results.push({ red: redPicks, blue: bluePicks });
   }
 
   var _redScoreMap = {};
   redScores.forEach(function(s){ _redScoreMap[s.num] = s; });
 
   var html = '<div style="padding:0.5rem">';
-  html += '<div style="text-align:center;margin-bottom:1rem;font-size:0.9rem;color:var(--muted)">基于大模型评分加权抽选，分数越高的号码被摇中的概率越大</div>';
+  html += '<div style="text-align:center;margin-bottom:1rem;font-size:0.9rem;color:var(--muted)">基于大模型评分加权抽选，每套为<strong style="color:var(--accent)">7红+2蓝复式套餐票</strong>（每套含14注）</div>';
   for (var s = 0; s < results.length; s++) {
-    // 胆码：评分最高的2个
+    // 胆码：评分最高的3个红球
     var scoredReds = results[s].red.map(function(n){
       var sc = _redScoreMap[n];
       return {num: n, score: sc ? sc.totalScore : 0};
     }).sort(function(a,b){return b.score - a.score;});
-    var danNums = scoredReds.slice(0,2).map(function(x){return x.num;});
+    var danNums = scoredReds.slice(0,3).map(function(x){return x.num;});
 
-    html += '<div style="display:flex;align-items:center;gap:1rem;padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
-    html += '<span style="font-weight:700;color:var(--accent);min-width:60px;font-size:0.9rem">第'+(s+1)+'注</span>';
-    html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">';
-    html += '<span style="font-size:0.75rem;color:var(--muted)">红球</span>';
+    html += '<div style="padding:0.8rem 1rem;margin-bottom:0.8rem;background:var(--bg3);border-radius:8px;border:2px solid var(--accent)">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem">';
+    html += '<span style="font-weight:700;color:var(--accent);font-size:0.95rem">套餐'+(s+1)+'（7+2复式）</span>';
+    html += '<span style="font-size:0.75rem;color:var(--muted);background:var(--bg2);padding:2px 8px;border-radius:4px">共14注 ¥28</span>';
+    html += '</div>';
+    html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.4rem">';
+    html += '<span style="font-size:0.75rem;color:var(--muted);min-width:35px">红球</span>';
     results[s].red.forEach(function(n){
       var isDan = danNums.indexOf(n) >= 0;
       html += '<div class="ball '+(isDan?'gold':'red')+'" style="width:34px;height:34px;font-size:0.75rem;'+(isDan?'box-shadow:0 0 8px rgba(245,158,11,0.6);':'')+'">'+pad(n)+'</div>';
     });
-    html += '<span style="font-size:0.75rem;color:var(--muted);margin-left:0.5rem">蓝球</span>';
-    html += '<div class="ball blue" style="width:34px;height:34px;font-size:0.75rem">'+pad(results[s].blue)+'</div>';
-    html += '</div></div>';
+    html += '</div>';
+    html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">';
+    html += '<span style="font-size:0.75rem;color:var(--muted);min-width:35px">蓝球</span>';
+    results[s].blue.forEach(function(n){
+      html += '<div class="ball blue" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
+    });
+    html += '</div>';
+    // 胆码提示
+    html += '<div style="margin-top:0.4rem;font-size:0.7rem;color:var(--muted)">胆码（评分最高3个）: '+danNums.map(function(n){return pad(n);}).join(' ')+'</div>';
+    html += '</div>';
   }
   html += '</div>';
 
