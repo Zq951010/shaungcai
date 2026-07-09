@@ -4205,8 +4205,8 @@ function runKL8AutoReview(history) {
   var testCount = Math.min(2, history.length - 1);
   if (testCount < 1) return { html: '', insights: [] };
 
-  var playTypes = [5, 6, 7, 8, 9, 10];
-  var playTypeNames = {5:'五', 6:'六', 7:'七', 8:'八', 9:'九', 10:'十'};
+  var playTypes = [5, 10];
+  var playTypeNames = {5:'五', 10:'十'};
 
   var results = [];
   for (var t = 0; t < testCount; t++) {
@@ -4880,7 +4880,6 @@ function renderKL8AllPlayTypes_V2(last, history) {
   for (var pt = 5; pt <= 10; pt++) {
     var s1 = genStrategy1(pt);
     var s2 = genStrategy2(pt);
-    var s3 = genStrategy3(pt);
     var s4 = genStrategy4(pt);
     var s5 = genStrategy5(pt);
     var strategies = [
@@ -4890,6 +4889,9 @@ function renderKL8AllPlayTypes_V2(last, history) {
       {name:'专家技巧综合', picks:s5, q:qualityScoreKL8(s5)}
     ];
     allPlayTypeRecs[pt] = strategies;
+
+    // 只展示选五和选十的推荐
+    if (pt !== 5 && pt !== 10) continue;
 
     html += '<div class="strategy-box" style="margin:12px 0;padding:12px;border:1px solid var(--rule);border-radius:8px;background:var(--bg2)">';
     html += '<h4 style="margin:0 0 6px 0;color:var(--ink)">选'+playTypeNames[pt-1]+'（'+pt+'个号码）</h4>';
@@ -7118,28 +7120,7 @@ function spinKL8Review() {
     results.push(picks);
   }
 
-  // 自动保存机选号码预测记录
-  var machineRec = {
-    key: new Date().toISOString().slice(0,10) + '_machine',
-    date: new Date().toISOString().slice(0,10),
-    period: '',
-    lastDraw: actualNums.slice().sort(function(a,b){return a-b;}),
-    playType: 10,
-    playTypeName: '机选选十',
-    actualDraw: null,
-    verified: false,
-    strategies: results.map(function(r, idx){ return {name: '机选第'+(idx+1)+'注', picks: r}; }),
-    savedAt: new Date().toISOString()
-  };
-  var predHistory = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
-  var existIdx = -1;
-  for (var i = 0; i < predHistory.length; i++) {
-    if (predHistory[i].key === machineRec.key) { existIdx = i; break; }
-  }
-  if (existIdx >= 0) predHistory[existIdx] = machineRec;
-  else predHistory.unshift(machineRec);
-  if (predHistory.length > KL8_MAX_PREDICTIONS) predHistory = predHistory.slice(0, KL8_MAX_PREDICTIONS);
-  localStorage.setItem(KL8_PREDICTION_STORAGE_KEY, JSON.stringify(predHistory));
+  // 不再保存机选号码到预测记录（只保留选五/选十策略推荐）
 
   // ==================== 选五/选十 策略推荐复盘 ====================
   function genStrategy1(pt) {
@@ -7365,24 +7346,10 @@ function spinKL8Review() {
 
   var html = '<div style="padding:0.5rem">';
   html += '<div style="margin-bottom:1rem;padding:0.6rem;background:var(--bg3);border-radius:8px;border:1px solid var(--accent);font-size:0.8rem;color:var(--muted)">';
-  html += '<strong style="color:var(--accent)">&#128161; 说明：</strong>以下号码为<strong>预测今日开奖</strong>的推荐号码。开奖后请在<strong>Tab7 往期预测记录</strong>中查看命中验证结果。';
+  html += '<strong style="color:var(--accent)">&#128161; 说明：</strong>以下号码为<strong>预测今日开奖</strong>的推荐号码（仅选五和选十）。开奖后请在<strong>Tab7 往期预测记录</strong>中查看命中验证结果。';
   html += '</div>';
 
-  // 机选号码预测
-  html += '<div style="margin-bottom:1rem;font-weight:700;color:var(--ink);font-size:0.95rem">&#127922; 机选号码预测（待开奖）</div>';
-  for (var s = 0; s < results.length; s++) {
-    html += '<div style="padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
-    html += '<div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">';
-    html += '<span style="font-weight:700;color:var(--accent);min-width:50px;font-size:0.9rem">第'+(s+1)+'注</span>';
-    results[s].forEach(function(n){
-      html += '<div class="ball red" style="width:30px;height:30px;font-size:0.7rem">'+pad(n)+'</div>';
-    });
-    html += '<span style="margin-left:auto;background:var(--accent);color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">待开奖</span>';
-    html += '</div>';
-    html += '</div>';
-  }
-
-  // 策略推荐预测
+  // 策略推荐预测（只选五和选十）
   for (var pi = 0; pi < playTypes.length; pi++) {
     var pt = playTypes[pi];
     var strategies = allPlayTypeRecs[pt];
@@ -7665,6 +7632,8 @@ function filterKL8HistoryByDate() {
 // 渲染预测历史
 function renderKL8PredictionHistory() {
   var history = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
+  // 只保留选五和选十的记录
+  history = history.filter(function(r){ return r.playType === 5 || r.playType === 10; });
   var container = document.getElementById('kl8-prediction-history');
 
   if (history.length === 0) {
