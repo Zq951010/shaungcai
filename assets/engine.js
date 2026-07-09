@@ -7388,14 +7388,14 @@ function saveKL8Prediction(lastDraw, playType, strategies) {
   localStorage.setItem(KL8_PREDICTION_STORAGE_KEY, JSON.stringify(history));
 }
 
-// 批量保存选五+选十推荐
+// 批量保存选五+选十推荐（只保存选五和选十）
 function saveKL8AllPredictions(lastDraw, allRecs) {
-  for (var pt = 5; pt <= 10; pt++) {
+  [5, 10].forEach(function(pt) {
     if (allRecs[pt]) {
       var strategies = allRecs[pt].map(function(s){ return {name: s.name, picks: s.picks}; });
       saveKL8Prediction(lastDraw, pt, strategies);
     }
-  }
+  });
 }
 
 // 根据实际开奖号码验证预测
@@ -8088,126 +8088,170 @@ function runSSQBacktest() {
 
 // KL8多期回溯验证
 function runKL8Backtest() {
-  var historyStr = document.getElementById('kl8-history').value;
-  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
-  var history = [];
-  for (var i = 0; i < lines.length; i++) {
-    var nums = parseNums(lines[i]);
-    if (nums.length >= 10) history.push(nums.slice(0,20).sort(function(a,b){return a-b;}));
+  // 读取localStorage中的往期预测记录
+  var predictions = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
+  
+  // 只筛选选五和选十，只保留已开奖验证的记录
+  var playTypesToTest = [5, 10];
+  var testRecords = predictions.filter(function(r){ 
+    return playTypesToTest.indexOf(r.playType) >= 0 && r.verified; 
+  });
+  
+  if (testRecords.length === 0) {
+    document.getElementById('kl8-backtest-results').innerHTML = 
+      '<div style="text-align:center;color:var(--muted);padding:2rem;background:var(--bg3);border-radius:8px">' +
+      '暂无已验证的往期预测记录，请先生成推荐并等待开奖后验证。' +
+      '<br>生成推荐后系统会自动保存，开奖后输入最新开奖号码会自动验证。' +
+      '</div>';
+    return;
   }
-  if (history.length < 15) { alert('请至少输入15期历史数据进行回溯验证'); return; }
-
-  var periods = Math.min(10, history.length - 5);
-  var results = [];
-  var dimensionHits = { wf:0, mpScore:0, mkScore:0, zoneScore:0, neighborScore:0, oddEvenScore:0, bigSmallScore:0, lastMissScore:0 };
-  var dimensionTotal = { wf:0, mpScore:0, mkScore:0, zoneScore:0, neighborScore:0, oddEvenScore:0, bigSmallScore:0, lastMissScore:0 };
-
-  for (var p = 0; p < periods; p++) {
-    var actual = history[p];
-    var simHistory = history.slice(p+1, p+6);
-    var last = simHistory[0];
-    var scores = scoreKL8Numbers(last, simHistory.slice(1));
-    var topNums = scores.slice(0,20).map(function(s){return s.num;});
-    var hits = topNums.filter(function(n){ return actual.indexOf(n) >= 0; });
-
-    results.push({
-      period: p + 1,
-      actual: actual,
-      predicted: topNums,
-      hits: hits,
-      hitCount: hits.length
-    });
-
-    hits.forEach(function(n){
-      for (var i = 0; i < scores.length; i++) {
-        if (scores[i].num === n) {
-          for (var dim in dimensionHits) {
-            if (scores[i][dim] !== undefined) {
-              dimensionHits[dim] += scores[i][dim];
-              dimensionTotal[dim]++;
-            }
-          }
-          break;
-        }
+  
+  // 按日期排序，最新在前
+  testRecords.sort(function(a,b){ return new Date(b.date) - new Date(a.date); });
+  
+  // 统计汇总
+  var totalStats = {
+    5: { total: 0, hits: 0, totalStrategies: 0, hitsByStrategy: {} },
+    10: { total: 0, hits: 0, totalStrategies: 0, hitsByStrategy: {} }
+  };
+  
+  testRecords.forEach(function(r){
+    var pt = r.playType;
+    totalStats[pt].total += r.playType;
+    r.strategies.forEach(function(st){
+      totalStats[pt].hits += (st.hits || 0);
+      totalStats[pt].totalStrategies++;
+      if (!totalStats[pt].hitsByStrategy[st.name]) {
+        totalStats[pt].hitsByStrategy[st.name] = { total: 0, hits: 0, count: 0 };
       }
+      totalStats[pt].hitsByStrategy[st.name].total += pt;
+      totalStats[pt].hitsByStrategy[st.name].hits += (st.hits || 0);
+      totalStats[pt].hitsByStrategy[st.name].count++;
     });
-  }
-
-  var dimAnalysis = {};
-  for (var dim in dimensionHits) {
-    dimAnalysis[dim] = dimensionTotal[dim] > 0 ? dimensionHits[dim] / dimensionTotal[dim] : 0;
-  }
+  });
 
   var html = '<div style="padding:0.5rem">';
-  var totalHits = results.reduce(function(s,r){return s+r.hitCount;},0);
-  var avgHit = (totalHits / periods).toFixed(2);
-
-  html += '<div style="margin-bottom:1rem;padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
-  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">回溯验证汇总（最近'+periods+'期）</div>';
-  html += '<div style="display:flex;gap:1rem;flex-wrap:wrap">';
-  html += '<div style="padding:0.5rem 1rem;background:var(--accent);color:#000;border-radius:6px;font-weight:bold">平均命中: '+avgHit+'/20</div>';
-  html += '<div style="padding:0.5rem 1rem;background:var(--accent3);color:#000;border-radius:6px;font-weight:bold">命中率: '+(totalHits/periods/20*100).toFixed(1)+'%</div>';
-  html += '</div></div>';
-
-  html += '<div style="margin-bottom:1rem">';
-  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">命中号码维度特征分析</div>';
-  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
-  html += '<thead><tr style="background:var(--bg3)"><th style="padding:6px;border:1px solid var(--rule)">维度</th><th style="padding:6px;border:1px solid var(--rule)">命中平均得分</th><th style="padding:6px;border:1px solid var(--rule)">有效性</th></tr></thead><tbody>';
-  var dimNames = { wf:'频率', mpScore:'遗漏回补', mkScore:'周期驱动', zoneScore:'区间', neighborScore:'邻号', oddEvenScore:'奇偶', bigSmallScore:'大小', lastMissScore:'遗漏' };
-  var sortedDims = Object.keys(dimAnalysis).sort(function(a,b){return dimAnalysis[b]-dimAnalysis[a];});
-  sortedDims.forEach(function(dim){
-    var val = dimAnalysis[dim];
-    var effective = val > 0.6 ? '高' : val > 0.4 ? '中' : '低';
-    var color = val > 0.6 ? 'var(--accent3)' : val > 0.4 ? 'var(--accent)' : 'var(--muted)';
-    html += '<tr><td style="padding:6px;border:1px solid var(--rule)">'+(dimNames[dim]||dim)+'</td>';
-    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center">'+(val*100).toFixed(1)+'</td>';
-    html += '<td style="padding:6px;border:1px solid var(--rule);text-align:center;color:'+color+';font-weight:bold">'+effective+'</td></tr>';
-  });
-  html += '</tbody></table></div></div>';
-
-  html += '<div style="margin-bottom:1rem">';
-  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">每期回测详情</div>';
-  results.forEach(function(r){
-    html += '<div style="margin-bottom:0.5rem;padding:0.6rem;background:var(--bg3);border-radius:6px;border:1px solid var(--rule);font-size:0.8rem">';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center">';
-    html += '<span>第'+r.period+'期</span>';
-    html += '<span style="color:var(--accent);font-weight:bold">命中'+r.hitCount+'/20</span>';
-    html += '</div>';
-    html += '<div style="margin-top:0.3rem;color:var(--muted)">命中: '+r.hits.map(function(n){return pad(n);}).join(',')+'</div>';
-    html += '</div>';
-  });
-  html += '</div>';
-
-  html += '<div style="padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
-  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem">下期推荐优化建议</div>';
-  var topDims = sortedDims.slice(0,3);
-  html += '<div style="font-size:0.8rem;color:var(--muted)">根据回溯验证，以下维度命中率最高，下期推荐将自动提升这些维度的权重：</div>';
-  html += '<div style="margin-top:0.5rem;display:flex;gap:0.5rem;flex-wrap:wrap">';
-  topDims.forEach(function(dim){
-    html += '<span style="padding:0.3rem 0.6rem;background:var(--accent);color:#000;border-radius:4px;font-size:0.75rem;font-weight:bold">'+(dimNames[dim]||dim)+'</span>';
-  });
-  html += '</div></div>';
-
-  html += '</div>';
-  document.getElementById('kl8-backtest-results').innerHTML = html;
-
-  var w = getKL8AdaptiveWeights();
-  var adjusted = {};
-  for (var k in w) adjusted[k] = w[k];
-  sortedDims.forEach(function(dim, idx){
-    if (idx < 3) {
-      adjusted[dim] = Math.min(adjusted[dim] * 1.15, adjusted[dim] + 0.03);
-    } else if (dimAnalysis[dim] < 0.3) {
-      adjusted[dim] = Math.max(adjusted[dim] * 0.9, adjusted[dim] - 0.02);
-    }
-  });
-  var sumAll = 0;
-  for (var k in adjusted) sumAll += adjusted[k];
-  if (sumAll > 0) {
-    for (var k in adjusted) adjusted[k] = adjusted[k] / sumAll;
+  
+  // 汇总统计
+  html += '<div style="margin-bottom:1rem;padding:0.8rem;background:var(--bg3);border-radius:8px;border:2px solid var(--accent)">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.8rem;font-size:1rem">📊 往期预测回溯验证汇总</div>';
+  html += '<div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:0.8rem">';
+  
+  if (totalStats[5].total > 0) {
+    var avg5 = (totalStats[5].hits / totalStats[5].totalStrategies).toFixed(2);
+    var rate5 = (totalStats[5].hits / totalStats[5].total * 100).toFixed(1);
+    html += '<div style="padding:0.5rem 1rem;background:var(--accent2);color:#000;border-radius:6px;font-weight:bold">选五: ' + 
+            totalStats[5].totalStrategies + '注，平均命中 ' + avg5 + ' (' + rate5 + '%)</div>';
   }
-  try {
-    localStorage.setItem('kl8_adaptive_weights', JSON.stringify(adjusted));
-    console.log('KL8回溯验证权重已优化:', adjusted);
-  } catch(e) {}
+  
+  if (totalStats[10].total > 0) {
+    var avg10 = (totalStats[10].hits / totalStats[10].totalStrategies).toFixed(2);
+    var rate10 = (totalStats[10].hits / totalStats[10].total * 100).toFixed(1);
+    html += '<div style="padding:0.5rem 1rem;background:var(--accent3);color:#000;border-radius:6px;font-weight:bold">选十: ' + 
+            totalStats[10].totalStrategies + '注，平均命中 ' + avg10 + ' (' + rate10 + '%)</div>';
+  }
+  
+  html += '<div style="padding:0.5rem 1rem;background:var(--accent);color:#000;border-radius:6px;font-weight:bold">总计: ' + 
+          testRecords.length + '期</div>';
+  html += '</div>';
+  
+  // 各策略命中率统计表
+  var hasStrategyStats = false;
+  [5, 10].forEach(function(pt){
+    if (Object.keys(totalStats[pt].hitsByStrategy).length > 0) hasStrategyStats = true;
+  });
+  
+  if (hasStrategyStats) {
+    html += '<div style="margin-top:0.8rem;border-top:1px solid var(--rule);padding-top:0.8rem">';
+    html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.5rem;font-size:0.9rem">各策略命中率</div>';
+    [5, 10].forEach(function(pt){
+      var stats = totalStats[pt].hitsByStrategy;
+      if (Object.keys(stats).length > 0) {
+        html += '<table style="width:100%;margin-bottom:0.8rem;border-collapse:collapse;font-size:0.75rem;border:1px solid var(--rule)">';
+        html += '<thead><tr style="background:var(--bg)"><th style="padding:4px;border:1px solid var(--rule)">玩法</th><th style="padding:4px;border:1px solid var(--rule)">策略</th><th style="padding:4px;border:1px solid var(--rule)">注数</th><th style="padding:4px;border:1px solid var(--rule)">总号码</th><th style="padding:4px;border:1px solid var(--rule)">命中</th><th style="padding:4px;border:1px solid var(--rule)">命中率</th></tr></thead><tbody>';
+        for (var name in stats) {
+          var s = stats[name];
+          var rate = (s.hits / s.total * 100).toFixed(1);
+          var color = rate >= 30 ? 'var(--accent3)' : (rate >= 20 ? 'var(--accent)' : 'var(--muted)');
+          html += '<tr><td style="padding:4px;border:1px solid var(--rule);text-align:center">选' + (pt === 5 ? '五' : '十') + '</td>';
+          html += '<td style="padding:4px;border:1px solid var(--rule)">' + name + '</td>';
+          html += '<td style="padding:4px;border:1px solid var(--rule);text-align:center">' + s.count + '</td>';
+          html += '<td style="padding:4px;border:1px solid var(--rule);text-align:center">' + s.total + '</td>';
+          html += '<td style="padding:4px;border:1px solid var(--rule);text-align:center">' + s.hits + '</td>';
+          html += '<td style="padding:4px;border:1px solid var(--rule);text-align:center;font-weight:bold;color:' + color + '">' + rate + '%</td></tr>';
+        }
+        html += '</tbody></table>';
+      }
+    });
+    html += '</div></div>';
+  }
+  
+  html += '</div>';
+  
+  // 每期回测详情（按日期分组）
+  html += '<div style="margin-top:1rem">';
+  html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.8rem;font-size:0.95rem">每期回测详情</div>';
+  
+  var groupedByDate = {};
+  testRecords.forEach(function(r){
+    if (!groupedByDate[r.date]) groupedByDate[r.date] = [];
+    groupedByDate[r.date].push(r);
+  });
+  var dates = Object.keys(groupedByDate).sort().reverse();
+  
+  dates.forEach(function(date){
+    var records = groupedByDate[date];
+    html += '<div style="margin-bottom:1rem;padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+    html += '<div style="font-weight:bold;color:var(--ink);margin-bottom:0.6rem;font-size:0.85rem">📅 ' + date + '</div>';
+    
+    records.forEach(function(r){
+      var pt = r.playType;
+      var ptName = pt === 5 ? '选五' : '选十';
+      html += '<div style="margin-bottom:0.6rem;padding:0.6rem;background:var(--bg2);border-radius:6px;border:1px solid var(--rule)">';
+      html += '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.4rem">';
+      html += '<span style="font-weight:bold;color:var(--accent);font-size:0.85rem">' + ptName + '</span>';
+      html += '</div>';
+      
+      // 实际开奖号码
+      if (r.actualDraw) {
+        html += '<div style="margin-bottom:0.4rem;font-size:0.75rem">';
+        html += '<span style="color:var(--muted)">实际开奖: </span>';
+        r.actualDraw.slice(0, pt).forEach(function(n){
+          html += '<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:var(--accent3);color:#000;font-size:0.6rem;margin:0 1px">' + pad(n) + '</span>';
+        });
+        html += '</div>';
+      }
+      
+      // 每个策略的推荐和命中
+      r.strategies.forEach(function(st){
+        var hits = st.hits || 0;
+        var hitNums = st.hitNums || [];
+        var hitRate = Math.round(hits / pt * 100);
+        var bgColor = hitRate >= 40 ? 'var(--accent3)' : (hitRate >= 20 ? 'var(--accent)' : 'var(--accent4)');
+        html += '<div style="margin-top:0.3rem">';
+        html += '<div style="display:flex;align-items:center;gap:0.3rem;flex-wrap:wrap">';
+        html += '<span style="font-size:0.7rem;color:var(--muted);min-width:70px">' + st.name + ':</span>';
+        st.picks.forEach(function(n){
+          var isHit = hitNums.indexOf(n) >= 0;
+          var style = isHit ? 'background:var(--accent3);color:#000;font-weight:bold;box-shadow:0 0 0 1px var(--accent3)' : 'background:var(--accent4);color:#fff';
+          html += '<span style="display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;font-size:0.65rem;margin:0 1px;' + style + '">' + pad(n) + '</span>';
+        });
+        html += '<span style="margin-left:auto;background:' + bgColor + ';color:#000;padding:1px 6px;border-radius:3px;font-size:0.65rem;font-weight:bold">' + hits + '/' + pt + '</span>';
+        html += '</div>';
+        if (hits > 0) {
+          html += '<div style="margin-top:0.15rem;font-size:0.65rem;color:var(--accent3)">命中: ' + hitNums.map(function(n){ return pad(n); }).join(', ') + '</div>';
+        }
+        html += '</div>';
+      });
+      
+      html += '</div>';
+    });
+    
+    html += '</div>';
+  });
+  
+  html += '</div>';
+  html += '</div>';
+  
+  document.getElementById('kl8-backtest-results').innerHTML = html;
 }
