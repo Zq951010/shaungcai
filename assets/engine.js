@@ -5868,15 +5868,6 @@ function spinDLTLottery() {
   var allBackNums = [];
   for (var n = 1; n <= 12; n++) allBackNums.push(n);
 
-  var results = [];
-  for (var set = 0; set < 5; set++) {
-    var frontPicks = weightedPick(allFrontNums, frontScores, 5);
-    var backPicks = weightedPick(allBackNums, backScores, 2);
-    frontPicks.sort(function(a,b){return a-b;});
-    backPicks.sort(function(a,b){return a-b;});
-    results.push({ front: frontPicks, back: backPicks });
-  }
-
   // 构建质量分所需的评分映射
   var _frontScoreMap = {};
   frontScores.forEach(function(s){ _frontScoreMap[s.num] = s; });
@@ -5884,27 +5875,73 @@ function spinDLTLottery() {
   backScores.forEach(function(s){ _backScoreMap[s.num] = s; });
   var qctx = { lastFront: last.front, frontScoreMap: _frontScoreMap, backScoreMap: _backScoreMap };
 
-  var html = '<div style="padding:0.5rem">';
-  html += '<div style="text-align:center;margin-bottom:1rem;font-size:0.9rem;color:var(--muted)">';
-  html += '基于大模型评分加权抽选，分数越高的号码被摇中的概率越大';
-  html += '</div>';
-  for (var s = 0; s < results.length; s++) {
-    html += '<div style="display:flex;align-items:center;gap:1rem;padding:0.8rem 1rem;margin-bottom:0.5rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
-    html += '<span style="font-weight:700;color:var(--accent);min-width:60px;font-size:0.9rem">第'+(s+1)+'注</span>';
-    html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">';
-    html += '<span style="font-size:0.75rem;color:var(--muted)">前区</span>';
-    results[s].front.forEach(function(n){
-      html += '<div class="ball red" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
-    });
-    html += '<span style="font-size:0.75rem;color:var(--muted);margin-left:0.5rem">后区</span>';
-    results[s].back.forEach(function(n){
-      html += '<div class="ball blue" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
-    });
-    // 质量分
-    var q = dltQualityScore(results[s].front, results[s].back, qctx);
-    html += '<span style="margin-left:auto;background:var(--accent);color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">质量分 '+q+'</span>';
-    html += '</div></div>';
+  function dltQual(bet) {
+    var q = dltQualityScore(bet.front, bet.back, qctx);
+    return '<span style="margin-left:auto;background:var(--accent);color:#000;padding:2px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">质量分 '+q+'</span>';
   }
+
+  var html = '<div style="padding:0.5rem">';
+
+  // ¥18 套餐：6注5+2单式 + 1注5+3复式（后区3选2 = 3注）
+  html += '<div style="margin-bottom:1.2rem;padding:1rem;background:var(--bg3);border-radius:8px;border:2px solid var(--accent3)">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.8rem">';
+  html += '<span style="font-weight:700;color:var(--accent3);font-size:1.05rem">&#127922; ¥18 套餐票（6注5+2 + 1注5+3复式）</span>';
+  html += '<span style="font-size:0.8rem;color:var(--muted);background:var(--bg2);padding:2px 8px;border-radius:4px">共9注 ¥18</span>';
+  html += '</div>';
+  // 6注5+2单式
+  for (var i = 0; i < 6; i++) {
+    var f = weightedPick(allFrontNums, frontScores, 5);
+    var b = weightedPick(allBackNums, backScores, 2);
+    f.sort(function(a,b){return a-b;}); b.sort(function(a,b){return a-b;});
+    html += '<div style="display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0;border-bottom:1px solid var(--rule)">';
+    html += '<span style="font-size:0.7rem;color:var(--muted);min-width:32px">第'+(i+1)+'注</span>';
+    f.forEach(function(n){ html += '<div class="ball red" style="width:30px;height:30px;font-size:0.7rem">'+pad(n)+'</div>'; });
+    b.forEach(function(n){ html += '<div class="ball blue" style="width:30px;height:30px;font-size:0.7rem">'+pad(n)+'</div>'; });
+    html += dltQual({front:f,back:b}) + '</div>';
+  }
+  // 1注5+3复式（后区3选2 = 3注）
+  var f3 = weightedPick(allFrontNums, frontScores, 5);
+  var b3 = weightedPick(allBackNums, backScores, 3);
+  f3.sort(function(a,b){return a-b;}); b3.sort(function(a,b){return a-b;});
+  html += '<div style="display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0;background:var(--accent4);border-radius:4px;margin-top:4px">';
+  html += '<span style="font-size:0.7rem;color:var(--muted);min-width:32px;font-weight:bold">5+3复</span>';
+  f3.forEach(function(n){ html += '<div class="ball red" style="width:30px;height:30px;font-size:0.7rem">'+pad(n)+'</div>'; });
+  b3.forEach(function(n){ html += '<div class="ball blue" style="width:30px;height:30px;font-size:0.7rem">'+pad(n)+'</div>'; });
+  html += dltQual({front:f3,back:b3}) + '</div>';
+  html += '</div>';
+
+  // ¥28 套餐：8注5+2单式 + 1注6+2复式（前区6选5 = 6注）
+  html += '<div style="padding:1rem;background:var(--bg3);border-radius:8px;border:2px solid var(--accent)">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.8rem">';
+  html += '<span style="font-weight:700;color:var(--accent);font-size:1.05rem">&#127922; ¥28 套餐票（8注5+2 + 1注6+2复式）</span>';
+  html += '<span style="font-size:0.8rem;color:var(--muted);background:var(--bg2);padding:2px 8px;border-radius:4px">共14注 ¥28</span>';
+  html += '</div>';
+  for (var i = 0; i < 8; i++) {
+    var f = weightedPick(allFrontNums, frontScores, 5);
+    var b = weightedPick(allBackNums, backScores, 2);
+    f.sort(function(a,b){return a-b;}); b.sort(function(a,b){return a-b;});
+    html += '<div style="display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0;border-bottom:1px solid var(--rule)">';
+    html += '<span style="font-size:0.7rem;color:var(--muted);min-width:32px">第'+(i+1)+'注</span>';
+    f.forEach(function(n){ html += '<div class="ball red" style="width:30px;height:30px;font-size:0.7rem">'+pad(n)+'</div>'; });
+    b.forEach(function(n){ html += '<div class="ball blue" style="width:30px;height:30px;font-size:0.7rem">'+pad(n)+'</div>'; });
+    html += dltQual({front:f,back:b}) + '</div>';
+  }
+  // 1注6+2复式（前区6选5 = 6注）
+  var f6 = weightedPick(allFrontNums, frontScores, 6);
+  var b6 = weightedPick(allBackNums, backScores, 2);
+  f6.sort(function(a,b){return a-b;}); b6.sort(function(a,b){return a-b;});
+  var scF6 = f6.map(function(n){ return {num:n, score:(_frontScoreMap[n]||{}).totalScore||0}; }).sort(function(a,b){return b.score-a.score;});
+  var danF6 = scF6.slice(0,2).map(function(x){return x.num;});
+  html += '<div style="display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0;background:var(--accent4);border-radius:4px;margin-top:4px">';
+  html += '<span style="font-size:0.7rem;color:var(--muted);min-width:32px;font-weight:bold">6+2复</span>';
+  f6.forEach(function(n){
+    var isDan = danF6.indexOf(n) >= 0;
+    html += '<div class="ball '+(isDan?'gold':'red')+'" style="width:30px;height:30px;font-size:0.7rem;'+(isDan?'box-shadow:0 0 6px rgba(245,158,11,0.6);':'')+'">'+pad(n)+'</div>';
+  });
+  b6.forEach(function(n){ html += '<div class="ball blue" style="width:30px;height:30px;font-size:0.7rem">'+pad(n)+'</div>'; });
+  html += dltQual({front:f6,back:b6}) + '</div>';
+  html += '</div>';
+
   html += '</div>';
 
   document.getElementById('dlt-lottery-results').innerHTML = html;
@@ -6536,21 +6573,8 @@ function spinSSQLottery() {
   var allBlueNums = [];
   for (var n = 1; n <= 16; n++) allBlueNums.push(n);
 
-  // 生成2种套餐票：¥18（8+1复式 = C(8,6)×1 = 28注→¥56 不对）
-  // ¥18 = 9注单式（6红+1蓝×9注），¥28 = 7+2复式（14注）
-  var results = [];
-
-  // ¥18套餐：9注单式（6红+1蓝），每注¥2，共9注
-  var ticket18 = { red: [], blue: [], type: '18', bets: [] };
-  for (var i = 0; i < 9; i++) {
-    var r = weightedPick(allRedNums, redScores, 6);
-    var b = weightedPick(allBlueNums, blueScores, 1);
-    r.sort(function(a,b){return a-b;});
-    ticket18.bets.push({ red: r, blue: b[0] });
-  }
-
-  // ¥28套餐：7+2复式（7红+2蓝 = C(7,6)×C(2,1) = 14注）
-  var ticket28 = { red: weightedPick(allRedNums, redScores, 7), blue: weightedPick(allBlueNums, blueScores, 2), type: '28' };
+  // 生成¥28 7+2复式套餐（7红+2蓝 = C(7,6)×C(2,1) = 14注）
+  var ticket28 = { red: weightedPick(allRedNums, redScores, 7), blue: weightedPick(allBlueNums, blueScores, 2) };
   ticket28.red.sort(function(a,b){return a-b;});
   ticket28.blue.sort(function(a,b){return a-b;});
 
@@ -6558,27 +6582,6 @@ function spinSSQLottery() {
   redScores.forEach(function(s){ _redScoreMap[s.num] = s; });
 
   var html = '<div style="padding:0.5rem">';
-
-  // ¥18套餐展示
-  html += '<div style="margin-bottom:1.2rem;padding:1rem;background:var(--bg3);border-radius:8px;border:2px solid var(--accent3)">';
-  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.8rem">';
-  html += '<span style="font-weight:700;color:var(--accent3);font-size:1.05rem">&#127922; ¥18 套餐票（9注单式）</span>';
-  html += '<span style="font-size:0.8rem;color:var(--muted);background:var(--bg2);padding:2px 8px;border-radius:4px">共9注 ¥18</span>';
-  html += '</div>';
-  for (var i = 0; i < ticket18.bets.length; i++) {
-    var bet = ticket18.bets[i];
-    var scoredReds = bet.red.map(function(n){ return {num:n, score:(_redScoreMap[n]||{}).totalScore||0}; }).sort(function(a,b){return b.score-a.score;});
-    var danNums = scoredReds.slice(0,2).map(function(x){return x.num;});
-    html += '<div style="display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0;border-bottom:1px solid var(--rule)">';
-    html += '<span style="font-size:0.7rem;color:var(--muted);min-width:32px">第'+(i+1)+'注</span>';
-    bet.red.forEach(function(n){
-      var isDan = danNums.indexOf(n) >= 0;
-      html += '<div class="ball '+(isDan?'gold':'red')+'" style="width:30px;height:30px;font-size:0.7rem;'+(isDan?'box-shadow:0 0 6px rgba(245,158,11,0.6);':'')+'">'+pad(n)+'</div>';
-    });
-    html += '<div class="ball blue" style="width:30px;height:30px;font-size:0.7rem">'+pad(bet.blue)+'</div>';
-    html += '</div>';
-  }
-  html += '</div>';
 
   // ¥28套餐展示
   html += '<div style="padding:1rem;background:var(--bg3);border-radius:8px;border:2px solid var(--accent)">';
