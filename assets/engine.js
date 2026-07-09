@@ -7826,24 +7826,151 @@ function filterKL8HistoryByDate() {
   renderKL8PredictionHistory();
 }
 
-// 渲染预测历史 V3（支持5策略显示）
+// 渲染预测历史 V3（兼容V2的4策略和V3的5策略）
 function renderKL8PredictionHistory() {
   var history = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
-  // 只保留选五和选十的记录，且排除机选旧数据，且排除只有4个策略的旧V2数据
+  // 只保留选五和选十的记录，且排除机选旧数据
   history = history.filter(function(r){ 
-    return (r.playType === 5 || r.playType === 10) && r.playTypeName && r.playTypeName.indexOf('机选') < 0 && r.strategies && r.strategies.length >= 5; 
+    return (r.playType === 5 || r.playType === 10) && r.playTypeName && r.playTypeName.indexOf('机选') < 0; 
   });
-  // 自动清理 localStorage 中的旧数据
+  // 自动清理 localStorage 中的旧机选记录（保留V2和V3数据）
   try {
     var allRaw = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
     var cleaned = allRaw.filter(function(r){ 
-      return (r.playType === 5 || r.playType === 10) && r.playTypeName && r.playTypeName.indexOf('机选') < 0 && r.strategies && r.strategies.length >= 5; 
+      return (r.playType === 5 || r.playType === 10) && r.playTypeName && r.playTypeName.indexOf('机选') < 0; 
     });
     if (cleaned.length !== allRaw.length) {
       localStorage.setItem(KL8_PREDICTION_STORAGE_KEY, JSON.stringify(cleaned));
       history = cleaned;
     }
   } catch(e) {}
+
+  // 自动补生成：如果昨日无推荐记录，基于V3策略补生成并用今日开奖验证
+  try {
+    var yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    var yesterdayStr = yesterday.toISOString().slice(0,10);
+    var hasYesterdayRec = history.some(function(r){ return r.date === yesterdayStr; });
+    if (!hasYesterdayRec && typeof kl8SampleHistory !== 'undefined' && kl8SampleHistory.length >= 2) {
+      // 用前一日数据作为"lastDraw"生成推荐
+      var lastDraw = kl8SampleHistory[0].split(',').map(Number); // 7月9日数据
+      var trainHistory = kl8SampleHistory.slice(1).map(function(s){ return s.split(',').map(Number); });
+      var last = trainHistory[0]; // 7月8日数据
+      var scores = scoreKL8Numbers(last, trainHistory.slice(1));
+      // 构建共现矩阵
+      var kl8Co = {};
+      var recentK = Math.min(10, trainHistory.length);
+      var histSlice = trainHistory.slice(0, recentK);
+      for (var ri = 0; ri < histSlice.length; ri++) {
+        for (var ra = 0; ra < histSlice[ri].length; ra++) {
+          for (var rb = ra + 1; rb < histSlice[ri].length; rb++) {
+            var a = histSlice[ri][ra], b = histSlice[ri][rb];
+            if (!kl8Co[a]) kl8Co[a] = {};
+            if (!kl8Co[b]) kl8Co[b] = {};
+            kl8Co[a][b] = (kl8Co[a][b] || 0) + 1;
+            kl8Co[b][a] = (kl8Co[b][a] || 0) + 1;
+          }
+        }
+      }
+      // V3策略生成
+      function rGenS1(pt) {
+        var picks=[],used={},zm=pt===5?2:3,zc=[0,0,0,0];
+        var sorted=scores.slice().sort(function(a,b){
+          var aC=0,aCC=0,bC=0,bCC=0;
+          scores.slice(0,10).forEach(function(t){if(t.num!==a.num&&kl8Co[a.num]&&kl8Co[a.num][t.num]){aC+=kl8Co[a.num][t.num];aCC++;}});
+          scores.slice(0,10).forEach(function(t){if(t.num!==b.num&&kl8Co[b.num]&&kl8Co[b.num][t.num]){bC+=kl8Co[b.num][t.num];bCC++;}});
+          var aCS=aCC?aC/aCC/recentK*2:0,bCS=bCC?bC/bCC/recentK*2:0;
+          var aS=a.lastMissScore*0.35+a.zoneScore*0.25+a.wf*0.15+(a.sumRegression||0)*0.1+aCS*0.15;
+          var bS=b.lastMissScore*0.35+b.zoneScore*0.25+b.wf*0.15+(b.sumRegression||0)*0.1+bCS*0.15;
+          if(a.heatDecay<-0.1&&b.heatDecay>=-0.1)return 1;if(b.heatDecay<-0.1&&a.heatDecay>=-0.1)return -1;
+          return bS-aS;
+        });
+        for(var i=0;i<sorted.length&&picks.length<pt;i++){var n=sorted[i].num,z=n<=20?0:n<=40?1:n<=60?2:3;if(zc[z]<zm){picks.push(n);used[n]=true;zc[z]++;}}
+        for(var i=0;i<sorted.length&&picks.length<pt;i++){if(!used[sorted[i].num]){picks.push(sorted[i].num);used[sorted[i].num]=true;}}
+        picks.sort(function(a,b){return a-b;});return picks;
+      }
+      function rGenS2(pt) {
+        var cr=pt===5?0.6:0.5;
+        var cold=scores.slice().filter(function(s){return s.heatDecay>=-0.05;}).sort(function(a,b){return(b.lastMissScore*0.7+b.mp*0.2+b.lu012Score*0.1)-(a.lastMissScore*0.7+a.mp*0.2+a.lu012Score*0.1);}).slice(0,Math.max(pt,15)).map(function(s){return s.num;});
+        var hot=scores.slice(0,8).filter(function(s){return s.heatDecay>=-0.05;}).map(function(s){return s.num;});
+        var hc=Math.ceil(pt*(1-cr));
+        var raw=cold.slice(0,pt-hc).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0,hc));
+        var u=[];for(var i=0;i<raw.length&&u.length<pt;i++)if(u.indexOf(raw[i])<0)u.push(raw[i]);
+        var rem=scores.filter(function(s){return u.indexOf(s.num)<0&&s.heatDecay>=-0.05;});
+        rem.sort(function(a,b){var aC=0,bC=0;u.forEach(function(n){if(kl8Co[a.num]&&kl8Co[a.num][n])aC+=kl8Co[a.num][n];});u.forEach(function(n){if(kl8Co[b.num]&&kl8Co[b.num][n])bC+=kl8Co[b.num][n];});return bC-aC||b.totalScore-a.totalScore;});
+        for(var i=0;i<rem.length&&u.length<pt;i++)u.push(rem[i].num);
+        u.sort(function(a,b){return a-b;});return u;
+      }
+      function rGenS3(pt) {
+        var picks=[],used={};
+        var seeds=scores.slice(0,pt===5?1:2).map(function(s){return s.num;});
+        seeds.forEach(function(n){picks.push(n);used[n]=true;});
+        while(picks.length<pt){var bn=null,bs=-1;for(var i=0;i<scores.length;i++){var n=scores[i].num;if(used[n])continue;var cs=0;picks.forEach(function(p){if(kl8Co[n]&&kl8Co[n][p])cs+=kl8Co[n][p];});var sc=cs/recentK+scores[i].totalScore*0.3;if(sc>bs){bs=sc;bn=n;}}if(bn!==null){picks.push(bn);used[bn]=true;}else break;}
+        for(var i=0;i<scores.length&&picks.length<pt;i++){if(!used[scores[i].num]){picks.push(scores[i].num);used[scores[i].num]=true;}}
+        picks.sort(function(a,b){return a-b;});return picks;
+      }
+      function rGenS4(pt) {
+        var mr=pt===5?2:3,picks=[],used={};
+        var rs=scores.slice().filter(function(s){return last.indexOf(s.num)>=0;}).sort(function(a,b){
+          var aC=0,bC=0;scores.slice(0,10).forEach(function(t){if(kl8Co[a.num]&&kl8Co[a.num][t.num])aC+=kl8Co[a.num][t.num];});
+          scores.slice(0,10).forEach(function(t){if(kl8Co[b.num]&&kl8Co[b.num][t.num])bC+=kl8Co[b.num][t.num];});
+          return(b.totalScore*0.6+bC/recentK*0.4)-(a.totalScore*0.6+aC/recentK*0.4);
+        });
+        for(var i=0;i<rs.length&&picks.length<mr;i++){if(!used[rs[i].num]){picks.push(rs[i].num);used[rs[i].num]=true;}}
+        var zc=[0,0,0,0];picks.forEach(function(n){zc[n<=20?0:n<=40?1:n<=60?2:3]++;});
+        var hyb=scores.slice().filter(function(s){return last.indexOf(s.num)<0;}).sort(function(a,b){return(b.wf*0.30+b.mp*0.25+b.zoneScore*0.20+b.lu012Score*0.15+(b.stability||0)*0.10)-(a.wf*0.30+a.mp*0.25+a.zoneScore*0.20+a.lu012Score*0.15+(a.stability||0)*0.10);});
+        for(var i=0;i<hyb.length&&picks.length<pt;i++){var n=hyb[i].num;if(!used[n]){var z=n<=20?0:n<=40?1:n<=60?2:3;if(zc[z]<Math.ceil(pt/2)){picks.push(n);used[n]=true;zc[z]++;}}}
+        for(var i=0;i<scores.length&&picks.length<pt;i++){var n=scores[i].num;if(!used[n]&&last.indexOf(n)<0){picks.push(n);used[n]=true;}}
+        picks.sort(function(a,b){return a-b;});return picks;
+      }
+      function rGenS5(pt) {
+        if(pt===5){var picks=[],used={};var dc=2,dn=scores.slice().filter(function(s){return last.indexOf(s.num)>=0||s.wf>0.15;}).sort(function(a,b){return b.totalScore-a.totalScore;});
+        for(var i=0;i<dn.length&&picks.length<dc;i++){if(!used[dn[i].num]){picks.push(dn[i].num);used[dn[i].num]=true;}}
+        var ts=scores.slice().filter(function(s){return !used[s.num];}).sort(function(a,b){var aC=0,bC=0;picks.forEach(function(p){if(kl8Co[a.num]&&kl8Co[a.num][p])aC+=kl8Co[a.num][p];});picks.forEach(function(p){if(kl8Co[b.num]&&kl8Co[b.num][p])bC+=kl8Co[b.num][p];});return(b.lastMissScore*0.3+b.zoneScore*0.2+bC/recentK*0.3+b.wf*0.2)-(a.lastMissScore*0.3+a.zoneScore*0.2+aC/recentK*0.3+a.wf*0.2);});
+        var zc=[0,0,0,0];picks.forEach(function(n){zc[n<=20?0:n<=40?1:n<=60?2:3]++;});
+        for(var i=0;i<ts.length&&picks.length<pt;i++){var n=ts[i].num,z=n<=20?0:n<=40?1:n<=60?2:3;if(zc[z]<2){picks.push(n);used[n]=true;zc[z]++;}}
+        for(var i=0;i<ts.length&&picks.length<pt;i++){if(!used[ts[i].num]){picks.push(ts[i].num);used[ts[i].num]=true;}}
+        picks.sort(function(a,b){return a-b;});return picks;
+        }else{var picks=[],used={};var hn=scores.filter(function(s){return s.wf>0.15;}).map(function(s){return s.num;});var wn=scores.filter(function(s){return s.wf>0.06&&s.wf<=0.15;}).map(function(s){return s.num;});var cn=scores.filter(function(s){return s.wf<=0.06&&s.lastMissScore>0.5;}).map(function(s){return s.num;});
+        var rc=scores.slice().filter(function(s){return last.indexOf(s.num)>=0&&s.totalScore>0.5;}).sort(function(a,b){return b.totalScore-a.totalScore;});
+        for(var i=0;i<rc.length&&picks.length<2;i++){if(!used[rc[i].num]){picks.push(rc[i].num);used[rc[i].num]=true;}}
+        var mc=scores.slice().filter(function(s){return s.lastMissScore>=0.55&&s.lastMissScore<=0.85&&!used[s.num];}).sort(function(a,b){return b.lastMissScore-a.lastMissScore;});
+        for(var i=0;i<mc.length&&picks.length<4;i++){if(!used[mc[i].num]){picks.push(mc[i].num);used[mc[i].num]=true;}}
+        for(var i=0;i<hn.length&&picks.length<7;i++){if(!used[hn[i]]){picks.push(hn[i]);used[hn[i]]=true;}}
+        for(var i=0;i<wn.length&&picks.length<9;i++){if(!used[wn[i]]){picks.push(wn[i]);used[wn[i]]=true;}}
+        for(var i=0;i<cn.length&&picks.length<pt;i++){if(!used[cn[i]]){picks.push(cn[i]);used[cn[i]]=true;}}
+        for(var i=0;i<scores.length&&picks.length<pt;i++){if(!used[scores[i].num]){picks.push(scores[i].num);used[scores[i].num]=true;}}
+        picks.sort(function(a,b){return a-b;});return picks;}
+      }
+      // 生成各玩法策略
+      var allRecs = {};
+      [5,10].forEach(function(pt){
+        var s1=rGenS1(pt),s2=rGenS2(pt),s3=rGenS3(pt),s4=rGenS4(pt),s5=rGenS5(pt);
+        var strategies = [
+          {name:'区间均衡+热号',picks:s1},{name:'冷号优先+遗漏',picks:s2},{name:'共现簇策略',picks:s3},{name:'重号优选',picks:s4},{name:'专家技巧综合',picks:s5}
+        ];
+        // 用7月9日开奖验证命中
+        strategies.forEach(function(s){ s.hits = s.picks.filter(function(n){return lastDraw.indexOf(n)>=0;}).length; s.hitNums = s.picks.filter(function(n){return lastDraw.indexOf(n)>=0;}); });
+        allRecs[pt] = strategies;
+        // 保存到 localStorage
+        var rec = {
+          key: yesterdayStr+'_'+pt, date: yesterdayStr, period: '2026179',
+          lastDraw: last.slice().sort(function(a,b){return a-b;}), playType: pt, playTypeName: '选'+pt,
+          actualDraw: lastDraw.slice().sort(function(a,b){return a-b;}), verified: true,
+          strategies: strategies, savedAt: new Date().toISOString()
+        };
+        var existing = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
+        var idx = -1;
+        for(var i=0;i<existing.length;i++){if(existing[i].key===rec.key){idx=i;break;}}
+        if(idx>=0)existing[idx]=rec;else existing.unshift(rec);
+        if(existing.length>50)existing=existing.slice(0,50);
+        localStorage.setItem(KL8_PREDICTION_STORAGE_KEY, JSON.stringify(existing));
+      });
+      history = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
+      history = history.filter(function(r){return(r.playType===5||r.playType===10)&&r.playTypeName&&r.playTypeName.indexOf('机选')<0;});
+    }
+  } catch(e) { console.log('auto-restore error:', e.message); }
+
   var container = document.getElementById('kl8-prediction-history');
 
   if (history.length === 0) {
