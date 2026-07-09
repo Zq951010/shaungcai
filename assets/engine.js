@@ -3913,12 +3913,12 @@ function renderKL8DanTuo(last, history, playType, targetId) {
 
 function getKL8AdaptiveWeights() {
   var defaults = {
-    wf: 0.10, mpScore: 0.15, zoneScore: 0.14,
+    wf: 0.08, mpScore: 0.15, zoneScore: 0.14,
     neighborScore: 0.10, oddEvenScore: 0.07, bigSmallScore: 0.07,
-    lastMissScore: 0.18, tailScore: 0.06, stability: 0.03,
+    lastMissScore: 0.20, tailScore: 0.06, stability: 0.03,
     consecutiveScore: 0.05, maScore: 0.04, cycleScore: 0.05,
-    heatDecay: 0.04, sumRegression: 0.06, lu012Score: 0.05,
-    coScore: 0.06
+    heatDecay: 0.04, sumRegression: 0.07, lu012Score: 0.05,
+    coScore: 0.08
   };
   try {
     var saved = localStorage.getItem('kl8_adaptive_weights_v2');
@@ -4129,7 +4129,7 @@ function scoreKL8Numbers(last, history, weights) {
     var cycle = cycleAnalysis(n, history);
     var cycleScore = cycle.score;
 
-    // 上期遗漏回补评分：精细分级，遗漏3-8期最优回补窗口
+    // 上期遗漏回补评分：精细分级，遗漏1-2期最强隔期回补
     var lastMissScore = 0;
     var lastMiss = 0;
     if (last.indexOf(n) < 0) {
@@ -4137,11 +4137,15 @@ function scoreKL8Numbers(last, history, weights) {
         if (history[mi].indexOf(n) >= 0) break;
         lastMiss++;
       }
-      if (lastMiss >= 3 && lastMiss <= 5) lastMissScore = 0.95;
+      if (lastMiss >= 1 && lastMiss <= 2) lastMissScore = 0.98; // 隔期回补，最强信号
+      else if (lastMiss >= 3 && lastMiss <= 5) lastMissScore = 0.95;
       else if (lastMiss >= 6 && lastMiss <= 8) lastMissScore = 0.85;
       else if (lastMiss >= 9 && lastMiss <= 12) lastMissScore = 0.70;
       else if (lastMiss >= 13 && lastMiss <= 18) lastMissScore = 0.55;
       else if (lastMiss >= 19 && lastMiss <= 25) lastMissScore = 0.40;
+    } else {
+      // 上期已出，给予隔期回升信号
+      lastMissScore = 0.25;
     }
 
     // 热号衰减：收紧衰减条件，近2期连续出现即降温
@@ -4207,8 +4211,7 @@ function scoreKL8Numbers(last, history, weights) {
 }
 
 /**
- * 快乐八自动复盘：对最近3期回溯测试，对比推荐与实际开奖
- * 返回复盘报告HTML和各维度偏差分析
+ * 快乐八自动复盘 V3：使用V3策略生成，展示选五选十各策略命中
  */
 function runKL8AutoReview(history) {
   var testCount = Math.min(2, history.length - 1);
@@ -4226,41 +4229,140 @@ function runKL8AutoReview(history) {
 
     var scores = scoreKL8Numbers(lastTrain, trainData.slice(0, -1));
 
-    // 按玩法生成各方案推荐
+    // 构建共现矩阵（用于V3策略）
+    var kl8Co = {};
+    var recentK = Math.min(10, trainData.length);
+    var histSlice = trainData.slice(0, recentK);
+    for (var ri = 0; ri < histSlice.length; ri++) {
+      for (var ra = 0; ra < histSlice[ri].length; ra++) {
+        for (var rb = ra + 1; rb < histSlice[ri].length; rb++) {
+          var a = histSlice[ri][ra], b = histSlice[ri][rb];
+          if (!kl8Co[a]) kl8Co[a] = {};
+          if (!kl8Co[b]) kl8Co[b] = {};
+          kl8Co[a][b] = (kl8Co[a][b] || 0) + 1;
+          kl8Co[b][a] = (kl8Co[b][a] || 0) + 1;
+        }
+      }
+    }
+
+    // V3策略生成（与renderKL8AllPlayTypes_V2一致）
+    function genS1(pt) {
+      var picks = [], used = {};
+      var zoneMax = pt === 5 ? 2 : 3;
+      var zoneCounts = [0,0,0,0];
+      var sorted = scores.slice().sort(function(a,b){
+        var aCo = 0, aCoCount = 0, bCo = 0, bCoCount = 0;
+        scores.slice(0,10).forEach(function(t){ if(t.num!==a.num&&kl8Co[a.num]&&kl8Co[a.num][t.num]){aCo+=kl8Co[a.num][t.num];aCoCount++;} });
+        scores.slice(0,10).forEach(function(t){ if(t.num!==b.num&&kl8Co[b.num]&&kl8Co[b.num][t.num]){bCo+=kl8Co[b.num][t.num];bCoCount++;} });
+        var aCoS = aCoCount ? aCo/aCoCount/recentK*2 : 0, bCoS = bCoCount ? bCo/bCoCount/recentK*2 : 0;
+        var aScore = a.lastMissScore*0.35 + a.zoneScore*0.25 + a.wf*0.15 + (a.sumRegression||0)*0.1 + aCoS*0.15;
+        var bScore = b.lastMissScore*0.35 + b.zoneScore*0.25 + b.wf*0.15 + (b.sumRegression||0)*0.1 + bCoS*0.15;
+        if(a.heatDecay<-0.1&&b.heatDecay>=-0.1)return 1; if(b.heatDecay<-0.1&&a.heatDecay>=-0.1)return -1;
+        return bScore - aScore;
+      });
+      for(var i=0;i<sorted.length&&picks.length<pt;i++){
+        var n=sorted[i].num, z=n<=20?0:n<=40?1:n<=60?2:3;
+        if(zoneCounts[z]<zoneMax){ picks.push(n); used[n]=true; zoneCounts[z]++; }
+      }
+      for(var i=0;i<sorted.length&&picks.length<pt;i++){ if(!used[sorted[i].num]){ picks.push(sorted[i].num); used[sorted[i].num]=true; } }
+      picks.sort(function(a,b){return a-b;}); return picks;
+    }
+
+    function genS2(pt) {
+      var coldRatio = pt === 5 ? 0.6 : 0.5;
+      var cold = scores.slice().filter(function(s){return s.heatDecay>=-0.05;}).sort(function(a,b){
+        return (b.lastMissScore*0.7+b.mp*0.2+b.lu012Score*0.1) - (a.lastMissScore*0.7+a.mp*0.2+a.lu012Score*0.1);
+      }).slice(0,Math.max(pt,15)).map(function(s){return s.num;});
+      var hot = scores.slice(0,8).filter(function(s){return s.heatDecay>=-0.05;}).map(function(s){return s.num;});
+      var hotCount = Math.ceil(pt*(1-coldRatio));
+      var raw = cold.slice(0,pt-hotCount).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0,hotCount));
+      var unique = [];
+      for(var i=0;i<raw.length&&unique.length<pt;i++) if(unique.indexOf(raw[i])<0) unique.push(raw[i]);
+      var remaining = scores.filter(function(s){return unique.indexOf(s.num)<0&&s.heatDecay>=-0.05;});
+      remaining.sort(function(a,b){
+        var aCo=0,bCo=0; unique.forEach(function(n){if(kl8Co[a.num]&&kl8Co[a.num][n])aCo+=kl8Co[a.num][n];});
+        unique.forEach(function(n){if(kl8Co[b.num]&&kl8Co[b.num][n])bCo+=kl8Co[b.num][n];});
+        return bCo-aCo||b.totalScore-a.totalScore;
+      });
+      for(var i=0;i<remaining.length&&unique.length<pt;i++) unique.push(remaining[i].num);
+      unique.sort(function(a,b){return a-b;}); return unique;
+    }
+
+    function genS3(pt) {
+      var picks = [], used = {};
+      var seeds = scores.slice(0,pt===5?1:2).map(function(s){return s.num;});
+      seeds.forEach(function(n){picks.push(n);used[n]=true;});
+      while(picks.length<pt){
+        var bestNum=null,bestScore=-1;
+        for(var i=0;i<scores.length;i++){
+          var n=scores[i].num; if(used[n])continue;
+          var coSum=0; picks.forEach(function(p){if(kl8Co[n]&&kl8Co[n][p])coSum+=kl8Co[n][p];});
+          var cs=coSum/recentK+scores[i].totalScore*0.3;
+          if(cs>bestScore){bestScore=cs;bestNum=n;}
+        }
+        if(bestNum!==null){picks.push(bestNum);used[bestNum]=true;}else break;
+      }
+      for(var i=0;i<scores.length&&picks.length<pt;i++){if(!used[scores[i].num]){picks.push(scores[i].num);used[scores[i].num]=true;}}
+      picks.sort(function(a,b){return a-b;}); return picks;
+    }
+
+    function genS4(pt) {
+      var maxRepeat=pt===5?2:3, picks=[], used={};
+      var repeatSorted = scores.slice().filter(function(s){return lastTrain.indexOf(s.num)>=0;}).sort(function(a,b){
+        var aCo=0,bCo=0; scores.slice(0,10).forEach(function(t){if(kl8Co[a.num]&&kl8Co[a.num][t.num])aCo+=kl8Co[a.num][t.num];});
+        scores.slice(0,10).forEach(function(t){if(kl8Co[b.num]&&kl8Co[b.num][t.num])bCo+=kl8Co[b.num][t.num];});
+        return (b.totalScore*0.6+bCo/recentK*0.4)-(a.totalScore*0.6+aCo/recentK*0.4);
+      });
+      for(var i=0;i<repeatSorted.length&&picks.length<maxRepeat;i++){if(!used[repeatSorted[i].num]){picks.push(repeatSorted[i].num);used[repeatSorted[i].num]=true;}}
+      var zc=[0,0,0,0]; picks.forEach(function(n){zc[n<=20?0:n<=40?1:n<=60?2:3]++;});
+      var hybrid = scores.slice().filter(function(s){return lastTrain.indexOf(s.num)<0;}).sort(function(a,b){
+        return (b.wf*0.30+b.mp*0.25+b.zoneScore*0.20+b.lu012Score*0.15+(b.stability||0)*0.10)-(a.wf*0.30+a.mp*0.25+a.zoneScore*0.20+a.lu012Score*0.15+(a.stability||0)*0.10);
+      });
+      for(var i=0;i<hybrid.length&&picks.length<pt;i++){var n=hybrid[i].num;if(!used[n]){var z=n<=20?0:n<=40?1:n<=60?2:3;if(zc[z]<Math.ceil(pt/2)){picks.push(n);used[n]=true;zc[z]++;}}}
+      for(var i=0;i<scores.length&&picks.length<pt;i++){var n=scores[i].num;if(!used[n]&&lastTrain.indexOf(n)<0){picks.push(n);used[n]=true;}}
+      picks.sort(function(a,b){return a-b;}); return picks;
+    }
+
+    function genS5(pt) {
+      if(pt===5){
+        var picks=[], used={};
+        var danCount=2, danCand=scores.slice().filter(function(s){return lastTrain.indexOf(s.num)>=0||s.wf>0.15;}).sort(function(a,b){return b.totalScore-a.totalScore;});
+        for(var i=0;i<danCand.length&&picks.length<danCount;i++){if(!used[danCand[i].num]){picks.push(danCand[i].num);used[danCand[i].num]=true;}}
+        var tuoSorted=scores.slice().filter(function(s){return !used[s.num];}).sort(function(a,b){
+          var aCo=0,bCo=0; picks.forEach(function(p){if(kl8Co[a.num]&&kl8Co[a.num][p])aCo+=kl8Co[a.num][p];});
+          picks.forEach(function(p){if(kl8Co[b.num]&&kl8Co[b.num][p])bCo+=kl8Co[b.num][p];});
+          return (b.lastMissScore*0.3+b.zoneScore*0.2+bCo/recentK*0.3+b.wf*0.2)-(a.lastMissScore*0.3+a.zoneScore*0.2+aCo/recentK*0.3+a.wf*0.2);
+        });
+        var zc=[0,0,0,0]; picks.forEach(function(n){zc[n<=20?0:n<=40?1:n<=60?2:3]++;});
+        for(var i=0;i<tuoSorted.length&&picks.length<pt;i++){var n=tuoSorted[i].num,z=n<=20?0:n<=40?1:n<=60?2:3;if(zc[z]<2){picks.push(n);used[n]=true;zc[z]++;}}
+        for(var i=0;i<tuoSorted.length&&picks.length<pt;i++){if(!used[tuoSorted[i].num]){picks.push(tuoSorted[i].num);used[tuoSorted[i].num]=true;}}
+        picks.sort(function(a,b){return a-b;}); return picks;
+      } else {
+        var picks=[], used={};
+        var hotNums=scores.filter(function(s){return s.wf>0.15;}).map(function(s){return s.num;});
+        var warmNums=scores.filter(function(s){return s.wf>0.06&&s.wf<=0.15;}).map(function(s){return s.num;});
+        var coldNums=scores.filter(function(s){return s.wf<=0.06&&s.lastMissScore>0.5;}).map(function(s){return s.num;});
+        var repCand=scores.slice().filter(function(s){return lastTrain.indexOf(s.num)>=0&&s.totalScore>0.5;}).sort(function(a,b){return b.totalScore-a.totalScore;});
+        for(var i=0;i<repCand.length&&picks.length<2;i++){if(!used[repCand[i].num]){picks.push(repCand[i].num);used[repCand[i].num]=true;}}
+        var missCand=scores.slice().filter(function(s){return s.lastMissScore>=0.55&&s.lastMissScore<=0.85&&!used[s.num];}).sort(function(a,b){return b.lastMissScore-a.lastMissScore;});
+        for(var i=0;i<missCand.length&&picks.length<4;i++){if(!used[missCand[i].num]){picks.push(missCand[i].num);used[missCand[i].num]=true;}}
+        for(var i=0;i<hotNums.length&&picks.length<7;i++){if(!used[hotNums[i]]){picks.push(hotNums[i]);used[hotNums[i]]=true;}}
+        for(var i=0;i<warmNums.length&&picks.length<9;i++){if(!used[warmNums[i]]){picks.push(warmNums[i]);used[warmNums[i]]=true;}}
+        for(var i=0;i<coldNums.length&&picks.length<pt;i++){if(!used[coldNums[i]]){picks.push(coldNums[i]);used[coldNums[i]]=true;}}
+        var zc=[0,0,0,0]; picks.forEach(function(n){zc[n<=20?0:n<=40?1:n<=60?2:3]++;});
+        for(var z=0;z<4;z++){if(zc[z]===0){var zcand=scores.filter(function(s){var sz=s.num<=20?0:s.num<=40?1:s.num<=60?2:3;return sz===z&&!used[s.num];}).sort(function(a,b){return b.totalScore-a.totalScore;});
+        if(zcand.length>0){if(picks.length>=pt){var mz=zc.indexOf(Math.max.apply(null,zc));if(mz!==z&&zc[mz]>2){for(var ri=0;ri<picks.length;ri++){var rz=picks[ri]<=20?0:picks[ri]<=40?1:picks[ri]<=60?2:3;if(rz===mz){used[picks[ri]]=false;picks[ri]=zcand[0].num;used[zcand[0].num]=true;break;}}}}else{picks.push(zcand[0].num);used[zcand[0].num]=true;}zc[z]++;}}}
+        for(var i=0;i<scores.length&&picks.length<pt;i++){if(!used[scores[i].num]){picks.push(scores[i].num);used[scores[i].num]=true;}}
+        picks.sort(function(a,b){return a-b;}); return picks;
+      }
+    }
+
+    // 按玩法生成V3策略推荐
     var ptResults = {};
     for (var pi = 0; pi < playTypes.length; pi++) {
       var pt = playTypes[pi];
-
-      // 方案1：区间均衡+热号
-      var s1 = scores.slice(0, pt).map(function(s){ return s.num; });
-
-      // 方案2：冷号优先
-      var cold = scores.slice().sort(function(a,b){return b.mp - a.mp;}).slice(0, pt).map(function(s){return s.num;});
-      var hot = scores.slice(0, Math.ceil(pt*0.4)).map(function(s){return s.num;});
-      var rec2raw = cold.slice(0, Math.ceil(pt*0.6)).concat(hot.filter(function(n){return cold.indexOf(n)<0;}).slice(0, Math.floor(pt*0.4)));
-      var s2 = [];
-      for (var i2=0; i2<rec2raw.length && s2.length<pt; i2++) if (s2.indexOf(rec2raw[i2])<0) s2.push(rec2raw[i2]);
-      for (var j2=0; j2<scores.length && s2.length<pt; j2++) if (s2.indexOf(scores[j2].num)<0) s2.push(scores[j2].num);
-
-      // 方案3：尾数分散
-      var tailUsed = {};
-      var s3 = [];
-      for (var i3 = 0; i3 < scores.length && s3.length < pt; i3++) {
-        var n3 = scores[i3].num;
-        var t3 = n3 % 10;
-        if (!tailUsed[t3] || s3.length >= pt - 2) { s3.push(n3); tailUsed[t3] = true; }
-      }
-
-      // 方案4：重号优选（仅选真正的重号，最多5个，剩余排除重号）
-      var maxRepeat4 = Math.min(3, Math.floor(pt * 0.25));
-      var s4 = scores.filter(function(s){ return lastTrain.indexOf(s.num) >= 0; }).slice(0, maxRepeat4).map(function(s){ return s.num; });
-      for (var i4 = 0; i4 < scores.length && s4.length < pt; i4++) {
-        var n4 = scores[i4].num;
-        if (s4.indexOf(n4) < 0 && lastTrain.indexOf(n4) < 0) s4.push(n4);
-      }
-
       ptResults[pt] = {
-        s1: s1, s2: s2, s3: s3, s4: s4
+        s1: genS1(pt), s2: genS2(pt), s3: genS3(pt), s4: genS4(pt), s5: genS5(pt)
       };
     }
 
@@ -4279,17 +4381,17 @@ function runKL8AutoReview(history) {
 
   // 计算各玩法各策略平均命中
   var avgHits = {};
+  var strategyNames = ['区间均衡+热号', '冷号优先+遗漏', '共现簇策略', '重号优选', '专家技巧综合'];
   for (var pi = 0; pi < playTypes.length; pi++) {
     var pt = playTypes[pi];
-    avgHits[pt] = {
-      s1: results.reduce(function(s,r){return s+r.hitCount(r.ptResults[pt].s1, r.actual);},0) / results.length,
-      s2: results.reduce(function(s,r){return s+r.hitCount(r.ptResults[pt].s2, r.actual);},0) / results.length,
-      s3: results.reduce(function(s,r){return s+r.hitCount(r.ptResults[pt].s3, r.actual);},0) / results.length,
-      s4: results.reduce(function(s,r){return s+r.hitCount(r.ptResults[pt].s4, r.actual);},0) / results.length
-    };
+    avgHits[pt] = {};
+    for (var si = 0; si < 5; si++) {
+      var key = 's' + (si + 1);
+      avgHits[pt][key] = results.reduce(function(s,r){return s+r.hitCount(r.ptResults[pt][key], r.actual);},0) / results.length;
+    }
   }
 
-  // 分析偏差：实际开奖但未被Top10推荐的号码
+  // 分析偏差
   var missedByTop = [];
   results.forEach(function(r){
     r.actual.forEach(function(n){
@@ -4297,7 +4399,6 @@ function runKL8AutoReview(history) {
     });
   });
 
-  // 统计missed号码的维度特征
   var missedZones = [0,0,0,0];
   var missedOdd = 0, missedEven = 0;
   missedByTop.forEach(function(n){
@@ -4307,18 +4408,16 @@ function runKL8AutoReview(history) {
 
   var insights = [];
 
-  // 找出各玩法最优策略
   for (var pi = 0; pi < playTypes.length; pi++) {
     var pt = playTypes[pi];
     var a = avgHits[pt];
-    var maxHit = Math.max(a.s1, a.s2, a.s3, a.s4);
-    var bestIdx = [a.s1, a.s2, a.s3, a.s4].indexOf(maxHit);
-    var names = ['区间均衡+热号', '冷号优先+遗漏', '尾数分散', '重号优选'];
-    insights.push('选' + playTypeNames[pt] + '最优策略：' + names[bestIdx] + '（平均命中' + maxHit.toFixed(1) + '个）');
+    var maxHit = Math.max(a.s1, a.s2, a.s3, a.s4, a.s5);
+    var bestIdx = [a.s1, a.s2, a.s3, a.s4, a.s5].indexOf(maxHit);
+    insights.push('选' + playTypeNames[pt] + '最优策略：' + strategyNames[bestIdx] + '（平均命中' + maxHit.toFixed(1) + '个）');
   }
 
-  var maxMissedZone = missedZones.indexOf(Math.max.apply(null, missedZones));
   var zoneNames = ['一区(01-20)', '二区(21-40)', '三区(41-60)', '四区(61-80)'];
+  var maxMissedZone = missedZones.indexOf(Math.max.apply(null, missedZones));
   if (missedZones[maxMissedZone] > missedByTop.length * 0.3) {
     insights.push('实际开奖中' + zoneNames[maxMissedZone] + '被遗漏最多（' + missedZones[maxMissedZone] + '个），建议提升该区权重');
   }
@@ -4331,23 +4430,23 @@ function runKL8AutoReview(history) {
 
   // 生成HTML
   var html = '<div style="margin-top:16px;padding:12px;background:var(--bg3);border-radius:8px;border:2px solid var(--accent3)">';
-  html += '<h4 style="margin:0 0 8px 0;color:var(--ink)">🤖 自动复盘报告（近' + testCount + '期回溯）</h4>';
+  html += '<h4 style="margin:0 0 8px 0;color:var(--ink)">🤖 V3 自动复盘报告（近' + testCount + '期回溯）</h4>';
 
   results.forEach(function(r, idx){
     html += '<div style="margin:8px 0;padding:8px;background:var(--bg2);border-radius:6px">';
     html += '<div style="font-weight:bold;color:var(--ink);font-size:12px">' + r.period + '</div>';
     html += '<div style="color:var(--muted);font-size:11px;margin:2px 0">实际开奖：' + r.actual.map(function(n){return String(n).padStart(2,'0');}).join(',') + '</div>';
 
-    // 按玩法显示对比
     for (var pi = 0; pi < playTypes.length; pi++) {
       var pt = playTypes[pi];
       var ptr = r.ptResults[pt];
       html += '<div style="margin-top:4px;padding:4px 6px;background:var(--bg);border-radius:4px">';
       html += '<span style="font-weight:bold;color:var(--ink);font-size:11px">选' + playTypeNames[pt] + '</span> ';
-      html += '<span style="font-size:11px;background:var(--accent3);color:#000;padding:1px 4px;border-radius:3px;margin-left:4px">S1:' + r.hitCount(ptr.s1, r.actual) + '</span>';
-      html += '<span style="font-size:11px;background:var(--accent);color:#000;padding:1px 4px;border-radius:3px;margin-left:2px">S2:' + r.hitCount(ptr.s2, r.actual) + '</span>';
-      html += '<span style="font-size:11px;background:var(--accent5);color:#000;padding:1px 4px;border-radius:3px;margin-left:2px">S3:' + r.hitCount(ptr.s3, r.actual) + '</span>';
-      html += '<span style="font-size:11px;background:var(--accent2);color:#000;padding:1px 4px;border-radius:3px;margin-left:2px">S4:' + r.hitCount(ptr.s4, r.actual) + '</span>';
+      for (var si = 0; si < 5; si++) {
+        var key = 's' + (si + 1);
+        var colors = ['var(--accent3)', 'var(--accent)', 'var(--accent5)', 'var(--accent2)', 'var(--accent4)'];
+        html += '<span style="font-size:11px;background:' + colors[si] + ';color:#000;padding:1px 4px;border-radius:3px;margin-left:2px">S' + (si+1) + ':' + r.hitCount(ptr[key], r.actual) + '</span>';
+      }
       html += '</div>';
     }
     html += '</div>';
