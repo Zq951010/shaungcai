@@ -6536,51 +6536,74 @@ function spinSSQLottery() {
   var allBlueNums = [];
   for (var n = 1; n <= 16; n++) allBlueNums.push(n);
 
-  // 生成5套7+2复式套餐票（每套7红+2蓝 = C(7,6)×C(2,1) = 14注）
+  // 生成2种套餐票：¥18（8+1复式 = C(8,6)×1 = 28注→¥56 不对）
+  // ¥18 = 9注单式（6红+1蓝×9注），¥28 = 7+2复式（14注）
   var results = [];
-  for (var set = 0; set < 5; set++) {
-    var redPicks = weightedPick(allRedNums, redScores, 7);
-    var bluePicks = weightedPick(allBlueNums, blueScores, 2);
-    redPicks.sort(function(a,b){return a-b;});
-    bluePicks.sort(function(a,b){return a-b;});
-    results.push({ red: redPicks, blue: bluePicks });
+
+  // ¥18套餐：9注单式（6红+1蓝），每注¥2，共9注
+  var ticket18 = { red: [], blue: [], type: '18', bets: [] };
+  for (var i = 0; i < 9; i++) {
+    var r = weightedPick(allRedNums, redScores, 6);
+    var b = weightedPick(allBlueNums, blueScores, 1);
+    r.sort(function(a,b){return a-b;});
+    ticket18.bets.push({ red: r, blue: b[0] });
   }
+
+  // ¥28套餐：7+2复式（7红+2蓝 = C(7,6)×C(2,1) = 14注）
+  var ticket28 = { red: weightedPick(allRedNums, redScores, 7), blue: weightedPick(allBlueNums, blueScores, 2), type: '28' };
+  ticket28.red.sort(function(a,b){return a-b;});
+  ticket28.blue.sort(function(a,b){return a-b;});
 
   var _redScoreMap = {};
   redScores.forEach(function(s){ _redScoreMap[s.num] = s; });
 
   var html = '<div style="padding:0.5rem">';
-  html += '<div style="text-align:center;margin-bottom:1rem;font-size:0.9rem;color:var(--muted)">基于大模型评分加权抽选，每套为<strong style="color:var(--accent)">7红+2蓝复式套餐票</strong>（每套含14注）</div>';
-  for (var s = 0; s < results.length; s++) {
-    // 胆码：评分最高的3个红球
-    var scoredReds = results[s].red.map(function(n){
-      var sc = _redScoreMap[n];
-      return {num: n, score: sc ? sc.totalScore : 0};
-    }).sort(function(a,b){return b.score - a.score;});
-    var danNums = scoredReds.slice(0,3).map(function(x){return x.num;});
 
-    html += '<div style="padding:0.8rem 1rem;margin-bottom:0.8rem;background:var(--bg3);border-radius:8px;border:2px solid var(--accent)">';
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem">';
-    html += '<span style="font-weight:700;color:var(--accent);font-size:0.95rem">套餐'+(s+1)+'（7+2复式）</span>';
-    html += '<span style="font-size:0.75rem;color:var(--muted);background:var(--bg2);padding:2px 8px;border-radius:4px">共14注 ¥28</span>';
-    html += '</div>';
-    html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.4rem">';
-    html += '<span style="font-size:0.75rem;color:var(--muted);min-width:35px">红球</span>';
-    results[s].red.forEach(function(n){
+  // ¥18套餐展示
+  html += '<div style="margin-bottom:1.2rem;padding:1rem;background:var(--bg3);border-radius:8px;border:2px solid var(--accent3)">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.8rem">';
+  html += '<span style="font-weight:700;color:var(--accent3);font-size:1.05rem">&#127922; ¥18 套餐票（9注单式）</span>';
+  html += '<span style="font-size:0.8rem;color:var(--muted);background:var(--bg2);padding:2px 8px;border-radius:4px">共9注 ¥18</span>';
+  html += '</div>';
+  for (var i = 0; i < ticket18.bets.length; i++) {
+    var bet = ticket18.bets[i];
+    var scoredReds = bet.red.map(function(n){ return {num:n, score:(_redScoreMap[n]||{}).totalScore||0}; }).sort(function(a,b){return b.score-a.score;});
+    var danNums = scoredReds.slice(0,2).map(function(x){return x.num;});
+    html += '<div style="display:flex;align-items:center;gap:0.4rem;padding:0.4rem 0;border-bottom:1px solid var(--rule)">';
+    html += '<span style="font-size:0.7rem;color:var(--muted);min-width:32px">第'+(i+1)+'注</span>';
+    bet.red.forEach(function(n){
       var isDan = danNums.indexOf(n) >= 0;
-      html += '<div class="ball '+(isDan?'gold':'red')+'" style="width:34px;height:34px;font-size:0.75rem;'+(isDan?'box-shadow:0 0 8px rgba(245,158,11,0.6);':'')+'">'+pad(n)+'</div>';
+      html += '<div class="ball '+(isDan?'gold':'red')+'" style="width:30px;height:30px;font-size:0.7rem;'+(isDan?'box-shadow:0 0 6px rgba(245,158,11,0.6);':'')+'">'+pad(n)+'</div>';
     });
-    html += '</div>';
-    html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">';
-    html += '<span style="font-size:0.75rem;color:var(--muted);min-width:35px">蓝球</span>';
-    results[s].blue.forEach(function(n){
-      html += '<div class="ball blue" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
-    });
-    html += '</div>';
-    // 胆码提示
-    html += '<div style="margin-top:0.4rem;font-size:0.7rem;color:var(--muted)">胆码（评分最高3个）: '+danNums.map(function(n){return pad(n);}).join(' ')+'</div>';
+    html += '<div class="ball blue" style="width:30px;height:30px;font-size:0.7rem">'+pad(bet.blue)+'</div>';
     html += '</div>';
   }
+  html += '</div>';
+
+  // ¥28套餐展示
+  html += '<div style="padding:1rem;background:var(--bg3);border-radius:8px;border:2px solid var(--accent)">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.8rem">';
+  html += '<span style="font-weight:700;color:var(--accent);font-size:1.05rem">&#127922; ¥28 套餐票（7+2复式）</span>';
+  html += '<span style="font-size:0.8rem;color:var(--muted);background:var(--bg2);padding:2px 8px;border-radius:4px">共14注 ¥28</span>';
+  html += '</div>';
+  var scoredReds28 = ticket28.red.map(function(n){ return {num:n, score:(_redScoreMap[n]||{}).totalScore||0}; }).sort(function(a,b){return b.score-a.score;});
+  var danNums28 = scoredReds28.slice(0,3).map(function(x){return x.num;});
+  html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.4rem">';
+  html += '<span style="font-size:0.75rem;color:var(--muted);min-width:35px">红球</span>';
+  ticket28.red.forEach(function(n){
+    var isDan = danNums28.indexOf(n) >= 0;
+    html += '<div class="ball '+(isDan?'gold':'red')+'" style="width:34px;height:34px;font-size:0.75rem;'+(isDan?'box-shadow:0 0 8px rgba(245,158,11,0.6);':'')+'">'+pad(n)+'</div>';
+  });
+  html += '</div>';
+  html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap">';
+  html += '<span style="font-size:0.75rem;color:var(--muted);min-width:35px">蓝球</span>';
+  ticket28.blue.forEach(function(n){
+    html += '<div class="ball blue" style="width:34px;height:34px;font-size:0.75rem">'+pad(n)+'</div>';
+  });
+  html += '</div>';
+  html += '<div style="margin-top:0.4rem;font-size:0.7rem;color:var(--muted)">胆码（评分最高3个）: '+danNums28.map(function(n){return pad(n);}).join(' ')+'</div>';
+  html += '</div>';
+
   html += '</div>';
 
   document.getElementById('ssq-lottery-results').innerHTML = html;
