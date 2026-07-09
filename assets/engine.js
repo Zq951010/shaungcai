@@ -2730,11 +2730,11 @@ function getRecent15Trend(allDraws) {
 
 function getSSQAdaptiveWeights() {
   var defaults = {
-    wf: 0.16, mpScore: 0.14, mkScore: 0.11, zoneScore: 0.09,
-    tailScore: 0.07, oddAltScore: 0.04, sizeScore: 0.04,
-    neighborScore: 0.07, pairScore: 0.05, hcScore: 0.07,
-    stability: 0.04, maScore: 0.04, cycleScore: 0.04,
-    coScore: 0.15
+    wf: 0.14, mpScore: 0.16, mkScore: 0.06, zoneScore: 0.12,
+    tailScore: 0.06, oddAltScore: 0.05, sizeScore: 0.05,
+    neighborScore: 0.08, pairScore: 0.05, hcScore: 0.05,
+    stability: 0.03, maScore: 0.04, cycleScore: 0.04,
+    coScore: 0.14, lastMissScore: 0.06
   };
   try {
     var saved = localStorage.getItem('ssq_adaptive_weights');
@@ -2775,6 +2775,13 @@ function scoreSSQNumbers(last, allReds, weights) {
     }
     var zoneAvg = recentZoneCounts[zoneIdx] / recentN;
     var zoneScore = zoneAvg < 1.5 ? 0.9 : zoneAvg < 2 ? 0.7 : 0.4;
+    // 上期区间偏态回补
+    var lastZoneCounts = [0, 0, 0];
+    last.red.forEach(function(x){ lastZoneCounts[x<=11?0:x<=22?1:2]++; });
+    var maxZ = lastZoneCounts.indexOf(Math.max.apply(null, lastZoneCounts));
+    var minZ = lastZoneCounts.indexOf(Math.min.apply(null, lastZoneCounts));
+    if (zoneIdx === minZ && lastZoneCounts[maxZ] - lastZoneCounts[zoneIdx] >= 2) { zoneScore += 0.15; }
+    else if (zoneIdx === maxZ && lastZoneCounts[zoneIdx] >= 4) { zoneScore -= 0.10; }
 
     var tail = n % 10;
     var tails = [0,0,0,0,0,0,0,0,0,0];
@@ -2844,6 +2851,19 @@ function scoreSSQNumbers(last, allReds, weights) {
 
     var stability = 1 - Math.abs(wf - 0.18) * 3;
 
+    // SSQ上期遗漏回补评分（与KL8一致）
+    var lastMissScore = 0;
+    if (last.red.indexOf(n) < 0) {
+      for (var mi = 0; mi < allReds.length; mi++) {
+        if (allReds[mi].indexOf(n) >= 0) break;
+      }
+      var miss = mi;
+      if (miss >= 2 && miss <= 4) lastMissScore = 0.95;
+      else if (miss >= 5 && miss <= 7) lastMissScore = 0.85;
+      else if (miss >= 8 && miss <= 12) lastMissScore = 0.65;
+      else if (miss >= 13) lastMissScore = 0.40;
+    }
+
     // 移动平均趋势评分
     var ma = movingAverageTrend(n, allReds);
     var maScore = ma.trend === 'up' ? 0.9 : ma.trend === 'warming' ? 0.75 : ma.trend === 'stable' ? 0.6 : 0.4;
@@ -2852,7 +2872,7 @@ function scoreSSQNumbers(last, allReds, weights) {
     var cycle = cycleAnalysis(n, allReds);
     var cycleScore = cycle.score;
 
-    var baseScore = wf*w.wf + mpScore*w.mpScore + mkScore*w.mkScore + zoneScore*w.zoneScore + tailScore*w.tailScore + oddAltScore*w.oddAltScore + sizeScore*w.sizeScore + neighborScore*w.neighborScore + pairScore*w.pairScore + hcScore*w.hcScore + stability*w.stability + maScore*w.maScore + cycleScore*w.cycleScore + crossLotteryScore*0.05;
+    var baseScore = wf*w.wf + mpScore*w.mpScore + mkScore*w.mkScore + zoneScore*w.zoneScore + tailScore*w.tailScore + oddAltScore*w.oddAltScore + sizeScore*w.sizeScore + neighborScore*w.neighborScore + pairScore*w.pairScore + hcScore*w.hcScore + stability*w.stability + maScore*w.maScore + cycleScore*w.cycleScore + crossLotteryScore*0.05 + lastMissScore*w.lastMissScore;
 
     var reasons = [];
     if (wf > 0.2) reasons.push('高频');
@@ -2918,7 +2938,20 @@ function scoreSSQBlueNumbers(last, allBlues) {
     var cycle = cycleAnalysis(n, blueHistory);
     var cycleScore = cycle.score;
 
-    var totalScore = wf * 0.25 + mpScore * 0.20 + mkScore * 0.11 + oddScore * 0.11 + sizeScore * 0.11 + tailScore * 0.09 + maScore * 0.04 + cycleScore * 0.04;
+    // 蓝球遗漏回补评分
+    var lastMissBlue = 0;
+    if (last.blue !== n) {
+      for (var bmi = 0; bmi < allBlues.length; bmi++) {
+        if (allBlues[bmi] === n) break;
+      }
+      var blueMiss = bmi;
+      if (blueMiss >= 3 && blueMiss <= 6) lastMissBlue = 0.95;
+      else if (blueMiss >= 7 && blueMiss <= 10) lastMissBlue = 0.80;
+      else if (blueMiss >= 11 && blueMiss <= 15) lastMissBlue = 0.55;
+      else if (blueMiss >= 16) lastMissBlue = 0.35;
+    }
+
+    var totalScore = wf * 0.22 + mpScore * 0.22 + mkScore * 0.06 + oddScore * 0.10 + sizeScore * 0.10 + tailScore * 0.08 + maScore * 0.04 + cycleScore * 0.04 + lastMissBlue * 0.14;
 
     var reasons = [];
     if (wf > 0.2) reasons.push('高频');
@@ -3871,11 +3904,12 @@ function renderKL8DanTuo(last, history, playType, targetId) {
 
 function getKL8AdaptiveWeights() {
   var defaults = {
-    wf: 0.10, mpScore: 0.15, zoneScore: 0.13,
-    neighborScore: 0.11, oddEvenScore: 0.08, bigSmallScore: 0.08,
-    lastMissScore: 0.16, tailScore: 0.07, stability: 0.04,
-    consecutiveScore: 0.06, maScore: 0.04, cycleScore: 0.06,
-    heatDecay: 0.05, sumRegression: 0.04, lu012Score: 0.05
+    wf: 0.10, mpScore: 0.15, zoneScore: 0.14,
+    neighborScore: 0.10, oddEvenScore: 0.07, bigSmallScore: 0.07,
+    lastMissScore: 0.18, tailScore: 0.06, stability: 0.03,
+    consecutiveScore: 0.05, maScore: 0.04, cycleScore: 0.05,
+    heatDecay: 0.04, sumRegression: 0.06, lu012Score: 0.05,
+    coScore: 0.06
   };
   try {
     var saved = localStorage.getItem('kl8_adaptive_weights_v2');
@@ -3916,6 +3950,21 @@ function scoreKL8Numbers(last, history, weights) {
     bigBias: kl8BigCounts.filter(function(x){return x>=12||x<=8;}).length,
     pairFreq: kl8PairCounts.filter(function(x){return x>=4;}).length
   };
+
+  // KL8共现分析：构建号码间共现矩阵
+  var kl8Co = {};
+  var recentK = Math.min(10, history.length);
+  for (var ri = 0; ri < recentK; ri++) {
+    for (var ra = 0; ra < history[ri].length; ra++) {
+      for (var rb = ra + 1; rb < history[ri].length; rb++) {
+        var a = history[ri][ra], b = history[ri][rb];
+        if (!kl8Co[a]) kl8Co[a] = {};
+        if (!kl8Co[b]) kl8Co[b] = {};
+        kl8Co[a][b] = (kl8Co[a][b] || 0) + 1;
+        kl8Co[b][a] = (kl8Co[b][a] || 0) + 1;
+      }
+    }
+  }
 
   for (var n = 1; n <= 80; n++) {
     var wf = weightedFreq(n, history, 12);
@@ -4086,15 +4135,15 @@ function scoreKL8Numbers(last, history, weights) {
       else if (lastMiss >= 19 && lastMiss <= 25) lastMissScore = 0.40;
     }
 
-    // 热号衰减：连续2-3期出现的热号降低评分（防止过度追捧）
+    // 热号衰减：收紧衰减条件，近2期连续出现即降温
     var heatDecay = 0;
     var recentAppear = 0;
     for (var hi = 0; hi < Math.min(3, history.length); hi++) {
       if (history[hi].indexOf(n) >= 0) recentAppear++;
     }
-    if (recentAppear >= 3) heatDecay = -0.25;
-    else if (recentAppear >= 2) heatDecay = -0.12;
-    else if (recentAppear === 0 && wf > 0.20) heatDecay = 0.08; // 隔期热号回升
+    if (recentAppear >= 3) heatDecay = -0.30;
+    else if (recentAppear >= 2 && history.length > 1 && history[0].indexOf(n) >= 0 && history[1].indexOf(n) >= 0) heatDecay = -0.18;
+    else if (recentAppear === 0 && wf > 0.20) heatDecay = 0.10; // 隔期热号回升增强
 
     // 和值回归信号：计算历史平均和值，号码对回归的贡献
     var sumRegression = 0;
@@ -4132,8 +4181,19 @@ function scoreKL8Numbers(last, history, weights) {
     if (sumRegression > 0.1) reasons.push('和值回归');
     if (lu012Score > 0.7) reasons.push('012路优');
 
-    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, zoneScore: zoneScore, oddEvenScore: oddEvenScore, bigSmallScore: bigSmallScore, tailScore: tailScore, neighborScore: neighborScore, lastMissScore: lastMissScore, stability: stability, maScore: maScore, cycleScore: cycleScore, heatDecay: heatDecay, sumRegression: sumRegression, lu012Score: lu012Score, totalScore: totalScore, reasons: reasons });
+    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, zoneScore: zoneScore, oddEvenScore: oddEvenScore, bigSmallScore: bigSmallScore, tailScore: tailScore, neighborScore: neighborScore, lastMissScore: lastMissScore, stability: stability, maScore: maScore, cycleScore: cycleScore, heatDecay: heatDecay, sumRegression: sumRegression, lu012Score: lu012Score, totalScore: totalScore, reasons: reasons, coScore: 0 });
   }
+
+  // KL8共现评分增强：基于top15号码的共现关系二次调整
+  var topK = scores.slice().sort(function(a,b){return b.totalScore-a.totalScore;}).slice(0, 15).map(function(s){return s.num;});
+  scores.forEach(function(s){
+    var coSum = 0, coCount = 0;
+    topK.forEach(function(t){
+      if (t !== s.num && kl8Co[s.num] && kl8Co[s.num][t]) { coSum += kl8Co[s.num][t]; coCount++; }
+    });
+    s.coScore = coCount ? Math.min(coSum / coCount / recentK * 3, 1) : 0;
+    s.totalScore = s.totalScore + s.coScore * w.coScore;
+  });
   return scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 }
 
