@@ -7963,7 +7963,7 @@ function renderKL8PredictionHistory() {
         var idx = -1;
         for(var i=0;i<existing.length;i++){if(existing[i].key===rec.key){idx=i;break;}}
         if(idx>=0)existing[idx]=rec;else existing.unshift(rec);
-        if(existing.length>50)existing=existing.slice(0,50);
+        if(existing.length>KL8_MAX_PREDICTIONS)existing=existing.slice(0,KL8_MAX_PREDICTIONS);
         localStorage.setItem(KL8_PREDICTION_STORAGE_KEY, JSON.stringify(existing));
       });
       history = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');

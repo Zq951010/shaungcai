@@ -1206,7 +1206,7 @@ tr:hover td { background: var(--bg3); }
           <span class="badge-sm" style="background:var(--accent);color:#000">6</span>模型复盘与推荐
         </button>
         <button class="dlt-sidebar-btn" onclick="switchKL8Tab('kl8-tab7', this)">
-          <span class="badge-sm" style="background:var(--accent4);color:#fff">7</span>往期预测记录
+          <span class="badge-sm" style="background:var(--accent4);color:#fff">7</span>每日推荐命中
         </button>
       </div>
 
@@ -1333,9 +1333,9 @@ tr:hover td { background: var(--bg3); }
         </div>
         <div class="dlt-tab" id="kl8-tab7">
           <div class="card">
-            <div class="card-title"><span class="icon">&#128190;</span> 7. 往期预测记录</div>
+            <div class="card-title"><span class="icon">&#127919;</span> 7. 每日推荐命中</div>
             <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
-              自动保存每次生成的选五/选十推荐号码，开奖后自动验证命中情况。支持清除历史记录。
+              自动保存每日选五/选十推荐号码，更新开奖数据后自动验证命中情况。数据保存在本地，不会丢失。
             </div>
             <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
               <button class="btn btn-primary" onclick="renderKL8PredictionHistory()" style="padding:0.4rem 1rem;border-radius:8px;font-size:0.8rem">&#128269; 刷新记录</button>
@@ -1737,10 +1737,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026071003"></script>
-<script src="assets/pl-data.js?v=2026071003"></script>
-<script src="assets/pl-engine.js?v=2026071003"></script>
-<script src="assets/auto-review.js?v=2026071003"></script>
+<script src="assets/engine.js?v=2026071004"></script>
+<script src="assets/pl-data.js?v=2026071004"></script>
+<script src="assets/pl-engine.js?v=2026071004"></script>
+<script src="assets/auto-review.js?v=2026071004"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)
@@ -1755,6 +1755,10 @@ window.addEventListener('DOMContentLoaded', function() {
     if (typeof kl8SampleHistory !== 'undefined' && kl8SampleHistory.length > 0 && typeof verifyKL8Predictions === 'function') {
       var latestDraw = kl8SampleHistory[0].split(',').map(Number);
       verifyKL8Predictions(latestDraw);
+    }
+    // 自动渲染预测记录（确保tab7一打开就有数据）
+    if (typeof renderKL8PredictionHistory === 'function') {
+      setTimeout(renderKL8PredictionHistory, 300);
     }
   } catch(e) { console.log('auto-verify error:', e.message); }
 });
