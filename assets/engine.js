@@ -2731,11 +2731,11 @@ function getRecent15Trend(allDraws) {
 
 function getSSQAdaptiveWeights() {
   var defaults = {
-    wf: 0.14, mpScore: 0.16, mkScore: 0.06, zoneScore: 0.12,
+    wf: 0.14, mpScore: 0.16, mkScore: 0.03, zoneScore: 0.12,
     tailScore: 0.06, oddAltScore: 0.05, sizeScore: 0.05,
     neighborScore: 0.08, pairScore: 0.05, hcScore: 0.05,
     stability: 0.03, maScore: 0.04, cycleScore: 0.04,
-    coScore: 0.14, lastMissScore: 0.06
+    coScore: 0.15, lastMissScore: 0.10
   };
   try {
     var saved = localStorage.getItem('ssq_adaptive_weights');
@@ -2852,17 +2852,25 @@ function scoreSSQNumbers(last, allReds, weights) {
 
     var stability = 1 - Math.abs(wf - 0.18) * 3;
 
-    // SSQ上期遗漏回补评分（与KL8一致）
+    // SSQ遗漏回补评分：优化为考虑所有遗漏状态
     var lastMissScore = 0;
-    if (last.red.indexOf(n) < 0) {
-      for (var mi = 0; mi < allReds.length; mi++) {
-        if (allReds[mi].indexOf(n) >= 0) break;
-      }
-      var miss = mi;
-      if (miss >= 2 && miss <= 4) lastMissScore = 0.95;
-      else if (miss >= 5 && miss <= 7) lastMissScore = 0.85;
-      else if (miss >= 8 && miss <= 12) lastMissScore = 0.65;
-      else if (miss >= 13) lastMissScore = 0.40;
+    var missStart = -1;
+    for (var mi = 0; mi < allReds.length; mi++) {
+      if (allReds[mi].indexOf(n) >= 0) { missStart = mi; break; }
+    }
+    if (missStart === -1) {
+      lastMissScore = 0.80; // 完全未出现，中等偏上
+    } else if (missStart === 0) {
+      // 上期刚出，隔期回升信号
+      lastMissScore = 0.30;
+    } else if (missStart >= 1 && missStart <= 2) {
+      lastMissScore = 0.95; // 遗漏1-2期，最强回补
+    } else if (missStart >= 3 && missStart <= 5) {
+      lastMissScore = 0.85; // 遗漏3-5期，强回补
+    } else if (missStart >= 6 && missStart <= 10) {
+      lastMissScore = 0.65; // 遗漏6-10期
+    } else if (missStart >= 11) {
+      lastMissScore = 0.35; // 深冷
     }
 
     // 移动平均趋势评分
@@ -6485,18 +6493,6 @@ function spinSSQLottery() {
     history.unshift({ red: lastRed.slice(0,6).sort(function(a,b){return a-b}), blue: lastBlue[0] });
   }
 
-  // 当期开奖号码（用于命中对比）
-  var actualRed, actualBlue;
-  if (hasInputLast) {
-    actualRed = lastRed.slice(0,6).sort(function(a,b){return a-b});
-    actualBlue = lastBlue[0];
-  } else if (history.length > 0) {
-    actualRed = history[0].red;
-    actualBlue = history[0].blue;
-  } else {
-    alert('请先输入当期开奖号码或历史数据'); return;
-  }
-
   // 用于生成推荐的历史数据（排除当期开奖号码本身，避免信息泄露）
   var genHistory = hasInputLast ? history : history.slice(1);
   if (genHistory.length < 1) { alert('请至少提供1期历史数据用于生成推荐'); return; }
@@ -8077,7 +8073,7 @@ function runSSQBacktest() {
   for (var p = 0; p < periods; p++) {
     var actual = history[p];
     var simHistory = history.slice(p+1, p+6);
-    var lastDraw = simHistory[0].red.concat([simHistory[0].blue]);
+    var lastDraw = simHistory[0];
     var simReds = simHistory.slice(1).map(function(h){ return h.red; });
     var scores = scoreSSQNumbers(lastDraw, simReds);
 
