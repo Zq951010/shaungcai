@@ -7632,8 +7632,21 @@ function filterKL8HistoryByDate() {
 // 渲染预测历史
 function renderKL8PredictionHistory() {
   var history = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
-  // 只保留选五和选十的记录
-  history = history.filter(function(r){ return r.playType === 5 || r.playType === 10; });
+  // 只保留选五和选十的记录，且排除机选旧数据
+  history = history.filter(function(r){ 
+    return (r.playType === 5 || r.playType === 10) && r.playTypeName && r.playTypeName.indexOf('机选') < 0; 
+  });
+  // 自动清理 localStorage 中的旧机选记录
+  try {
+    var allRaw = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
+    var cleaned = allRaw.filter(function(r){ 
+      return (r.playType === 5 || r.playType === 10) && r.playTypeName && r.playTypeName.indexOf('机选') < 0; 
+    });
+    if (cleaned.length !== allRaw.length) {
+      localStorage.setItem(KL8_PREDICTION_STORAGE_KEY, JSON.stringify(cleaned));
+      history = cleaned;
+    }
+  } catch(e) {}
   var container = document.getElementById('kl8-prediction-history');
 
   if (history.length === 0) {
@@ -7665,9 +7678,9 @@ function renderKL8PredictionHistory() {
 
   var html = '';
 
-  // 显示今日待开奖推荐
+  // 显示今日待开奖推荐（过滤掉机选旧数据）
   var todayStr = new Date().toISOString().slice(0,10);
-  var todayRecs = history.filter(function(r){ return r.date === todayStr && !r.verified; });
+  var todayRecs = history.filter(function(r){ return r.date === todayStr && !r.verified && r.playTypeName.indexOf('机选') < 0; });
   if (todayRecs.length > 0) {
     html += '<div style="padding:0.8rem;background:var(--bg3);border-radius:8px;border:2px solid var(--accent);margin-bottom:1rem">';
     html += '<div style="font-weight:700;color:var(--accent);margin-bottom:0.5rem;font-size:0.9rem">&#127775; 今日推荐（待开奖）</div>';
@@ -7711,6 +7724,7 @@ function renderKL8PredictionHistory() {
     for (var i = 0; i < verifiedRecs.length; i++) {
       for (var j = 0; j < verifiedRecs[i].strategies.length; j++) {
         var sn = verifiedRecs[i].strategies[j].name;
+        if (sn.indexOf('机选') >= 0) continue; // 过滤旧机选策略
         if (!strategyHitMap[sn]) { strategyHitMap[sn] = 0; strategyTotalMap[sn] = 0; }
         strategyHitMap[sn] += (verifiedRecs[i].strategies[j].hits || 0);
         strategyTotalMap[sn] += verifiedRecs[i].playType;
