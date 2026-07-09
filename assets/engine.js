@@ -5868,7 +5868,7 @@ function spinDLTLottery() {
   var allBackNums = [];
   for (var n = 1; n <= 12; n++) allBackNums.push(n);
 
-  // 构建质量分所需的评分映射
+  // 构建质量分所需的评分映射 (DLT V3)
   var _frontScoreMap = {};
   frontScores.forEach(function(s){ _frontScoreMap[s.num] = s; });
   var _backScoreMap = {};
