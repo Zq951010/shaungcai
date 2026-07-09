@@ -7577,7 +7577,7 @@ function spinKL8Review() {
 // ==================== KL8往期预测记录模块 ====================
 
 var KL8_PREDICTION_STORAGE_KEY = 'kl8_prediction_history';
-var KL8_MAX_PREDICTIONS = 50;
+var KL8_MAX_PREDICTIONS = 100; // 最多保存100条（约50天数据）
 
 // 保存预测记录
 function saveKL8Prediction(lastDraw, playType, strategies) {
