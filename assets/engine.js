@@ -3599,6 +3599,8 @@ function analyzeKL8() {
   try { renderKL8Tail(history); } catch(e) { console.log('renderKL8Tail error:', e.message); }
   try { renderKL8Consecutive(history); } catch(e) { console.log('renderKL8Consecutive error:', e.message); }
   try { renderKL8AC(history); } catch(e) { console.log('renderKL8AC error:', e.message); }
+  try { renderKL8MissTrend(history); } catch(e) { console.log('renderKL8MissTrend error:', e.message); }
+  try { renderKL8Lu012(history); } catch(e) { console.log('renderKL8Lu012 error:', e.message); }
   try { renderKL8DanTuo(last, history, 5, 'kl8-dantuo-5'); } catch(e) { console.log('renderKL8DanTuo 5 error:', e.message); }
   try { renderKL8DanTuo(last, history, 10, 'kl8-dantuo-10'); } catch(e) { console.log('renderKL8DanTuo 10 error:', e.message); }
   try { renderKL8AllPlayTypes_V2(last, history); } catch(e) { console.log('renderKL8AllPlayTypes_V2 error:', e.message); }
@@ -3869,11 +3871,11 @@ function renderKL8DanTuo(last, history, playType, targetId) {
 
 function getKL8AdaptiveWeights() {
   var defaults = {
-    wf: 0.09, mpScore: 0.13, mkScore: 0.10, zoneScore: 0.12,
-    neighborScore: 0.10, oddEvenScore: 0.07, bigSmallScore: 0.07,
-    lastMissScore: 0.14, tailScore: 0.06, stability: 0.03,
-    consecutiveScore: 0.05, maScore: 0.03, cycleScore: 0.05,
-    heatDecay: 0.04, sumRegression: 0.03
+    wf: 0.10, mpScore: 0.15, zoneScore: 0.13,
+    neighborScore: 0.11, oddEvenScore: 0.08, bigSmallScore: 0.08,
+    lastMissScore: 0.16, tailScore: 0.07, stability: 0.04,
+    consecutiveScore: 0.06, maScore: 0.04, cycleScore: 0.06,
+    heatDecay: 0.05, sumRegression: 0.04, lu012Score: 0.05
   };
   try {
     var saved = localStorage.getItem('kl8_adaptive_weights_v2');
@@ -3919,10 +3921,25 @@ function scoreKL8Numbers(last, history, weights) {
     var wf = weightedFreq(n, history, 12);
     var dist = getMissDistribution(n, history);
     var mp = getMissPercentile(n, history);
-    var mk = markovProb(n, history);
 
     var mpScore = mp > 0.85 ? 1.0 : (mp > 0.7 ? 0.8 : (mp > 0.5 ? 0.6 : 0.3));
-    var mkScore = mk.pBtoA > mk.pAtoA ? 0.9 : (mk.pBtoA > 0.3 ? 0.7 : 0.4);
+
+    // 012路分析评分（0路:3,6,9...; 1路:1,4,7...; 2路:2,5,8...）
+    var lu = n % 3;
+    var luCounts = [0, 0, 0];
+    for (var hi = 0; hi < history.length; hi++) {
+      for (var hj = 0; hj < history[hi].length; hj++) {
+        luCounts[history[hi][hj] % 3]++;
+      }
+    }
+    var luTotal = luCounts.reduce(function(a,b){return a+b;},0) || 1;
+    var luRatios = luCounts.map(function(c){return c/luTotal;});
+    var lu012Score = 1 - Math.abs(luRatios[lu] - 1/3) * 4;
+    // 上期012路偏态回补：某路出现>=9次则降温，<=5次则升温
+    var lastLuCounts = [0, 0, 0];
+    for (var lj = 0; lj < last.length; lj++) { lastLuCounts[last[lj] % 3]++; }
+    if (lastLuCounts[lu] >= 9) { lu012Score -= 0.15; }
+    else if (lastLuCounts[lu] <= 5) { lu012Score += 0.12; }
 
     var zoneIdx = n <= 20 ? 0 : n <= 40 ? 1 : n <= 60 ? 2 : 3;
     var recentZoneCounts = [0, 0, 0, 0];
@@ -4094,12 +4111,11 @@ function scoreKL8Numbers(last, history, weights) {
     }
 
     // V4权重参数化：支持自适应学习调整
-    var totalScore = wf*w.wf + mpScore*w.mpScore + mkScore*w.mkScore + zoneScore*w.zoneScore + neighborScore*w.neighborScore + oddEvenScore*w.oddEvenScore + bigSmallScore*w.bigSmallScore + lastMissScore*w.lastMissScore + tailScore*w.tailScore + stability*w.stability + consecutiveScore*w.consecutiveScore + maScore*w.maScore + cycleScore*w.cycleScore + heatDecay*w.heatDecay + sumRegression*w.sumRegression;
+    var totalScore = wf*w.wf + mpScore*w.mpScore + zoneScore*w.zoneScore + neighborScore*w.neighborScore + oddEvenScore*w.oddEvenScore + bigSmallScore*w.bigSmallScore + lastMissScore*w.lastMissScore + tailScore*w.tailScore + stability*w.stability + consecutiveScore*w.consecutiveScore + maScore*w.maScore + cycleScore*w.cycleScore + heatDecay*w.heatDecay + sumRegression*w.sumRegression + lu012Score*w.lu012Score;
 
     var reasons = [];
     if (wf > 0.25) reasons.push('高频');
     if (mp > 0.8) reasons.push('深冷');
-    if (mkScore > 0.8) reasons.push('冷转热');
     if (zoneScore > 0.7) reasons.push('区间');
     if (neighborScore > 0.9) reasons.push('重号');
     else if (neighborScore > 0.7) reasons.push('邻号');
@@ -4114,8 +4130,9 @@ function scoreKL8Numbers(last, history, weights) {
     if (heatDecay < -0.1) reasons.push('热号降温');
     else if (heatDecay > 0) reasons.push('隔期回升');
     if (sumRegression > 0.1) reasons.push('和值回归');
+    if (lu012Score > 0.7) reasons.push('012路优');
 
-    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, zoneScore: zoneScore, oddEvenScore: oddEvenScore, bigSmallScore: bigSmallScore, tailScore: tailScore, neighborScore: neighborScore, lastMissScore: lastMissScore, stability: stability, maScore: maScore, cycleScore: cycleScore, heatDecay: heatDecay, sumRegression: sumRegression, totalScore: totalScore, reasons: reasons });
+    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, zoneScore: zoneScore, oddEvenScore: oddEvenScore, bigSmallScore: bigSmallScore, tailScore: tailScore, neighborScore: neighborScore, lastMissScore: lastMissScore, stability: stability, maScore: maScore, cycleScore: cycleScore, heatDecay: heatDecay, sumRegression: sumRegression, lu012Score: lu012Score, totalScore: totalScore, reasons: reasons });
   }
   return scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 }
@@ -5280,6 +5297,144 @@ function renderKL8AC(history) {
   html += '</div>';
   document.getElementById('kl8-ac').innerHTML = html;
   renderKL8ACChart(acValues);
+}
+
+function renderKL8MissTrend(history) {
+  var container = document.getElementById('kl8-miss-trend');
+  if (!container) return;
+  var html = '<div class="result-section">';
+  html += '<div class="result-title">遗漏值走势图</div>';
+  html += '<div style="overflow-x:auto;margin-bottom:1rem">';
+  html += '<table style="border-collapse:collapse;font-size:0.65rem;white-space:nowrap">';
+
+  // 表头：号码 01-80
+  html += '<thead><tr><th style="padding:3px 4px;border:1px solid #ddd;background:var(--bg3);position:sticky;left:0;z-index:2">期号</th>';
+  for (var n = 1; n <= 80; n++) {
+    var zoneBg = n <= 20 ? 'background:#ffe0e0' : n <= 40 ? 'background:#e0f0ff' : n <= 60 ? 'background:#e0ffe0' : 'background:#fff0e0';
+    html += '<th style="padding:2px 1px;border:1px solid #ddd;text-align:center;font-size:0.6rem;width:20px;' + zoneBg + '">' + pad(n) + '</th>';
+  }
+  html += '</tr></thead><tbody>';
+
+  // 计算每期的遗漏值
+  var miss = {};
+  for (var n = 1; n <= 80; n++) miss[n] = 0;
+
+  for (var i = history.length - 1; i >= 0; i--) {
+    var nums = history[i];
+    html += '<tr>';
+    html += '<td style="padding:3px 4px;border:1px solid #eee;text-align:center;font-size:0.6rem;background:#fafafa;position:sticky;left:0;z-index:1">第' + (history.length - i) + '期</td>';
+    for (var n = 1; n <= 80; n++) {
+      var isHit = nums.indexOf(n) >= 0;
+      var cellStyle = 'padding:2px 1px;border:1px solid #eee;text-align:center;width:20px;height:20px;vertical-align:middle;';
+      if (n <= 20) cellStyle += 'background:#fff8f8;';
+      else if (n <= 40) cellStyle += 'background:#f8fbff;';
+      else if (n <= 60) cellStyle += 'background:#f8fff8;';
+      else cellStyle += 'background:#fff8f0;';
+      if (isHit) {
+        miss[n] = 0;
+        html += '<td style="' + cellStyle + '"><span style="display:inline-block;width:16px;height:16px;line-height:16px;border-radius:50%;background:#e74c3c;color:#fff;font-weight:700;font-size:0.55rem;text-align:center">' + pad(n) + '</span></td>';
+      } else {
+        miss[n]++;
+        var missColor = miss[n] >= 10 ? '#e74c3c' : miss[n] >= 5 ? '#f39c12' : '#bbb';
+        html += '<td style="' + cellStyle + '"><span style="color:' + missColor + ';font-size:0.55rem">' + miss[n] + '</span></td>';
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table></div>';
+
+  // 当前遗漏统计
+  var currentMiss = [];
+  for (var n = 1; n <= 80; n++) currentMiss.push({num: n, miss: miss[n]});
+  currentMiss.sort(function(a,b){return b.miss - a.miss;});
+
+  html += '<div style="display:flex;gap:1rem;flex-wrap:wrap;font-size:0.75rem">';
+  html += '<div style="flex:1;min-width:200px"><strong style="color:var(--accent)">当前遗漏最大 TOP10</strong><br/>';
+  for (var i = 0; i < 10; i++) {
+    var m = currentMiss[i];
+    html += '<span style="display:inline-block;margin:2px;padding:2px 6px;background:var(--bg2);border-radius:4px;font-size:0.7rem">' + pad(m.num) + '(' + m.miss + ')</span>';
+  }
+  html += '</div>';
+  html += '<div style="flex:1;min-width:200px"><strong style="color:var(--accent)">当前遗漏最小 TOP10</strong><br/>';
+  for (var i = currentMiss.length - 1; i >= currentMiss.length - 10; i--) {
+    var m = currentMiss[i];
+    html += '<span style="display:inline-block;margin:2px;padding:2px 6px;background:var(--bg2);border-radius:4px;font-size:0.7rem">' + pad(m.num) + '(' + m.miss + ')</span>';
+  }
+  html += '</div>';
+  html += '</div>';
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function renderKL8Lu012(history) {
+  var container = document.getElementById('kl8-lu012');
+  if (!container) return;
+  var html = '<div class="result-section">';
+  html += '<div class="result-title">012路分析</div>';
+
+  var luNames = ['0路(3,6,9...)', '1路(1,4,7...)', '2路(2,5,8...)'];
+  var luColors = ['#e74c3c', '#3498db', '#27ae60'];
+
+  // 统计每期012路分布
+  var rows = '';
+  for (var i = 0; i < Math.min(15, history.length); i++) {
+    var nums = history[i];
+    var counts = [0, 0, 0];
+    for (var j = 0; j < nums.length; j++) counts[nums[j] % 3]++;
+    rows += '<tr><td style="padding:3px 6px;border:1px solid #eee;font-size:0.7rem;text-align:center">第' + (i+1) + '期</td>';
+    for (var l = 0; l < 3; l++) {
+      var pct = (counts[l] / 20 * 100).toFixed(0);
+      rows += '<td style="padding:3px 6px;border:1px solid #eee;font-size:0.7rem;text-align:center;color:' + luColors[l] + '">' + counts[l] + ' <span style="font-size:0.6rem;color:#999">(' + pct + '%)</span></td>';
+    }
+    rows += '</tr>';
+  }
+
+  html += '<table style="border-collapse:collapse;font-size:0.75rem;margin-bottom:1rem;width:100%;max-width:500px">';
+  html += '<thead><tr><th style="padding:4px 6px;border:1px solid #ddd;background:var(--bg3)">期数</th>';
+  for (var l = 0; l < 3; l++) {
+    html += '<th style="padding:4px 6px;border:1px solid #ddd;background:var(--bg3);color:' + luColors[l] + '">' + luNames[l] + '</th>';
+  }
+  html += '</tr></thead><tbody>' + rows + '</tbody></table>';
+
+  // 历史总体012路分布
+  var totalCounts = [0, 0, 0];
+  for (var i = 0; i < history.length; i++) {
+    for (var j = 0; j < history[i].length; j++) {
+      totalCounts[history[i][j] % 3]++;
+    }
+  }
+  var total = totalCounts.reduce(function(a,b){return a+b;},0) || 1;
+
+  html += '<div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">';
+  for (var l = 0; l < 3; l++) {
+    var pct = (totalCounts[l] / total * 100).toFixed(1);
+    html += '<div style="flex:1;min-width:120px;text-align:center;padding:0.5rem;background:var(--bg2);border-radius:8px">';
+    html += '<div style="font-size:1.2rem;font-weight:700;color:' + luColors[l] + '">' + pct + '%</div>';
+    html += '<div style="font-size:0.7rem;color:var(--muted)">' + luNames[l] + '</div>';
+    html += '<div style="font-size:0.65rem;color:#999">' + totalCounts[l] + '次/' + history.length + '期</div>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // 偏态分析与回补建议
+  var last = history[0];
+  var lastCounts = [0, 0, 0];
+  for (var j = 0; j < last.length; j++) lastCounts[last[j] % 3]++;
+  var maxLu = lastCounts.indexOf(Math.max.apply(null, lastCounts));
+  var minLu = lastCounts.indexOf(Math.min.apply(null, lastCounts));
+
+  html += '<div style="font-size:0.8rem;color:var(--muted);background:var(--bg2);padding:0.75rem;border-radius:8px">';
+  html += '<strong>上期012路分布：</strong>0路 ' + lastCounts[0] + '个，1路 ' + lastCounts[1] + '个，2路 ' + lastCounts[2] + '个。<br/>';
+  if (Math.abs(lastCounts[maxLu] - lastCounts[minLu]) >= 4) {
+    html += '<strong>偏态提示：</strong>' + luNames[maxLu] + '偏强，' + luNames[minLu] + '偏弱，下期建议关注' + luNames[minLu] + '回补。';
+  } else {
+    html += '<strong>均衡提示：</strong>012路分布相对均衡，下期保持均衡分布。';
+  }
+  html += '</div>';
+
+  html += '</div>';
+  container.innerHTML = html;
 }
 
 // ==================== 当期选号复盘函数 ====================

@@ -1251,6 +1251,14 @@ tr:hover td { background: var(--bg3); }
               <div id="chart-kl8-ac" style="width:100%;min-height:300px"></div>
             </figure>
           </div>
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128308;</span> 遗漏值走势图</div>
+            <div id="kl8-miss-trend"></div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128207;</span> 012路分析</div>
+            <div id="kl8-lu012"></div>
+          </div>
         </div>
 
         <!-- Tab 2: 大模型统计概率 -->
@@ -1258,7 +1266,7 @@ tr:hover td { background: var(--bg3); }
           <div class="card">
             <div class="card-title"><span class="icon">&#128202;</span> 2. 大模型统计概率</div>
             <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
-              基于加权频率、遗漏回补、马尔可夫转移、邻号、区间、奇偶、大小、尾数、共现等多维评分模型，对01-80所有号码进行综合评分。
+              基于加权频率、遗漏回补、邻号、区间、奇偶、大小、尾数、012路、连号、共现等多维评分模型，对01-80所有号码进行综合评分。
             </div>
             <h4 style="margin-bottom:0.5rem;color:var(--ink)">号码评分 Top 20</h4>
             <div id="kl8-prob-nums"></div>
@@ -1729,10 +1737,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026070901"></script>
-<script src="assets/pl-engine.js?v=2026070901"></script>
-<script src="assets/pl-data.js?v=2026070901"></script>
-<script src="assets/auto-review.js?v=2026070901"></script>
+<script src="assets/engine.js?v=2026070902"></script>
+<script src="assets/pl-data.js?v=2026070902"></script>
+<script src="assets/pl-engine.js?v=2026070902"></script>
+<script src="assets/auto-review.js?v=2026070902"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)
