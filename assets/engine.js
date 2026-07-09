@@ -7822,18 +7822,18 @@ function filterKL8HistoryByDate() {
   renderKL8PredictionHistory();
 }
 
-// 渲染预测历史
+// 渲染预测历史 V3（支持5策略显示）
 function renderKL8PredictionHistory() {
   var history = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
-  // 只保留选五和选十的记录，且排除机选旧数据
+  // 只保留选五和选十的记录，且排除机选旧数据，且排除只有4个策略的旧V2数据
   history = history.filter(function(r){ 
-    return (r.playType === 5 || r.playType === 10) && r.playTypeName && r.playTypeName.indexOf('机选') < 0; 
+    return (r.playType === 5 || r.playType === 10) && r.playTypeName && r.playTypeName.indexOf('机选') < 0 && r.strategies && r.strategies.length >= 5; 
   });
-  // 自动清理 localStorage 中的旧机选记录
+  // 自动清理 localStorage 中的旧数据
   try {
     var allRaw = JSON.parse(localStorage.getItem(KL8_PREDICTION_STORAGE_KEY) || '[]');
     var cleaned = allRaw.filter(function(r){ 
-      return (r.playType === 5 || r.playType === 10) && r.playTypeName && r.playTypeName.indexOf('机选') < 0; 
+      return (r.playType === 5 || r.playType === 10) && r.playTypeName && r.playTypeName.indexOf('机选') < 0 && r.strategies && r.strategies.length >= 5; 
     });
     if (cleaned.length !== allRaw.length) {
       localStorage.setItem(KL8_PREDICTION_STORAGE_KEY, JSON.stringify(cleaned));
