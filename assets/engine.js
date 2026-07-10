@@ -6953,31 +6953,232 @@ function computeSSQFormulaKills() {
   container.innerHTML = html;
 }
 
+// ==================== 大乐透专属杀号公式 ====================
+// 基于"28种大乐透杀号公式"网络资料实现
+
+function calculateDLTFormulaFrontKills(lastDraw, prevDraw) {
+  var kills = [];
+  var frontAsc = lastDraw.front.slice().sort(function(a,b){return a-b;}); // 前区从小到大
+  var backAsc = lastDraw.back.slice().sort(function(a,b){return a-b;});   // 后区从小到大
+  var f1 = frontAsc[0], f2 = frontAsc[1], f3 = frontAsc[2], f4 = frontAsc[3], f5 = frontAsc[4];
+  var bSmall = backAsc[0], bBig = backAsc[1];
+
+  function norm35(n) {
+    while (n > 35) n -= 35;
+    while (n < 1) n += 35;
+    return n;
+  }
+
+  // 1: 上期首尾和
+  kills.push(norm35(f1 + f5));
+
+  // 2: 上期首尾和/3（取整）
+  kills.push(norm35(Math.floor((f1 + f5) / 3)));
+
+  // 3: 上期前跨×后跨/8（取整）
+  var frontSpan = f5 - f1;
+  var backSpan = bBig - bSmall;
+  kills.push(norm35(Math.floor(frontSpan * backSpan / 8)));
+
+  // 4: 上期前跨
+  kills.push(norm35(frontSpan));
+
+  // 5: 上期后和
+  var backSum = bSmall + bBig;
+  kills.push(norm35(backSum));
+
+  // 6: 上期第一位+后区小号
+  kills.push(norm35(f1 + bSmall));
+
+  // 7: 上期第一位+后区大号
+  kills.push(norm35(f1 + bBig));
+
+  // 8: 上期红球一位+二位
+  kills.push(norm35(f1 + f2));
+
+  // 9: (上期红球一位+二位)/2（进位取整）
+  kills.push(norm35(Math.ceil((f1 + f2) / 2)));
+
+  // 10: 上两期首尾和相减（大-小）
+  if (prevDraw) {
+    var prevFront = prevDraw.front.slice().sort(function(a,b){return a-b;});
+    var prevSum = prevFront[0] + prevFront[4];
+    var currSum = f1 + f5;
+    kills.push(norm35(Math.abs(currSum - prevSum)));
+  }
+
+  // 11: 上期五码红球尾数相加
+  var tailSum = 0;
+  frontAsc.forEach(function(n){ tailSum += n % 10; });
+  kills.push(norm35(tailSum));
+
+  // 12: 上期五码红球尾数相加/2（进位取整）
+  kills.push(norm35(Math.ceil(tailSum / 2)));
+
+  // 13: 上期龙头+10
+  kills.push(norm35(f1 + 10));
+
+  // 14: 上期龙头+12
+  kills.push(norm35(f1 + 12));
+
+  // 15: 上期后区和+3
+  kills.push(norm35(backSum + 3));
+
+  // 16: 上期后区积+3（大于35依次减12）
+  var backProduct = bSmall * bBig;
+  kills.push(norm35(backProduct + 3));
+
+  // 17: 上期红球第五位-后区大号
+  kills.push(norm35(f5 - bBig));
+
+  // 18: 上期红球第五位-(第一位+第二位)
+  kills.push(norm35(f5 - (f1 + f2)));
+
+  // 19: 上期同尾号差值
+  // 找同尾号差值
+  for (var i = 0; i < 4; i++) {
+    for (var j = i+1; j < 5; j++) {
+      if (frontAsc[i] % 10 === frontAsc[j] % 10) {
+        kills.push(norm35(Math.abs(frontAsc[i] - frontAsc[j])));
+      }
+    }
+  }
+
+  // 20: 上期前后尾和/10（取整）
+  var frontTailSum = 0, backTailSum = 0;
+  frontAsc.forEach(function(n){ frontTailSum += n % 10; });
+  backAsc.forEach(function(n){ backTailSum += n % 10; });
+  kills.push(norm35(Math.floor((frontTailSum + backTailSum) / 10)));
+
+  // 21: 上期第三位红球×7/10（取整）
+  kills.push(norm35(Math.floor(f3 * 7 / 10)));
+
+  // 22: 上期凤尾个位+十位
+  kills.push(norm35((f5 % 10) + Math.floor(f5 / 10)));
+
+  // 23: 上期凤尾个位-十位（绝对值）
+  kills.push(norm35(Math.abs((f5 % 10) - Math.floor(f5 / 10))));
+
+  // 24: 上期凤尾-上上期龙头
+  if (prevDraw) {
+    var prevFront2 = prevDraw.front.slice().sort(function(a,b){return a-b;});
+    kills.push(norm35(f5 - prevFront2[0]));
+  }
+
+  // 25: 上期凤尾-(上期龙头+上上期龙头)
+  if (prevDraw) {
+    var prevFront3 = prevDraw.front.slice().sort(function(a,b){return a-b;});
+    kills.push(norm35(f5 - (f1 + prevFront3[0])));
+  }
+
+  // 26: 上期第五位-第四位
+  kills.push(norm35(f5 - f4));
+
+  // 27: 上期第五位红球-后区一位
+  kills.push(norm35(f5 - bSmall));
+
+  // 28: 上期第三位红球个位+十位
+  kills.push(norm35((f3 % 10) + Math.floor(f3 / 10)));
+
+  // 归一化去重
+  kills = kills.map(function(n){ return norm35(n); });
+  var unique = [], seen = {};
+  for (var i = 0; i < kills.length; i++) {
+    var k = kills[i];
+    if (k >= 1 && k <= 35 && !seen[k]) { seen[k] = true; unique.push(k); }
+  }
+  return unique.sort(function(a,b){return a-b;});
+}
+
+// 大乐透后区杀号公式（基于网络资料汇总）
+function calculateDLTFormulaBackKills(lastDraw, prevDraw) {
+  var kills = [];
+  var frontAsc = lastDraw.front.slice().sort(function(a,b){return a-b;});
+  var backAsc = lastDraw.back.slice().sort(function(a,b){return a-b;});
+  var bSmall = backAsc[0], bBig = backAsc[1];
+  var f1 = frontAsc[0], f3 = frontAsc[2], f4 = frontAsc[3], f5 = frontAsc[4];
+
+  function norm12(n) {
+    while (n > 12) n -= 12;
+    while (n < 1) n += 12;
+    return n;
+  }
+
+  // 1: 上期后区两码和（>12取尾数）
+  var backSum = bSmall + bBig;
+  kills.push(norm12(backSum > 12 ? backSum % 10 : backSum));
+
+  // 2: 上期后区两码差
+  kills.push(norm12(Math.abs(bSmall - bBig)));
+
+  // 3: 上期后区全奇 => 杀奇; 全偶 => 杀偶
+  var isAllOdd = (bSmall % 2 === 1) && (bBig % 2 === 1);
+  var isAllEven = (bSmall % 2 === 0) && (bBig % 2 === 0);
+  if (isAllOdd) {
+    // 杀所有奇数中的热号
+    for (var i = 1; i <= 12; i += 2) kills.push(i);
+  }
+  if (isAllEven) {
+    for (var i = 2; i <= 12; i += 2) kills.push(i);
+  }
+
+  // 4: 前区和尾对应的后区号码
+  var frontSum = frontAsc.reduce(function(a,b){return a+b;}, 0);
+  kills.push(norm12(frontSum % 10));
+  kills.push(norm12(frontSum % 10 + 10));
+
+  // 5: 前区最小3个号码分别-1、-2、-3
+  kills.push(norm12(f1 - 1));
+  kills.push(norm12(f1 - 2));
+  kills.push(norm12(f1 - 3));
+  kills.push(norm12(f3 - 1));
+  kills.push(norm12(f3 - 2));
+  kills.push(norm12(f3 - 3));
+
+  // 6: 用上期生肖乐互加（前后区关联）
+  kills.push(norm12(bSmall + bBig));
+  kills.push(norm12(Math.abs(bSmall - bBig) + 5));
+
+  // 7: 前区最小号+后区小号
+  kills.push(norm12(f1 + bSmall));
+
+  // 8: 前区最大号-后区大号
+  kills.push(norm12(f5 - bBig));
+
+  // 归一化去重
+  kills = kills.map(function(n){ return norm12(n); });
+  var unique = [], seen = {};
+  for (var i = 0; i < kills.length; i++) {
+    var k = kills[i];
+    if (k >= 1 && k <= 12 && !seen[k]) { seen[k] = true; unique.push(k); }
+  }
+  return unique.sort(function(a,b){return a-b;});
+}
+
 // 计算并显示DLT公式杀号（独立功能页调用）
 function computeDLTFormulaKills() {
-  var redStr = document.getElementById('dlt-front').value;
-  var blueStr = document.getElementById('dlt-back').value;
+  var frontStr = document.getElementById('dlt-front').value;
+  var backStr = document.getElementById('dlt-back').value;
   var historyStr = document.getElementById('dlt-history').value;
 
-  var lastFront = parseNums(redStr);
-  var lastBack = parseNums(blueStr);
+  var lastFront = parseNums(frontStr);
+  var lastBack = parseNums(backStr);
   if (lastFront.length < 5 || lastBack.length < 2) {
     alert('请先在"开奖号码输入"中填写上期开奖号码（前区5个+后区2个）');
     return;
   }
 
-  // 大乐透用SSQ公式近似计算（前区35选5用红球公式，后区12选2用蓝球公式）
-  var lastDraw = { red: lastFront.slice(0,5).sort(function(a,b){return a-b;}), blue: lastBack[0] };
   var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
   var prevDraw = null;
   if (lines.length >= 2) {
     var parts = lines[1].split('|');
-    var r = parseNums(parts[0]), b = parseNums(parts[1] || '');
-    if (r.length >= 5 && b.length >= 2) prevDraw = { red: r.slice(0,5).sort(function(a,b){return a-b;}), blue: b[0] };
+    var f = parseNums(parts[0]), b = parseNums(parts[1] || '');
+    if (f.length >= 5 && b.length >= 2) prevDraw = { front: f.slice(0,5).sort(function(a,b){return a-b;}), back: b.slice(0,2).sort(function(a,b){return a-b;}) };
   }
 
-  var frontKills = calculateSSQFormulaRedKills(lastDraw, prevDraw).filter(function(n){ return n >= 1 && n <= 35; });
-  var backKills = calculateSSQFormulaBlueKills(lastDraw, prevDraw, null).filter(function(n){ return n >= 1 && n <= 12; });
+  var lastDraw = { front: lastFront.slice(0,5).sort(function(a,b){return a-b;}), back: lastBack.slice(0,2).sort(function(a,b){return a-b;}) };
+  var frontKills = calculateDLTFormulaFrontKills(lastDraw, prevDraw);
+  var backKills = calculateDLTFormulaBackKills(lastDraw, prevDraw);
 
   // 保存到全局变量
   _dltFormulaKills = { front: frontKills, back: backKills };
