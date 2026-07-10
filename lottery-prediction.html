@@ -1044,9 +1044,7 @@ tr:hover td { background: var(--bg3); }
         <button class="dlt-sidebar-btn" onclick="switchSSQTab('ssq-tab2', this)">
           <span class="badge-sm" style="background:var(--accent2);color:#fff">2</span>大模型统计概率
         </button>
-        <button class="dlt-sidebar-btn" onclick="switchSSQTab('ssq-tab3', this)">
-          <span class="badge-sm" style="background:var(--accent3);color:#fff">3</span>AI模型推测方案
-        </button>
+
         <button class="dlt-sidebar-btn" onclick="switchSSQTab('ssq-tab4', this)">
           <span class="badge-sm" style="background:var(--accent5);color:#fff">4</span>摇奖机模拟选号
         </button>
@@ -1114,13 +1112,6 @@ tr:hover td { background: var(--bg3); }
         </div>
 
         <!-- Tab 3 -->
-        <div class="dlt-tab" id="ssq-tab3">
-          <div class="card">
-            <div class="card-title"><span class="icon">&#129302;</span> 3. AI模型推测方案</div>
-            <div id="ssq-recommend"></div>
-          </div>
-        </div>
-
         <!-- Tab 4 -->
         <div class="dlt-tab" id="ssq-tab4">
           <div class="card">
@@ -1907,7 +1898,7 @@ function switchDLTTab(tabId, btn) {
 <script>
 function switchSSQTab(tabId, btn) {
   document.querySelectorAll('#ssq-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('#ssq-tab0, #ssq-tab1, #ssq-tab2, #ssq-tab3, #ssq-tab4, #ssq-tab5, #ssq-tab6, #ssq-tab7, #ssq-tab8').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('#ssq-tab0, #ssq-tab1, #ssq-tab2, #ssq-tab4, #ssq-tab5, #ssq-tab6, #ssq-tab7, #ssq-tab8').forEach(function(t){ t.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   var tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');
