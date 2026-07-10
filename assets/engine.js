@@ -6016,10 +6016,24 @@ function spinDLTLottery() {
     return result;
   }
 
+  // 读取杀号
+  var killFront = [];
+  var killBack = [];
+  try {
+    var kf = document.getElementById('dlt-kill-front').value;
+    var kb = document.getElementById('dlt-kill-back').value;
+    if (kf) killFront = parseNums(kf);
+    if (kb) killBack = parseNums(kb);
+  } catch(e) {}
+
   var allFrontNums = [];
-  for (var n = 1; n <= 35; n++) allFrontNums.push(n);
+  for (var n = 1; n <= 35; n++) { if (killFront.indexOf(n) < 0) allFrontNums.push(n); }
   var allBackNums = [];
-  for (var n = 1; n <= 12; n++) allBackNums.push(n);
+  for (var n = 1; n <= 12; n++) { if (killBack.indexOf(n) < 0) allBackNums.push(n); }
+
+  // 检查杀号后剩余号码是否足够
+  if (allFrontNums.length < 5) { alert('前区杀号过多，剩余号码不足5个，请减少杀号'); return; }
+  if (allBackNums.length < 2) { alert('后区杀号过多，剩余号码不足2个，请减少杀号'); return; }
 
   // 构建质量分所需的评分映射 (DLT V3)
   var _frontScoreMap = {};
@@ -6721,10 +6735,24 @@ function spinSSQLottery() {
     return result;
   }
 
+  // 读取杀号
+  var killRed = [];
+  var killBlue = [];
+  try {
+    var kr = document.getElementById('ssq-kill-red').value;
+    var kb = document.getElementById('ssq-kill-blue').value;
+    if (kr) killRed = parseNums(kr);
+    if (kb) killBlue = parseNums(kb);
+  } catch(e) {}
+
   var allRedNums = [];
-  for (var n = 1; n <= 33; n++) allRedNums.push(n);
+  for (var n = 1; n <= 33; n++) { if (killRed.indexOf(n) < 0) allRedNums.push(n); }
   var allBlueNums = [];
-  for (var n = 1; n <= 16; n++) allBlueNums.push(n);
+  for (var n = 1; n <= 16; n++) { if (killBlue.indexOf(n) < 0) allBlueNums.push(n); }
+
+  // 检查杀号后剩余号码是否足够
+  if (allRedNums.length < 6) { alert('红球杀号过多，剩余号码不足6个，请减少杀号'); return; }
+  if (allBlueNums.length < 1) { alert('蓝球杀号过多，剩余号码不足1个，请减少杀号'); return; }
 
   // 生成¥28 7+2复式套餐（7红+2蓝 = C(7,6)×C(2,1) = 14注）
   var ticket28 = { red: weightedPick(allRedNums, redScores, 7), blue: weightedPick(allBlueNums, blueScores, 2) };

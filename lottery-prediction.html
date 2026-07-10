@@ -724,6 +724,14 @@ tr:hover td { background: var(--bg3); }
       <label>后区号码：</label>
       <input type="text" id="dlt-back" placeholder="如: 04,09" style="width:160px">
     </div>
+    <div class="input-row" style="margin-top:0.5rem">
+      <label>前区杀号：</label>
+      <input type="text" id="dlt-kill-front" placeholder="排除的号码，如: 03,15,22" style="width:300px">
+    </div>
+    <div class="input-row" style="margin-top:0.5rem">
+      <label>后区杀号：</label>
+      <input type="text" id="dlt-kill-back" placeholder="排除的号码，如: 04,09" style="width:160px">
+    </div>
     <!-- 隐藏的textarea用于数据同步 -->
     <textarea id="dlt-history" style="display:none"></textarea>
 
@@ -937,6 +945,14 @@ tr:hover td { background: var(--bg3); }
     <div class="input-row" style="margin-top:0.5rem">
       <label>蓝球号码：</label>
       <input type="text" id="ssq-blue" placeholder="如: 07" style="width:100px">
+    </div>
+    <div class="input-row" style="margin-top:0.5rem">
+      <label>红球杀号：</label>
+      <input type="text" id="ssq-kill-red" placeholder="排除的号码，如: 03,15,22" style="width:300px">
+    </div>
+    <div class="input-row" style="margin-top:0.5rem">
+      <label>蓝球杀号：</label>
+      <input type="text" id="ssq-kill-blue" placeholder="排除的号码，如: 07" style="width:100px">
     </div>
     <!-- 隐藏的textarea用于数据同步 -->
     <textarea id="ssq-history" style="display:none"></textarea>
@@ -1755,10 +1771,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026071009"></script>
-<script src="assets/pl-data.js?v=2026071009"></script>
-<script src="assets/pl-engine.js?v=2026071009"></script>
-<script src="assets/auto-review.js?v=2026071009"></script>
+<script src="assets/engine.js?v=2026071010"></script>
+<script src="assets/pl-data.js?v=2026071010"></script>
+<script src="assets/pl-engine.js?v=2026071010"></script>
+<script src="assets/auto-review.js?v=2026071010"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)
