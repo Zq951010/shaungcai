@@ -724,14 +724,6 @@ tr:hover td { background: var(--bg3); }
       <label>后区号码：</label>
       <input type="text" id="dlt-back" placeholder="如: 04,09" style="width:160px">
     </div>
-    <div class="input-row" style="margin-top:0.5rem">
-      <label>前区杀号：</label>
-      <input type="text" id="dlt-kill-front" placeholder="排除的号码，如: 03,15,22" style="width:300px">
-    </div>
-    <div class="input-row" style="margin-top:0.5rem">
-      <label>后区杀号：</label>
-      <input type="text" id="dlt-kill-back" placeholder="排除的号码，如: 04,09" style="width:160px">
-    </div>
     <!-- 隐藏的textarea用于数据同步 -->
     <textarea id="dlt-history" style="display:none"></textarea>
 
@@ -863,6 +855,14 @@ tr:hover td { background: var(--bg3); }
               <strong>摇奖规则：</strong>前区号码池中总分越高的号码被抽中的概率越大，后区同理。每摇出一注后，已选号码暂时移出池中，避免重复。
             </div>
             <div style="text-align:center;margin:1.5rem 0">
+              <div class="input-row" style="justify-content:center;margin-bottom:0.8rem">
+                <label style="font-size:0.85rem">前区杀号：</label>
+                <input type="text" id="dlt-kill-front" placeholder="排除的号码，如: 03,15,22" style="width:260px;font-size:0.85rem">
+              </div>
+              <div class="input-row" style="justify-content:center;margin-bottom:1rem">
+                <label style="font-size:0.85rem">后区杀号：</label>
+                <input type="text" id="dlt-kill-back" placeholder="排除的号码，如: 04,09" style="width:260px;font-size:0.85rem">
+              </div>
               <button class="btn btn-primary" onclick="spinDLTLottery()" style="font-size:1.1rem;padding:0.8rem 2.5rem;border-radius:50px">&#127922; 开始摇奖</button>
             </div>
             <div id="dlt-lottery-results" style="display:none"></div>
@@ -945,14 +945,6 @@ tr:hover td { background: var(--bg3); }
     <div class="input-row" style="margin-top:0.5rem">
       <label>蓝球号码：</label>
       <input type="text" id="ssq-blue" placeholder="如: 07" style="width:100px">
-    </div>
-    <div class="input-row" style="margin-top:0.5rem">
-      <label>红球杀号：</label>
-      <input type="text" id="ssq-kill-red" placeholder="排除的号码，如: 03,15,22" style="width:300px">
-    </div>
-    <div class="input-row" style="margin-top:0.5rem">
-      <label>蓝球杀号：</label>
-      <input type="text" id="ssq-kill-blue" placeholder="排除的号码，如: 07" style="width:100px">
     </div>
     <!-- 隐藏的textarea用于数据同步 -->
     <textarea id="ssq-history" style="display:none"></textarea>
@@ -1085,6 +1077,14 @@ tr:hover td { background: var(--bg3); }
               基于大模型评分加权随机抽取红球01-33、蓝球01-16，生成1注¥28的7+2复式套餐票（7红+2蓝，14注）。
             </div>
             <div style="text-align:center;margin:1.5rem 0">
+              <div class="input-row" style="justify-content:center;margin-bottom:0.8rem">
+                <label style="font-size:0.85rem">红球杀号：</label>
+                <input type="text" id="ssq-kill-red" placeholder="排除的号码，如: 03,15,22" style="width:260px;font-size:0.85rem">
+              </div>
+              <div class="input-row" style="justify-content:center;margin-bottom:1rem">
+                <label style="font-size:0.85rem">蓝球杀号：</label>
+                <input type="text" id="ssq-kill-blue" placeholder="排除的号码，如: 07" style="width:260px;font-size:0.85rem">
+              </div>
               <button class="btn btn-primary" onclick="spinSSQLottery()" style="font-size:1.1rem;padding:0.8rem 2.5rem;border-radius:50px">&#127922; 开始摇奖</button>
             </div>
             <div id="ssq-lottery-results" style="display:none"></div>
