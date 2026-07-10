@@ -1074,7 +1074,8 @@ tr:hover td { background: var(--bg3); }
           <div class="card">
             <div class="card-title"><span class="icon">&#127922;</span> 4. 摇奖机模拟选号</div>
             <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
-              基于大模型评分加权随机抽取红球01-33、蓝球01-16，生成1注¥28的7+2复式套餐票（7红+2蓝，14注）。
+              基于大模型评分加权随机抽取红球01-33、蓝球01-16，生成1注¥28的7+2复式套餐票（7红+2蓝，14注）。<br>
+              <strong>杀号公式：</strong>基于45种红球杀号公式+8种蓝球杀号公式，自动计算排除号码，摇奖时从剩余号码中抽取。
             </div>
             <div style="text-align:center;margin:1.5rem 0">
               <div class="input-row" style="justify-content:center;margin-bottom:0.8rem">
@@ -1085,6 +1086,8 @@ tr:hover td { background: var(--bg3); }
                 <label style="font-size:0.85rem">蓝球杀号：</label>
                 <input type="text" id="ssq-kill-blue" placeholder="排除的号码，如: 07" style="width:260px;font-size:0.85rem">
               </div>
+              <button class="btn btn-secondary" onclick="autoFillSSQKills()" style="font-size:0.85rem;padding:0.5rem 1.5rem;border-radius:50px;margin-bottom:0.8rem;background:var(--accent3);color:#000;border:1px solid var(--accent3)">&#128300; 公式计算杀号</button>
+              <br>
               <button class="btn btn-primary" onclick="spinSSQLottery()" style="font-size:1.1rem;padding:0.8rem 2.5rem;border-radius:50px">&#127922; 开始摇奖</button>
             </div>
             <div id="ssq-lottery-results" style="display:none"></div>
@@ -1771,10 +1774,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026071010"></script>
-<script src="assets/pl-data.js?v=2026071010"></script>
-<script src="assets/pl-engine.js?v=2026071010"></script>
-<script src="assets/auto-review.js?v=2026071010"></script>
+<script src="assets/engine.js?v=2026071011"></script>
+<script src="assets/pl-data.js?v=2026071011"></script>
+<script src="assets/pl-engine.js?v=2026071011"></script>
+<script src="assets/auto-review.js?v=2026071011"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)

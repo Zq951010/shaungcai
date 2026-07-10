@@ -6675,6 +6675,199 @@ function renderDLTProbAnalysis() {
 
 // ==================== 双色球新功能模块 ====================
 
+// ==================== 双色球45种杀号公式 ====================
+// 基于"双色球45种杀号公式"网络资料实现
+// 大小顺序 = 红球从小到大排序; 出号顺序 = 红球按出球顺序排列(无出球顺序时用大小顺序代替)
+
+function calculateSSQFormulaRedKills(lastDraw, prevDraw) {
+  var kills = [];
+  var redAsc = lastDraw.red.slice().sort(function(a,b){return a-b;}); // 大小顺序
+  var redOut = lastDraw.red; // 出号顺序(用大小顺序近似)
+  var blue = lastDraw.blue;
+  var r1 = redAsc[0], r2 = redAsc[1], r3 = redAsc[2], r4 = redAsc[3], r5 = redAsc[4], r6 = redAsc[5];
+  var o1 = redOut[0], o2 = redOut[1], o3 = redOut[2], o4 = redOut[3], o5 = redOut[4], o6 = redOut[5];
+
+  // 辅助函数: 归一化到1-33
+  function norm33(n) {
+    while (n > 33) n -= 33;
+    while (n < 1) n += 33;
+    return n;
+  }
+
+  // === 大小顺序公式(1-11) ===
+  kills.push(norm33(r6 - r1));           // 1: 第一位与第六位的差
+  kills.push(norm33(r2 - r3));           // 2: 第二位与第三位的差
+  kills.push(norm33(r2 - r5));           // 3: 第二位与第五位的差
+  kills.push(norm33(r1 * 4 - 2));        // 4: 第一位乘4减2
+  kills.push(norm33((r1 + blue) * 3));   // 5: (第一位+蓝号)乘3
+  kills.push(norm33(r1 + 9));            // 6: 第一位加09
+  kills.push(norm33(r2 + 5));            // 7: 第二位加05
+  kills.push(norm33(r3 + 4));            // 8: 第三位加04
+  kills.push(norm33(r3 + 7));            // 9: 第三位加07
+  kills.push(norm33(r6 + 4));            // 10: 第六位加04
+  kills.push(norm33((r4 - r5) + blue + 1)); // 11: (第四位-第五位)+蓝号+01
+
+  // === 出号顺序公式(12-17) ===
+  kills.push(norm33(o1 + o2));           // 12: 出号第一位+第二位
+  kills.push(norm33(o2 - o3));           // 13: 出号第二位-第三位
+  kills.push(norm33(o3 - o5));           // 14: 出号第三位-第五位
+  kills.push(norm33((o6 - o1) + blue - 3)); // 15: (首尾差)+蓝号-03
+  kills.push(norm33((o1 - o3) + blue + 2)); // 16: (第一位-第三位)+蓝号+02
+  kills.push(norm33((o1 + o2 + o3) + blue - 1)); // 17: (出号一位+二位+三位)+蓝号-01
+
+  // === 蓝号相关公式(18-27) ===
+  kills.push(norm33(blue + r1));         // 18: 蓝号+第一位
+  kills.push(norm33(blue + r2 - 1));     // 19: 蓝号+第二位-01
+  kills.push(norm33(blue - r4 + 1));     // 20: 蓝号-第四位+01
+  kills.push(norm33(blue - r5));         // 21: 蓝号-第五位
+  kills.push(norm33(blue * r1));         // 22: 蓝号×第一位
+  kills.push(norm33(blue + 7));          // 23: 蓝号+07
+  kills.push(norm33(blue + 9));          // 24: 蓝号+09
+  kills.push(norm33(blue * 5 + 2));      // 25: 蓝号×05+02
+  kills.push(norm33(blue % 2 === 0 ? blue * 2 + 2 : blue * 5 + 2)); // 26/27: 偶数×2+02, 奇数×5+02
+
+  // === 高级公式(28-40) ===
+  kills.push(norm33(Math.floor((r3 + r6) % 33) + 14)); // 28: (第三位+第六位)%33+14
+  kills.push(norm33(Math.floor((r1 + r3 + r5) / 2)));  // 29: (红1+红3+红5)/2
+  kills.push(norm33(r6 - blue));         // 30: 红6位减蓝1位
+  kills.push(norm33(Math.floor(r1 * 3 / 2))); // 31: 红1位×3/2
+  kills.push(norm33((r1 % 10) + (r2 % 10))); // 32: 红1位尾+红2位尾
+  kills.push(norm33(blue));              // 33: 上期蓝码
+  kills.push(norm33(33 - blue));         // 34: 33-上期蓝码
+
+  // 需要上上期数据的公式(35-37)
+  if (prevDraw) {
+    kills.push(norm33(prevDraw.blue));        // 35: 上上期蓝码
+    kills.push(norm33(33 - prevDraw.blue));   // 36: 33-上上期蓝码
+    kills.push(norm33(blue + prevDraw.blue)); // 37: 上期蓝码+上上期蓝码
+  }
+
+  kills.push(r5 + 5 > 33 ? r5 + 5 - 33 : r5 + 5); // 39: 第五位加5
+
+  // 连号杀号(41)
+  for (var i = 0; i < 5; i++) {
+    if (redAsc[i+1] - redAsc[i] === 1) {
+      kills.push(norm33(redAsc[i] + redAsc[i+1] - 33));
+    }
+  }
+
+  // 固定公式(42-45)
+  kills.push(22 - r2);                   // 42: 22减第二红
+  kills.push(54 - r5);                   // 43: 54减第五红
+  kills.push(r1 + r2);                   // 44: 第一红+第二红
+  kills.push(r1 + r3);                   // 45: 第一红+第三红
+
+  // 归一化所有结果
+  kills = kills.map(function(n){ return norm33(n); });
+
+  // 去重，过滤无效值
+  var unique = [];
+  var seen = {};
+  for (var i = 0; i < kills.length; i++) {
+    var k = kills[i];
+    if (k >= 1 && k <= 33 && !seen[k]) {
+      seen[k] = true;
+      unique.push(k);
+    }
+  }
+  return unique.sort(function(a,b){return a-b;});
+}
+
+// 蓝球杀号公式(8种)
+function calculateSSQFormulaBlueKills(lastDraw, prevDraw, prevPrevDraw) {
+  var kills = [];
+  var redAsc = lastDraw.red.slice().sort(function(a,b){return a-b;});
+  var blue = lastDraw.blue;
+  var r1 = redAsc[0], r4 = redAsc[3];
+
+  function norm16(n) {
+    while (n > 16) n -= 16;
+    while (n < 1) n += 16;
+    return n;
+  }
+
+  kills.push(norm16((r1 % 10) + 5));     // 1: 最小红球尾数+5
+  kills.push(norm16((blue % 10) - 1));    // 2: 蓝球尾数-1
+  kills.push(norm16((r4 % 10) + 4));      // 3: 第四位红球尾数+4
+  if (prevDraw) {
+    kills.push(norm16(prevDraw.blue + blue)); // 4: A+B杀号法 (A=上上期蓝, B=上期蓝)
+    kills.push(norm16(prevDraw.blue + 16));   // 5: A+16杀号法
+  }
+  if (prevDraw && prevPrevDraw) {
+    kills.push(norm16(prevPrevDraw.blue + prevDraw.blue + blue)); // 6: A+B+C (近三期蓝球和)
+  }
+  if (prevDraw) {
+    kills.push(norm16(r1 + blue));        // 8: 红球+蓝球杀号法
+  }
+
+  kills = kills.map(function(n){ return norm16(n); });
+  var unique = [];
+  var seen = {};
+  for (var i = 0; i < kills.length; i++) {
+    var k = kills[i];
+    if (k >= 1 && k <= 16 && !seen[k]) {
+      seen[k] = true;
+      unique.push(k);
+    }
+  }
+  return unique.sort(function(a,b){return a-b;});
+}
+
+// 一键计算并填充杀号
+function autoFillSSQKills() {
+  var redStr = document.getElementById('ssq-red').value;
+  var blueStr = document.getElementById('ssq-blue').value;
+  var historyStr = document.getElementById('ssq-history').value;
+
+  var lastRed = parseNums(redStr);
+  var lastBlue = parseNums(blueStr);
+  if (lastRed.length < 6 || lastBlue.length < 1) {
+    alert('请先在上方输入上期开奖号码（红球6个+蓝球1个），才能计算杀号');
+    return;
+  }
+
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var prevDraw = null, prevPrevDraw = null;
+  if (lines.length >= 2) {
+    var parts = lines[1].split('|');
+    var r = parseNums(parts[0]);
+    var b = parseNums(parts[1] || '');
+    if (r.length >= 6 && b.length >= 1) {
+      prevDraw = { red: r.slice(0,6).sort(function(a,b){return a-b;}), blue: b[0] };
+    }
+  }
+  if (lines.length >= 3) {
+    var parts = lines[2].split('|');
+    var r = parseNums(parts[0]);
+    var b = parseNums(parts[1] || '');
+    if (r.length >= 6 && b.length >= 1) {
+      prevPrevDraw = { red: r.slice(0,6).sort(function(a,b){return a-b;}), blue: b[0] };
+    }
+  }
+
+  var lastDraw = { red: lastRed.slice(0,6).sort(function(a,b){return a-b;}), blue: lastBlue[0] };
+  var redKills = calculateSSQFormulaRedKills(lastDraw, prevDraw);
+  var blueKills = calculateSSQFormulaBlueKills(lastDraw, prevDraw, prevPrevDraw);
+
+  // 填充到杀号输入框
+  document.getElementById('ssq-kill-red').value = redKills.join(',');
+  document.getElementById('ssq-kill-blue').value = blueKills.join(',');
+
+  // 显示计算结果提示
+  var container = document.getElementById('ssq-lottery-results');
+  if (container) {
+    container.style.display = 'block';
+    container.innerHTML = '<div style="padding:0.8rem;background:var(--bg2);border-radius:8px;border:1px solid var(--rule);margin-bottom:0.5rem">' +
+      '<div style="font-weight:600;color:var(--ink);margin-bottom:0.4rem">&#128203; 公式计算结果（已自动填入杀号框）</div>' +
+      '<div style="font-size:0.8rem"><span style="color:var(--muted)">红球杀号('+redKills.length+'个)：</span>' +
+      redKills.map(function(n){return '<span style="color:var(--accent4);font-weight:600">'+pad(n)+'</span>';}).join(', ') + '</div>' +
+      '<div style="font-size:0.8rem;margin-top:0.3rem"><span style="color:var(--muted)">蓝球杀号('+blueKills.length+'个)：</span>' +
+      blueKills.map(function(n){return '<span style="color:var(--accent4);font-weight:600">'+pad(n)+'</span>';}).join(', ') + '</div>' +
+      '<div style="font-size:0.7rem;color:var(--muted);margin-top:0.5rem">基于45种红球杀号公式+8种蓝球杀号公式计算，点击"开始摇奖"从剩余号码中机选</div>' +
+      '</div>';
+  }
+}
+
 // 摇奖机模拟选号
 function spinSSQLottery() {
   var redStr = document.getElementById('ssq-red').value;
