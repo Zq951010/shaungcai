@@ -3917,11 +3917,11 @@ function renderKL8DanTuo(last, history, playType, targetId) {
 
 function getKL8AdaptiveWeights() {
   var defaults = {
-    wf: 0.08, mpScore: 0.15, zoneScore: 0.14,
-    neighborScore: 0.10, oddEvenScore: 0.07, bigSmallScore: 0.07,
-    lastMissScore: 0.20, tailScore: 0.06, stability: 0.03,
-    consecutiveScore: 0.05, maScore: 0.04, cycleScore: 0.05,
-    heatDecay: 0.04, sumRegression: 0.07, lu012Score: 0.05,
+    wf: 0.06, mpScore: 0.12, zoneScore: 0.10,
+    neighborScore: 0.14, oddEvenScore: 0.04, bigSmallScore: 0.04,
+    lastMissScore: 0.18, tailScore: 0.03, stability: 0.02,
+    consecutiveScore: 0.03, maScore: 0.03, cycleScore: 0.03,
+    heatDecay: 0.04, sumRegression: 0.05, lu012Score: 0.03,
     coScore: 0.08
   };
   try {
@@ -4091,10 +4091,10 @@ function scoreKL8Numbers(last, history, weights) {
     }
 
     var neighborScore = 0;
-    if (last.indexOf(n) >= 0) neighborScore = 0.9;
+    if (last.indexOf(n) >= 0) neighborScore = 0.95; // 重号是最强信号
     else {
       for (var i = 0; i < last.length; i++) {
-        if (Math.abs(n - last[i]) === 1) { neighborScore = 0.7; break; }
+        if (Math.abs(n - last[i]) === 1) { neighborScore = 0.75; break; }
       }
     }
     // 重号历史频率优化：计算近5期平均重号数，若偏高则上期号码额外加分
@@ -4103,12 +4103,18 @@ function scoreKL8Numbers(last, history, weights) {
       repeatHistory.push(history[ri].filter(function(x){ return history[ri+1].indexOf(x) >= 0; }).length);
     }
     var avgRepeat = kl8Avg(repeatHistory);
-    if (avgRepeat >= 3 && last.indexOf(n) >= 0) { neighborScore += 0.08; }
+    if (avgRepeat >= 3 && last.indexOf(n) >= 0) { neighborScore += 0.05; }
 
     // 连续重号追踪：连续2期出现额外+0.10，连续3期额外再+0.08
     if (history.length > 1 && last.indexOf(n) >= 0 && history[1].indexOf(n) >= 0) {
       neighborScore += 0.10;
       if (history.length > 2 && history[2].indexOf(n) >= 0) neighborScore += 0.08;
+    }
+    // 连续2期未出的邻号加分（邻号回补）
+    if (last.indexOf(n) < 0 && history.length > 1 && history[1].indexOf(n) < 0) {
+      for (var i = 0; i < last.length; i++) {
+        if (Math.abs(n - last[i]) === 1) { neighborScore += 0.05; break; }
+      }
     }
 
     // KL8连号历史频率评分（增强：近5期连号趋势）
@@ -4252,15 +4258,15 @@ function runKL8AutoReview(history) {
     // V3策略生成（与renderKL8AllPlayTypes_V2一致）
     function genS1(pt) {
       var picks = [], used = {};
-      var zoneMax = pt === 5 ? 2 : 3;
+      var zoneMax = pt === 5 ? 3 : 4;  // 放宽区间限制，避免错过好号码
       var zoneCounts = [0,0,0,0];
       var sorted = scores.slice().sort(function(a,b){
         var aCo = 0, aCoCount = 0, bCo = 0, bCoCount = 0;
         scores.slice(0,10).forEach(function(t){ if(t.num!==a.num&&kl8Co[a.num]&&kl8Co[a.num][t.num]){aCo+=kl8Co[a.num][t.num];aCoCount++;} });
         scores.slice(0,10).forEach(function(t){ if(t.num!==b.num&&kl8Co[b.num]&&kl8Co[b.num][t.num]){bCo+=kl8Co[b.num][t.num];bCoCount++;} });
         var aCoS = aCoCount ? aCo/aCoCount/recentK*2 : 0, bCoS = bCoCount ? bCo/bCoCount/recentK*2 : 0;
-        var aScore = a.lastMissScore*0.35 + a.zoneScore*0.25 + a.wf*0.15 + (a.sumRegression||0)*0.1 + aCoS*0.15;
-        var bScore = b.lastMissScore*0.35 + b.zoneScore*0.25 + b.wf*0.15 + (b.sumRegression||0)*0.1 + bCoS*0.15;
+        var aScore = a.lastMissScore*0.30 + a.zoneScore*0.15 + a.neighborScore*0.25 + (a.sumRegression||0)*0.05 + aCoS*0.15 + a.wf*0.10;
+        var bScore = b.lastMissScore*0.30 + b.zoneScore*0.15 + b.neighborScore*0.25 + (b.sumRegression||0)*0.05 + bCoS*0.15 + b.wf*0.10;
         if(a.heatDecay<-0.1&&b.heatDecay>=-0.1)return 1; if(b.heatDecay<-0.1&&a.heatDecay>=-0.1)return -1;
         return bScore - aScore;
       });
@@ -4294,14 +4300,16 @@ function runKL8AutoReview(history) {
 
     function genS3(pt) {
       var picks = [], used = {};
-      var seeds = scores.slice(0,pt===5?1:2).map(function(s){return s.num;});
+      // 从top3/top4开始扩展种子（更多起点=更多共现路径）
+      var seeds = scores.slice(0,pt===5?3:4).map(function(s){return s.num;});
       seeds.forEach(function(n){picks.push(n);used[n]=true;});
       while(picks.length<pt){
         var bestNum=null,bestScore=-1;
         for(var i=0;i<scores.length;i++){
           var n=scores[i].num; if(used[n])continue;
           var coSum=0; picks.forEach(function(p){if(kl8Co[n]&&kl8Co[n][p])coSum+=kl8Co[n][p];});
-          var cs=coSum/recentK+scores[i].totalScore*0.3;
+          // 提高共现权重，加入遗漏回补和重号信号
+          var cs=coSum/recentK*0.6+scores[i].totalScore*0.2+scores[i].neighborScore*0.1+scores[i].lastMissScore*0.1;
           if(cs>bestScore){bestScore=cs;bestNum=n;}
         }
         if(bestNum!==null){picks.push(bestNum);used[bestNum]=true;}else break;
@@ -4311,16 +4319,16 @@ function runKL8AutoReview(history) {
     }
 
     function genS4(pt) {
-      var maxRepeat=pt===5?2:3, picks=[], used={};
+      var maxRepeat=pt===5?3:4, picks=[], used={};  // KL8平均重号3-5个，增加重号配额
       var repeatSorted = scores.slice().filter(function(s){return lastTrain.indexOf(s.num)>=0;}).sort(function(a,b){
         var aCo=0,bCo=0; scores.slice(0,10).forEach(function(t){if(kl8Co[a.num]&&kl8Co[a.num][t.num])aCo+=kl8Co[a.num][t.num];});
         scores.slice(0,10).forEach(function(t){if(kl8Co[b.num]&&kl8Co[b.num][t.num])bCo+=kl8Co[b.num][t.num];});
-        return (b.totalScore*0.6+bCo/recentK*0.4)-(a.totalScore*0.6+aCo/recentK*0.4);
+        return (b.totalScore*0.5+bCo/recentK*0.3+b.neighborScore*0.2)-(a.totalScore*0.5+aCo/recentK*0.3+a.neighborScore*0.2);
       });
       for(var i=0;i<repeatSorted.length&&picks.length<maxRepeat;i++){if(!used[repeatSorted[i].num]){picks.push(repeatSorted[i].num);used[repeatSorted[i].num]=true;}}
       var zc=[0,0,0,0]; picks.forEach(function(n){zc[n<=20?0:n<=40?1:n<=60?2:3]++;});
       var hybrid = scores.slice().filter(function(s){return lastTrain.indexOf(s.num)<0;}).sort(function(a,b){
-        return (b.wf*0.30+b.mp*0.25+b.zoneScore*0.20+b.lu012Score*0.15+(b.stability||0)*0.10)-(a.wf*0.30+a.mp*0.25+a.zoneScore*0.20+a.lu012Score*0.15+(a.stability||0)*0.10);
+        return (b.lastMissScore*0.30+b.wf*0.20+b.mp*0.15+b.zoneScore*0.15+b.lu012Score*0.10+(b.neighborScore||0)*0.10)-(a.lastMissScore*0.30+a.wf*0.20+a.mp*0.15+a.zoneScore*0.15+a.lu012Score*0.10+(a.neighborScore||0)*0.10);
       });
       for(var i=0;i<hybrid.length&&picks.length<pt;i++){var n=hybrid[i].num;if(!used[n]){var z=n<=20?0:n<=40?1:n<=60?2:3;if(zc[z]<Math.ceil(pt/2)){picks.push(n);used[n]=true;zc[z]++;}}}
       for(var i=0;i<scores.length&&picks.length<pt;i++){var n=scores[i].num;if(!used[n]&&lastTrain.indexOf(n)<0){picks.push(n);used[n]=true;}}
@@ -4345,7 +4353,7 @@ function runKL8AutoReview(history) {
         var picks=[], used={};
         var hotNums=scores.filter(function(s){return s.wf>0.15;}).map(function(s){return s.num;});
         var warmNums=scores.filter(function(s){return s.wf>0.06&&s.wf<=0.15;}).map(function(s){return s.num;});
-        var coldNums=scores.filter(function(s){return s.wf<=0.06&&s.lastMissScore>0.5;}).map(function(s){return s.num;});
+        var coldNums=scores.filter(function(s){return s.wf<=0.06&&s.lastMissScore>0.55;}).map(function(s){return s.num;});
         var repCand=scores.slice().filter(function(s){return lastTrain.indexOf(s.num)>=0&&s.totalScore>0.5;}).sort(function(a,b){return b.totalScore-a.totalScore;});
         for(var i=0;i<repCand.length&&picks.length<2;i++){if(!used[repCand[i].num]){picks.push(repCand[i].num);used[repCand[i].num]=true;}}
         var missCand=scores.slice().filter(function(s){return s.lastMissScore>=0.55&&s.lastMissScore<=0.85&&!used[s.num];}).sort(function(a,b){return b.lastMissScore-a.lastMissScore;});
