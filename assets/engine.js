@@ -6024,6 +6024,13 @@ function spinDLTLottery() {
     var kb = document.getElementById('dlt-kill-back').value;
     if (kf) killFront = parseNums(kf);
     if (kb) killBack = parseNums(kb);
+    // 合并公式杀号（如果已计算）
+    if (_dltFormulaKills && _dltFormulaKills.front.length > 0) {
+      _dltFormulaKills.front.forEach(function(n){ if (killFront.indexOf(n) < 0) killFront.push(n); });
+    }
+    if (_dltFormulaKills && _dltFormulaKills.back.length > 0) {
+      _dltFormulaKills.back.forEach(function(n){ if (killBack.indexOf(n) < 0) killBack.push(n); });
+    }
   } catch(e) {}
 
   var allFrontNums = [];
@@ -6868,6 +6875,150 @@ function autoFillSSQKills() {
   }
 }
 
+// 全局变量：存储公式计算出的杀号
+var _ssqFormulaKills = { red: [], blue: [] };
+var _dltFormulaKills = { front: [], back: [] };
+
+// 计算并显示SSQ公式杀号（独立功能页调用）
+function computeSSQFormulaKills() {
+  var redStr = document.getElementById('ssq-red').value;
+  var blueStr = document.getElementById('ssq-blue').value;
+  var historyStr = document.getElementById('ssq-history').value;
+
+  var lastRed = parseNums(redStr);
+  var lastBlue = parseNums(blueStr);
+  if (lastRed.length < 6 || lastBlue.length < 1) {
+    alert('请先在"开奖号码输入"中填写上期开奖号码（红球6个+蓝球1个）');
+    return;
+  }
+
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var prevDraw = null, prevPrevDraw = null;
+  if (lines.length >= 2) {
+    var parts = lines[1].split('|');
+    var r = parseNums(parts[0]), b = parseNums(parts[1] || '');
+    if (r.length >= 6 && b.length >= 1) prevDraw = { red: r.slice(0,6).sort(function(a,b){return a-b;}), blue: b[0] };
+  }
+  if (lines.length >= 3) {
+    var parts = lines[2].split('|');
+    var r = parseNums(parts[0]), b = parseNums(parts[1] || '');
+    if (r.length >= 6 && b.length >= 1) prevPrevDraw = { red: r.slice(0,6).sort(function(a,b){return a-b;}), blue: b[0] };
+  }
+
+  var lastDraw = { red: lastRed.slice(0,6).sort(function(a,b){return a-b;}), blue: lastBlue[0] };
+  var redKills = calculateSSQFormulaRedKills(lastDraw, prevDraw);
+  var blueKills = calculateSSQFormulaBlueKills(lastDraw, prevDraw, prevPrevDraw);
+
+  // 保存到全局变量
+  _ssqFormulaKills = { red: redKills, blue: blueKills };
+
+  // 渲染结果
+  var container = document.getElementById('ssq-formula-kills-results');
+  if (!container) return;
+  container.style.display = 'block';
+
+  var html = '';
+
+  // 统计面板
+  html += '<div style="padding:0.6rem 0.8rem;background:var(--bg2);border-radius:8px;border:1px solid var(--rule);margin-bottom:1rem;font-size:0.8rem;display:flex;gap:1.5rem;flex-wrap:wrap">';
+  html += '<div><span style="color:var(--muted)">红球杀号：</span><strong style="color:var(--accent4)">'+redKills.length+'个</strong></div>';
+  html += '<div><span style="color:var(--muted)">蓝球杀号：</span><strong style="color:var(--accent4)">'+blueKills.length+'个</strong></div>';
+  html += '<div><span style="color:var(--muted)">剩余红球：</span><strong style="color:var(--accent3)">'+(33-redKills.length)+'个</strong></div>';
+  html += '<div><span style="color:var(--muted)">剩余蓝球：</span><strong style="color:var(--accent3)">'+(16-blueKills.length)+'个</strong></div>';
+  html += '</div>';
+
+  // 红球杀号详细列表
+  html += '<div style="margin-bottom:1rem;padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+  html += '<div style="font-weight:600;color:var(--ink);margin-bottom:0.5rem">红球杀号列表（45种公式）</div>';
+  html += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+  for (var i = 1; i <= 33; i++) {
+    var isKill = redKills.indexOf(i) >= 0;
+    html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;font-size:0.7rem;'+(isKill?'background:var(--accent4);color:#fff;font-weight:600':'background:var(--accent3);color:#000;font-weight:600')+'">'+pad(i)+'</span>';
+  }
+  html += '</div></div>';
+
+  // 蓝球杀号详细列表
+  html += '<div style="margin-bottom:1rem;padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+  html += '<div style="font-weight:600;color:var(--ink);margin-bottom:0.5rem">蓝球杀号列表（8种公式）</div>';
+  html += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+  for (var i = 1; i <= 16; i++) {
+    var isKill = blueKills.indexOf(i) >= 0;
+    html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;font-size:0.7rem;'+(isKill?'background:var(--accent4);color:#fff;font-weight:600':'background:#2196F3;color:#fff;font-weight:600')+'">'+pad(i)+'</span>';
+  }
+  html += '</div></div>';
+
+  // 提示切换到摇奖机
+  html += '<div style="padding:0.6rem;background:var(--accent);color:#000;border-radius:8px;font-size:0.8rem;text-align:center">&#128077; 杀号已保存！切换到"摇奖机模拟选号"页面，在手动杀号基础上叠加公式杀号，点击"开始摇奖"即可</div>';
+
+  container.innerHTML = html;
+}
+
+// 计算并显示DLT公式杀号（独立功能页调用）
+function computeDLTFormulaKills() {
+  var redStr = document.getElementById('dlt-front').value;
+  var blueStr = document.getElementById('dlt-back').value;
+  var historyStr = document.getElementById('dlt-history').value;
+
+  var lastFront = parseNums(redStr);
+  var lastBack = parseNums(blueStr);
+  if (lastFront.length < 5 || lastBack.length < 2) {
+    alert('请先在"开奖号码输入"中填写上期开奖号码（前区5个+后区2个）');
+    return;
+  }
+
+  // 大乐透用SSQ公式近似计算（前区35选5用红球公式，后区12选2用蓝球公式）
+  var lastDraw = { red: lastFront.slice(0,5).sort(function(a,b){return a-b;}), blue: lastBack[0] };
+  var lines = historyStr.trim().split('\n').filter(function(l){ return l.trim(); });
+  var prevDraw = null;
+  if (lines.length >= 2) {
+    var parts = lines[1].split('|');
+    var r = parseNums(parts[0]), b = parseNums(parts[1] || '');
+    if (r.length >= 5 && b.length >= 2) prevDraw = { red: r.slice(0,5).sort(function(a,b){return a-b;}), blue: b[0] };
+  }
+
+  var frontKills = calculateSSQFormulaRedKills(lastDraw, prevDraw).filter(function(n){ return n >= 1 && n <= 35; });
+  var backKills = calculateSSQFormulaBlueKills(lastDraw, prevDraw, null).filter(function(n){ return n >= 1 && n <= 12; });
+
+  // 保存到全局变量
+  _dltFormulaKills = { front: frontKills, back: backKills };
+
+  // 渲染结果
+  var container = document.getElementById('dlt-formula-kills-results');
+  if (!container) return;
+  container.style.display = 'block';
+
+  var html = '';
+
+  html += '<div style="padding:0.6rem 0.8rem;background:var(--bg2);border-radius:8px;border:1px solid var(--rule);margin-bottom:1rem;font-size:0.8rem;display:flex;gap:1.5rem;flex-wrap:wrap">';
+  html += '<div><span style="color:var(--muted)">前区杀号：</span><strong style="color:var(--accent4)">'+frontKills.length+'个</strong></div>';
+  html += '<div><span style="color:var(--muted)">后区杀号：</span><strong style="color:var(--accent4)">'+backKills.length+'个</strong></div>';
+  html += '<div><span style="color:var(--muted)">剩余前区：</span><strong style="color:var(--accent3)">'+(35-frontKills.length)+'个</strong></div>';
+  html += '<div><span style="color:var(--muted)">剩余后区：</span><strong style="color:var(--accent3)">'+(12-backKills.length)+'个</strong></div>';
+  html += '</div>';
+
+  html += '<div style="margin-bottom:1rem;padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+  html += '<div style="font-weight:600;color:var(--ink);margin-bottom:0.5rem">前区杀号列表</div>';
+  html += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+  for (var i = 1; i <= 35; i++) {
+    var isKill = frontKills.indexOf(i) >= 0;
+    html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;font-size:0.7rem;'+(isKill?'background:var(--accent4);color:#fff;font-weight:600':'background:var(--accent3);color:#000;font-weight:600')+'">'+pad(i)+'</span>';
+  }
+  html += '</div></div>';
+
+  html += '<div style="margin-bottom:1rem;padding:0.8rem;background:var(--bg3);border-radius:8px;border:1px solid var(--rule)">';
+  html += '<div style="font-weight:600;color:var(--ink);margin-bottom:0.5rem">后区杀号列表</div>';
+  html += '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+  for (var i = 1; i <= 12; i++) {
+    var isKill = backKills.indexOf(i) >= 0;
+    html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;font-size:0.7rem;'+(isKill?'background:var(--accent4);color:#fff;font-weight:600':'background:#2196F3;color:#fff;font-weight:600')+'">'+pad(i)+'</span>';
+  }
+  html += '</div></div>';
+
+  html += '<div style="padding:0.6rem;background:var(--accent);color:#000;border-radius:8px;font-size:0.8rem;text-align:center">&#128077; 杀号已保存！切换到"摇奖机模拟选号"页面，在手动杀号基础上叠加公式杀号，点击"开始摇奖"即可</div>';
+
+  container.innerHTML = html;
+}
+
 // 摇奖机模拟选号
 function spinSSQLottery() {
   var redStr = document.getElementById('ssq-red').value;
@@ -6936,6 +7087,13 @@ function spinSSQLottery() {
     var kb = document.getElementById('ssq-kill-blue').value;
     if (kr) killRed = parseNums(kr);
     if (kb) killBlue = parseNums(kb);
+    // 合并公式杀号（如果已计算）
+    if (_ssqFormulaKills && _ssqFormulaKills.red.length > 0) {
+      _ssqFormulaKills.red.forEach(function(n){ if (killRed.indexOf(n) < 0) killRed.push(n); });
+    }
+    if (_ssqFormulaKills && _ssqFormulaKills.blue.length > 0) {
+      _ssqFormulaKills.blue.forEach(function(n){ if (killBlue.indexOf(n) < 0) killBlue.push(n); });
+    }
   } catch(e) {}
 
   var allRedNums = [];

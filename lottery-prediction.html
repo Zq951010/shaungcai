@@ -793,6 +793,9 @@ tr:hover td { background: var(--bg3); }
         <button class="dlt-sidebar-btn" onclick="switchDLTTab('tab7', this)">
           <span class="badge-sm" style="background:#e74c3c;color:#fff">7</span>走势图
         </button>
+        <button class="dlt-sidebar-btn" onclick="switchDLTTab('tab8', this)">
+          <span class="badge-sm" style="background:var(--accent4);color:#fff">8</span>杀号公式
+        </button>
       </div>
 
       <!-- 右侧内容 -->
@@ -866,6 +869,7 @@ tr:hover td { background: var(--bg3); }
               <button class="btn btn-primary" onclick="spinDLTLottery()" style="font-size:1.1rem;padding:0.8rem 2.5rem;border-radius:50px">&#127922; 开始摇奖</button>
             </div>
             <div id="dlt-lottery-results" style="display:none"></div>
+            <div style="font-size:0.7rem;color:var(--muted);text-align:center;margin-top:0.3rem">&#128300; 先在"杀号公式"中计算，摇奖时自动合并公式杀号</div>
           </div>
         </div>
 
@@ -903,6 +907,29 @@ tr:hover td { background: var(--bg3); }
               红色圆圈表示前区开奖号码，蓝色圆圈表示后区开奖号码，灰色数字表示该号码的遗漏期数。右侧统计列包含和值、跨度、区间比与奇偶比。
             </div>
             <div id="dlt-trend-chart" style="overflow-x:auto"></div>
+          </div>
+        </div>
+
+        <!-- Tab 8: 杀号公式 -->
+        <div class="dlt-tab" id="tab8">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128300;</span> 8. 杀号公式</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              基于双色球45种红球杀号公式+8种蓝球杀号公式，自动计算前区/后区排除号码。计算结果会同步到"摇奖机模拟选号"功能中，摇奖时自动排除。
+            </div>
+            <div style="margin-bottom:1rem;padding:0.8rem;background:var(--bg2);border-radius:8px;border:1px solid var(--rule)">
+              <div style="font-size:0.85rem;margin-bottom:0.5rem;color:var(--muted)">&#128200; 使用说明</div>
+              <div style="font-size:0.78rem;line-height:1.6;color:var(--muted)">
+                1. 确保已在"开奖号码输入"中填写了上期开奖号码（前区+后区）<br>
+                2. 点击下方"计算杀号"按钮，自动基于公式计算排除号码<br>
+                3. 计算结果会显示在下方的列表中，同时自动保存到"摇奖机"功能中<br>
+                4. 切换到"摇奖机模拟选号"页面，可在手动杀号基础上再叠加公式杀号，点击"开始摇奖"即可
+              </div>
+            </div>
+            <div style="text-align:center;margin:1rem 0">
+              <button class="btn btn-primary" onclick="computeDLTFormulaKills()" style="font-size:1rem;padding:0.6rem 2rem;border-radius:50px">&#128300; 计算杀号</button>
+            </div>
+            <div id="dlt-formula-kills-results" style="display:none"></div>
           </div>
         </div>
       </div>
@@ -1010,6 +1037,9 @@ tr:hover td { background: var(--bg3); }
         <button class="dlt-sidebar-btn" onclick="switchSSQTab('ssq-tab6', this)">
           <span class="badge-sm" style="background:var(--accent);color:#000">6</span>模型复盘与推荐
         </button>
+        <button class="dlt-sidebar-btn" onclick="switchSSQTab('ssq-tab7', this)">
+          <span class="badge-sm" style="background:var(--accent4);color:#fff">7</span>杀号公式
+        </button>
       </div>
 
       <div class="dlt-content">
@@ -1074,8 +1104,7 @@ tr:hover td { background: var(--bg3); }
           <div class="card">
             <div class="card-title"><span class="icon">&#127922;</span> 4. 摇奖机模拟选号</div>
             <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
-              基于大模型评分加权随机抽取红球01-33、蓝球01-16，生成1注¥28的7+2复式套餐票（7红+2蓝，14注）。<br>
-              <strong>杀号公式：</strong>基于45种红球杀号公式+8种蓝球杀号公式，自动计算排除号码，摇奖时从剩余号码中抽取。
+              基于大模型评分加权随机抽取红球01-33、蓝球01-16，生成1注¥28的7+2复式套餐票（7红+2蓝，14注）。
             </div>
             <div style="text-align:center;margin:1.5rem 0">
               <div class="input-row" style="justify-content:center;margin-bottom:0.8rem">
@@ -1086,11 +1115,10 @@ tr:hover td { background: var(--bg3); }
                 <label style="font-size:0.85rem">蓝球杀号：</label>
                 <input type="text" id="ssq-kill-blue" placeholder="排除的号码，如: 07" style="width:260px;font-size:0.85rem">
               </div>
-              <button class="btn btn-secondary" onclick="autoFillSSQKills()" style="font-size:0.85rem;padding:0.5rem 1.5rem;border-radius:50px;margin-bottom:0.8rem;background:var(--accent3);color:#000;border:1px solid var(--accent3)">&#128300; 公式计算杀号</button>
-              <br>
               <button class="btn btn-primary" onclick="spinSSQLottery()" style="font-size:1.1rem;padding:0.8rem 2.5rem;border-radius:50px">&#127922; 开始摇奖</button>
             </div>
             <div id="ssq-lottery-results" style="display:none"></div>
+            <div style="font-size:0.7rem;color:var(--muted);text-align:center;margin-top:0.3rem">&#128300; 先在"杀号公式"中计算，摇奖时自动合并公式杀号</div>
           </div>
         </div>
 
@@ -1117,6 +1145,29 @@ tr:hover td { background: var(--bg3); }
               <button class="btn btn-primary" onclick="spinSSQReview()" style="font-size:1rem;padding:0.6rem 2rem;border-radius:50px">&#127922; 机选号码并分析</button>
             </div>
             <div id="ssq-review-analysis"></div>
+          </div>
+        </div>
+
+        <!-- Tab 7: 杀号公式 -->
+        <div class="dlt-tab" id="ssq-tab7">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128300;</span> 7. 杀号公式</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              基于45种红球杀号公式+8种蓝球杀号公式，自动计算排除号码。计算结果会同步到"摇奖机模拟选号"功能中，摇奖时自动排除。
+            </div>
+            <div style="margin-bottom:1rem;padding:0.8rem;background:var(--bg2);border-radius:8px;border:1px solid var(--rule)">
+              <div style="font-size:0.85rem;margin-bottom:0.5rem;color:var(--muted)">&#128200; 使用说明</div>
+              <div style="font-size:0.78rem;line-height:1.6;color:var(--muted)">
+                1. 确保已在"开奖号码输入"中填写了上期开奖号码（红球6个+蓝球1个）<br>
+                2. 点击下方"计算杀号"按钮，自动基于45种公式计算排除号码<br>
+                3. 计算结果会显示在下方的列表中，同时自动保存到"摇奖机"功能中<br>
+                4. 切换到"摇奖机模拟选号"页面，可在手动杀号基础上再叠加公式杀号，点击"开始摇奖"即可
+              </div>
+            </div>
+            <div style="text-align:center;margin:1rem 0">
+              <button class="btn btn-primary" onclick="computeSSQFormulaKills()" style="font-size:1rem;padding:0.6rem 2rem;border-radius:50px">&#128300; 计算杀号</button>
+            </div>
+            <div id="ssq-formula-kills-results" style="display:none"></div>
           </div>
         </div>
       </div>
@@ -1774,10 +1825,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026071011"></script>
-<script src="assets/pl-data.js?v=2026071011"></script>
-<script src="assets/pl-engine.js?v=2026071011"></script>
-<script src="assets/auto-review.js?v=2026071011"></script>
+<script src="assets/engine.js?v=2026071012"></script>
+<script src="assets/pl-data.js?v=2026071012"></script>
+<script src="assets/pl-engine.js?v=2026071012"></script>
+<script src="assets/auto-review.js?v=2026071012"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)
@@ -1805,7 +1856,7 @@ window.addEventListener('DOMContentLoaded', function() {
 <script>
 function switchDLTTab(tabId, btn) {
   document.querySelectorAll('#dlt-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('#dlt-tab0, #tab1, #tab2, #tab3, #tab4, #tab5, #tab6, #tab7').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('#dlt-tab0, #tab1, #tab2, #tab3, #tab4, #tab5, #tab6, #tab7, #tab8').forEach(function(t){ t.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   var tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');
@@ -1818,7 +1869,7 @@ function switchDLTTab(tabId, btn) {
 <script>
 function switchSSQTab(tabId, btn) {
   document.querySelectorAll('#ssq-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('#ssq-tab0, #ssq-tab1, #ssq-tab2, #ssq-tab3, #ssq-tab4, #ssq-tab5, #ssq-tab6').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('#ssq-tab0, #ssq-tab1, #ssq-tab2, #ssq-tab3, #ssq-tab4, #ssq-tab5, #ssq-tab6, #ssq-tab7').forEach(function(t){ t.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   var tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');
