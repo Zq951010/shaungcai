@@ -2259,6 +2259,12 @@ function renderDLTRecommend_V3(lastDraw, allFronts, allBacks) {
   } catch(e) {
     console.log('保存DLT推荐失败:', e.message);
   }
+
+  // 保存每日推荐
+  try {
+    var lastDrawObj = {front: last.slice(0,5).sort(function(a,b){return a-b;}), back: last.slice(5).sort(function(a,b){return a-b;})};
+    saveDLTDailyRecommendation(lastDrawObj, strategies);
+  } catch(e) { console.log('DLT每日推荐保存失败:', e.message); }
 }
 
 
@@ -3257,6 +3263,12 @@ function renderSSQRecommend(last, allReds, allBlues) {
   } catch(e) {
     console.log('保存SSQ推荐失败:', e.message);
   }
+
+  // 保存每日推荐
+  try {
+    var lastDrawObj = {red: last.red.slice().sort(function(a,b){return a-b;}), blue: last.blue};
+    saveSSQDailyRecommendation(lastDrawObj, strategies);
+  } catch(e) { console.log('SSQ每日推荐保存失败:', e.message); }
 }
 
 
@@ -9317,4 +9329,330 @@ function runKL8Backtest() {
   html += '</div>';
   
   document.getElementById('kl8-backtest-results').innerHTML = html;
+}
+
+// ==================== SSQ每日推荐号码模块 ====================
+var SSQ_DAILY_KEY = 'ssq_daily_recommendations';
+var SSQ_DAILY_MAX = 200;
+
+function saveSSQDailyRecommendation(lastDraw, strategies) {
+  var today = new Date().toISOString().slice(0,10);
+  var existing = JSON.parse(localStorage.getItem(SSQ_DAILY_KEY) || '[]');
+  var key = today;
+  var rec = {
+    key: key,
+    date: today,
+    lastDraw: {red: lastDraw.red.slice().sort(function(a,b){return a-b;}), blue: lastDraw.blue},
+    verified: false,
+    actualDraw: null,
+    strategies: strategies.map(function(s){ return {name: s.name, desc: s.desc, combos: s.combos}; }),
+    savedAt: new Date().toISOString()
+  };
+  var idx = -1;
+  for (var i = 0; i < existing.length; i++) {
+    if (existing[i].key === key) { idx = i; break; }
+  }
+  if (idx >= 0) {
+    rec.verified = existing[idx].verified;
+    rec.actualDraw = existing[idx].actualDraw;
+    if (rec.verified && rec.actualDraw) {
+      rec.strategies.forEach(function(s){
+        s.combos.forEach(function(c){
+          c.redHits = c.reds.filter(function(n){return rec.actualDraw.red.indexOf(n)>=0;});
+          c.blueHit = c.blue === rec.actualDraw.blue;
+        });
+      });
+    }
+    existing[idx] = rec;
+  } else {
+    existing.unshift(rec);
+  }
+  if (existing.length > SSQ_DAILY_MAX) existing = existing.slice(0, SSQ_DAILY_MAX);
+  localStorage.setItem(SSQ_DAILY_KEY, JSON.stringify(existing));
+  console.log('SSQ每日推荐已保存:', today);
+}
+
+function renderSSQDailyRecommendations() {
+  var recs = JSON.parse(localStorage.getItem(SSQ_DAILY_KEY) || '[]');
+  var container = document.getElementById('ssq-daily-recommendations');
+  if (!container) return;
+  if (recs.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem">暂无推荐记录，请先在"推荐分析"中生成推荐号码</div>';
+    return;
+  }
+  var html = '';
+  var totalRecs = recs.length;
+  var verifiedRecs = recs.filter(function(r){return r.verified;}).length;
+  var pendingRecs = totalRecs - verifiedRecs;
+  html += '<div style="padding:0.6rem 0.8rem;background:var(--bg2);border-radius:8px;border:1px solid var(--rule);margin-bottom:1rem;font-size:0.8rem;display:flex;gap:1.5rem;flex-wrap:wrap">';
+  html += '<div><span style="color:var(--muted)">总天数：</span><strong>'+totalRecs+'天</strong></div>';
+  html += '<div><span style="color:var(--muted)">已验证：</span><strong style="color:var(--accent3)">'+verifiedRecs+'天</strong></div>';
+  html += '<div><span style="color:var(--muted)">待开奖：</span><strong style="color:var(--accent)">'+pendingRecs+'天</strong></div>';
+  html += '</div>';
+  for (var ri = 0; ri < recs.length; ri++) {
+    var rec = recs[ri];
+    html += '<div style="padding:0.8rem 1rem;margin-bottom:0.6rem;background:var(--bg3);border-radius:8px;border:1px solid '+(rec.verified?'var(--accent3)':'var(--accent)')+'">';
+    html += '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">';
+    html += '<span style="font-weight:700;color:var(--ink);font-size:0.9rem">'+rec.date+'</span>';
+    if (rec.verified) {
+      html += '<span style="background:var(--accent3);color:#000;padding:1px 8px;border-radius:4px;font-size:0.7rem;font-weight:600">已验证</span>';
+    } else {
+      html += '<span style="background:var(--accent);color:#000;padding:1px 8px;border-radius:4px;font-size:0.7rem;font-weight:600">待开奖</span>';
+    }
+    html += '</div>';
+    html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">预测基准：红球'+rec.lastDraw.red.map(function(n){return pad(n);}).join(', ')+' + 蓝球'+pad(rec.lastDraw.blue)+'</div>';
+    if (rec.verified && rec.actualDraw) {
+      html += '<div style="margin-top:0.2rem;font-size:0.7rem;color:var(--accent3);font-weight:600">开奖号码：红球'+rec.actualDraw.red.map(function(n){return pad(n);}).join(', ')+' + 蓝球'+pad(rec.actualDraw.blue)+'</div>';
+    }
+    for (var si = 0; si < rec.strategies.length; si++) {
+      var st = rec.strategies[si];
+      html += '<div style="margin-top:0.5rem;padding-top:0.4rem;border-top:1px dashed var(--rule)">';
+      html += '<div style="font-weight:600;color:var(--ink);font-size:0.8rem;margin-bottom:0.3rem">'+st.name+'</div>';
+      html += '<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem">'+(st.desc||'')+'</div>';
+      for (var ci = 0; ci < st.combos.length; ci++) {
+        var c = st.combos[ci];
+        var redHits = c.redHits || [];
+        var blueHit = c.blueHit || false;
+        html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-top:0.2rem">';
+        html += '<span style="font-size:0.7rem;color:var(--muted);min-width:35px">方案'+(ci+1)+'</span>';
+        html += '<div style="display:flex;gap:3px;flex-wrap:wrap">';
+        for (var ni = 0; ni < c.reds.length; ni++) {
+          var n = c.reds[ni];
+          var isHit = redHits.indexOf(n) >= 0;
+          if (rec.verified) {
+            html += '<span style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;font-size:0.65rem;'+(isHit?'background:var(--accent3);color:#000;font-weight:700;box-shadow:0 0 0 2px var(--accent3);':'background:var(--accent4);color:#fff;')+'">'+pad(n)+'</span>';
+          } else {
+            html += '<span style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;font-size:0.65rem;background:var(--accent4);color:#fff;">'+pad(n)+'</span>';
+          }
+        }
+        html += '<span style="margin:0 2px;color:var(--muted)">+</span>';
+        html += '<span style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;font-size:0.65rem;'+(rec.verified&&blueHit?'background:var(--accent3);color:#000;font-weight:700;box-shadow:0 0 0 2px var(--accent3);':'background:#2196F3;color:#fff;')+'">'+pad(c.blue)+'</span>';
+        html += '</div>';
+        if (rec.verified) {
+          var hitCount = redHits.length;
+          html += '<span style="margin-left:auto;background:'+(hitCount>=4?'var(--accent3)':(hitCount>=2?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:600">'+hitCount+(blueHit?'+1蓝':'')+'</span>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  container.innerHTML = html;
+}
+
+function clearSSQDailyRecommendations() {
+  if (!confirm('确定要清除全部每日推荐记录吗？')) return;
+  localStorage.removeItem(SSQ_DAILY_KEY);
+  var container = document.getElementById('ssq-daily-recommendations');
+  if (container) container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem">已清除全部记录</div>';
+}
+
+function manualVerifySSQDaily() {
+  if (typeof ssqSampleHistory === 'undefined' || ssqSampleHistory.length === 0) {
+    alert('无内置开奖数据'); return;
+  }
+  var actualParts = ssqSampleHistory[0].split('|');
+  var actualRed = actualParts[0].split(',').map(Number).sort(function(a,b){return a-b;});
+  var actualBlue = parseInt(actualParts[1], 10);
+  var recs = JSON.parse(localStorage.getItem(SSQ_DAILY_KEY) || '[]');
+  var updated = false;
+  for (var i = 0; i < recs.length; i++) {
+    var rec = recs[i];
+    if (!rec.verified) {
+      var lastDrawStr = rec.lastDraw.red.join(',') + '|' + rec.lastDraw.blue;
+      var actualStr = actualRed.join(',') + '|' + actualBlue;
+      if (lastDrawStr !== actualStr) {
+        rec.verified = true;
+        rec.actualDraw = {red: actualRed, blue: actualBlue};
+        rec.strategies.forEach(function(s){
+          s.combos.forEach(function(c){
+            c.redHits = c.reds.filter(function(n){return actualRed.indexOf(n)>=0;});
+            c.blueHit = c.blue === actualBlue;
+          });
+        });
+        updated = true;
+      }
+    }
+  }
+  if (updated) {
+    localStorage.setItem(SSQ_DAILY_KEY, JSON.stringify(recs));
+    alert('验证成功！已更新'+recs.filter(function(r){return r.verified;}).length+'条记录');
+    renderSSQDailyRecommendations();
+  } else {
+    alert('没有待验证的推荐记录，或验证条件不满足（基准号码与开奖号码相同）');
+  }
+}
+
+// ==================== DLT每日推荐号码模块 ====================
+var DLT_DAILY_KEY = 'dlt_daily_recommendations';
+var DLT_DAILY_MAX = 200;
+
+function saveDLTDailyRecommendation(lastDraw, strategies) {
+  // lastDraw格式: {front:[5个], back:[2个]}
+  // strategies格式: [{name:'策略名', desc:'描述', combos:[[7个数组: 5前区+2后区]]}]
+  var today = new Date().toISOString().slice(0,10);
+  var existing = JSON.parse(localStorage.getItem(DLT_DAILY_KEY) || '[]');
+  var key = today;
+  var rec = {
+    key: key,
+    date: today,
+    lastDraw: {front: lastDraw.front.slice().sort(function(a,b){return a-b;}), back: lastDraw.back.slice().sort(function(a,b){return a-b;})},
+    verified: false,
+    actualDraw: null,
+    strategies: strategies.map(function(s){
+      return {
+        name: s.name,
+        desc: s.desc,
+        combos: s.combos.map(function(c){
+          // 将扁平数组转为结构化 {front:[5], back:[2]}
+          return {front: c.slice(0,5), back: c.slice(5)};
+        })
+      };
+    }),
+    savedAt: new Date().toISOString()
+  };
+  var idx = -1;
+  for (var i = 0; i < existing.length; i++) {
+    if (existing[i].key === key) { idx = i; break; }
+  }
+  if (idx >= 0) {
+    rec.verified = existing[idx].verified;
+    rec.actualDraw = existing[idx].actualDraw;
+    if (rec.verified && rec.actualDraw) {
+      rec.strategies.forEach(function(s){
+        s.combos.forEach(function(c){
+          c.frontHits = c.front.filter(function(n){return rec.actualDraw.front.indexOf(n)>=0;});
+          c.backHits = c.back.filter(function(n){return rec.actualDraw.back.indexOf(n)>=0;});
+        });
+      });
+    }
+    existing[idx] = rec;
+  } else {
+    existing.unshift(rec);
+  }
+  if (existing.length > DLT_DAILY_MAX) existing = existing.slice(0, DLT_DAILY_MAX);
+  localStorage.setItem(DLT_DAILY_KEY, JSON.stringify(existing));
+  console.log('DLT每日推荐已保存:', today);
+}
+
+function renderDLTDailyRecommendations() {
+  var recs = JSON.parse(localStorage.getItem(DLT_DAILY_KEY) || '[]');
+  var container = document.getElementById('dlt-daily-recommendations');
+  if (!container) return;
+  if (recs.length === 0) {
+    container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem">暂无推荐记录，请先在"推荐分析"中生成推荐号码</div>';
+    return;
+  }
+  var html = '';
+  var totalRecs = recs.length;
+  var verifiedRecs = recs.filter(function(r){return r.verified;}).length;
+  var pendingRecs = totalRecs - verifiedRecs;
+  html += '<div style="padding:0.6rem 0.8rem;background:var(--bg2);border-radius:8px;border:1px solid var(--rule);margin-bottom:1rem;font-size:0.8rem;display:flex;gap:1.5rem;flex-wrap:wrap">';
+  html += '<div><span style="color:var(--muted)">总天数：</span><strong>'+totalRecs+'天</strong></div>';
+  html += '<div><span style="color:var(--muted)">已验证：</span><strong style="color:var(--accent3)">'+verifiedRecs+'天</strong></div>';
+  html += '<div><span style="color:var(--muted)">待开奖：</span><strong style="color:var(--accent)">'+pendingRecs+'天</strong></div>';
+  html += '</div>';
+  for (var ri = 0; ri < recs.length; ri++) {
+    var rec = recs[ri];
+    html += '<div style="padding:0.8rem 1rem;margin-bottom:0.6rem;background:var(--bg3);border-radius:8px;border:1px solid '+(rec.verified?'var(--accent3)':'var(--accent)')+'">';
+    html += '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap">';
+    html += '<span style="font-weight:700;color:var(--ink);font-size:0.9rem">'+rec.date+'</span>';
+    if (rec.verified) {
+      html += '<span style="background:var(--accent3);color:#000;padding:1px 8px;border-radius:4px;font-size:0.7rem;font-weight:600">已验证</span>';
+    } else {
+      html += '<span style="background:var(--accent);color:#000;padding:1px 8px;border-radius:4px;font-size:0.7rem;font-weight:600">待开奖</span>';
+    }
+    html += '</div>';
+    html += '<div style="margin-top:0.3rem;font-size:0.7rem;color:var(--muted)">预测基准：前区'+rec.lastDraw.front.map(function(n){return pad(n);}).join(', ')+' + 后区'+rec.lastDraw.back.map(function(n){return pad(n);}).join(', ')+'</div>';
+    if (rec.verified && rec.actualDraw) {
+      html += '<div style="margin-top:0.2rem;font-size:0.7rem;color:var(--accent3);font-weight:600">开奖号码：前区'+rec.actualDraw.front.map(function(n){return pad(n);}).join(', ')+' + 后区'+rec.actualDraw.back.map(function(n){return pad(n);}).join(', ')+'</div>';
+    }
+    for (var si = 0; si < rec.strategies.length; si++) {
+      var st = rec.strategies[si];
+      html += '<div style="margin-top:0.5rem;padding-top:0.4rem;border-top:1px dashed var(--rule)">';
+      html += '<div style="font-weight:600;color:var(--ink);font-size:0.8rem;margin-bottom:0.3rem">'+st.name+'</div>';
+      html += '<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.2rem">'+(st.desc||'')+'</div>';
+      for (var ci = 0; ci < st.combos.length; ci++) {
+        var c = st.combos[ci];
+        var frontHits = c.frontHits || [];
+        var backHits = c.backHits || [];
+        html += '<div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-top:0.2rem">';
+        html += '<span style="font-size:0.7rem;color:var(--muted);min-width:35px">方案'+(ci+1)+'</span>';
+        html += '<div style="display:flex;gap:3px;flex-wrap:wrap">';
+        for (var ni = 0; ni < c.front.length; ni++) {
+          var n = c.front[ni];
+          var isHit = frontHits.indexOf(n) >= 0;
+          if (rec.verified) {
+            html += '<span style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;font-size:0.65rem;'+(isHit?'background:var(--accent3);color:#000;font-weight:700;box-shadow:0 0 0 2px var(--accent3);':'background:var(--accent4);color:#fff;')+'">'+pad(n)+'</span>';
+          } else {
+            html += '<span style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;font-size:0.65rem;background:var(--accent4);color:#fff;">'+pad(n)+'</span>';
+          }
+        }
+        html += '<span style="margin:0 2px;color:var(--muted)">+</span>';
+        for (var bi = 0; bi < c.back.length; bi++) {
+          var bn = c.back[bi];
+          var isBHit = backHits.indexOf(bn) >= 0;
+          if (rec.verified) {
+            html += '<span style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;font-size:0.65rem;'+(isBHit?'background:var(--accent3);color:#000;font-weight:700;box-shadow:0 0 0 2px var(--accent3);':'background:#2196F3;color:#fff;')+'">'+pad(bn)+'</span>';
+          } else {
+            html += '<span style="display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;font-size:0.65rem;background:#2196F3;color:#fff;">'+pad(bn)+'</span>';
+          }
+        }
+        html += '</div>';
+        if (rec.verified) {
+          var fHitCount = frontHits.length;
+          var bHitCount = backHits.length;
+          html += '<span style="margin-left:auto;background:'+(fHitCount>=4?'var(--accent3)':(fHitCount>=2?'var(--accent)':'var(--accent4)'))+';color:#000;padding:2px 6px;border-radius:4px;font-size:0.7rem;font-weight:600">'+fHitCount+'+'+bHitCount+'</span>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+  container.innerHTML = html;
+}
+
+function clearDLTDailyRecommendations() {
+  if (!confirm('确定要清除全部每日推荐记录吗？')) return;
+  localStorage.removeItem(DLT_DAILY_KEY);
+  var container = document.getElementById('dlt-daily-recommendations');
+  if (container) container.innerHTML = '<div style="text-align:center;color:var(--muted);padding:2rem">已清除全部记录</div>';
+}
+
+function manualVerifyDLTDaily() {
+  if (typeof dltSampleHistory === 'undefined' || dltSampleHistory.length === 0) {
+    alert('无内置开奖数据'); return;
+  }
+  var actualParts = dltSampleHistory[0].split('|');
+  var actualFront = actualParts[0].split(',').map(Number).sort(function(a,b){return a-b;});
+  var actualBack = actualParts[1].split(',').map(Number).sort(function(a,b){return a-b;});
+  var recs = JSON.parse(localStorage.getItem(DLT_DAILY_KEY) || '[]');
+  var updated = false;
+  for (var i = 0; i < recs.length; i++) {
+    var rec = recs[i];
+    if (!rec.verified) {
+      var lastDrawStr = rec.lastDraw.front.join(',') + '|' + rec.lastDraw.back.join(',');
+      var actualStr = actualFront.join(',') + '|' + actualBack.join(',');
+      if (lastDrawStr !== actualStr) {
+        rec.verified = true;
+        rec.actualDraw = {front: actualFront, back: actualBack};
+        rec.strategies.forEach(function(s){
+          s.combos.forEach(function(c){
+            c.frontHits = c.front.filter(function(n){return actualFront.indexOf(n)>=0;});
+            c.backHits = c.back.filter(function(n){return actualBack.indexOf(n)>=0;});
+          });
+        });
+        updated = true;
+      }
+    }
+  }
+  if (updated) {
+    localStorage.setItem(DLT_DAILY_KEY, JSON.stringify(recs));
+    alert('验证成功！已更新'+recs.filter(function(r){return r.verified;}).length+'条记录');
+    renderDLTDailyRecommendations();
+  } else {
+    alert('没有待验证的推荐记录，或验证条件不满足（基准号码与开奖号码相同）');
+  }
 }
