@@ -2733,11 +2733,11 @@ function getRecent15Trend(allDraws) {
 
 function getSSQAdaptiveWeights() {
   var defaults = {
-    wf: 0.14, mpScore: 0.16, mkScore: 0.03, zoneScore: 0.12,
-    tailScore: 0.06, oddAltScore: 0.05, sizeScore: 0.05,
-    neighborScore: 0.08, pairScore: 0.05, hcScore: 0.05,
-    stability: 0.03, maScore: 0.04, cycleScore: 0.04,
-    coScore: 0.15, lastMissScore: 0.10
+    wf: 0.10, mpScore: 0.12, mkScore: 0.03, zoneScore: 0.08,
+    tailScore: 0.04, oddAltScore: 0.04, sizeScore: 0.04,
+    neighborScore: 0.16, pairScore: 0.05, hcScore: 0.04,
+    stability: 0.02, maScore: 0.03, cycleScore: 0.03,
+    coScore: 0.10, lastMissScore: 0.14
   };
   try {
     var saved = localStorage.getItem('ssq_adaptive_weights');
@@ -2823,10 +2823,27 @@ function scoreSSQNumbers(last, allReds, weights) {
     }
 
     var neighborScore = 0;
-    if (last.red.indexOf(n) >= 0) neighborScore = 0.9;
+    if (last.red.indexOf(n) >= 0) neighborScore = 0.95; // 重号强信号
     else {
       for (var i = 0; i < last.red.length; i++) {
-        if (Math.abs(n - last.red[i]) === 1) { neighborScore = 0.7; break; }
+        if (Math.abs(n - last.red[i]) === 1) { neighborScore = 0.75; break; }
+      }
+    }
+    // 连续重号追踪
+    if (allReds.length > 1 && last.red.indexOf(n) >= 0 && allReds[1].indexOf(n) >= 0) {
+      neighborScore += 0.05;
+    }
+    // 近5期平均重号数偏高，重号额外加分
+    var ssqRepeatHistory = [];
+    for (var ri = 0; ri < Math.min(5, allReds.length - 1); ri++) {
+      ssqRepeatHistory.push(allReds[ri].filter(function(x){ return allReds[ri+1].indexOf(x) >= 0; }).length);
+    }
+    var ssqAvgRepeat = ssqRepeatHistory.length > 0 ? ssqRepeatHistory.reduce(function(a,b){return a+b;},0)/ssqRepeatHistory.length : 0;
+    if (ssqAvgRepeat >= 1.5 && last.red.indexOf(n) >= 0) { neighborScore += 0.05; }
+    // 连续2期未出的邻号回补
+    if (last.red.indexOf(n) < 0 && allReds.length > 1 && allReds[1].indexOf(n) < 0) {
+      for (var i = 0; i < last.red.length; i++) {
+        if (Math.abs(n - last.red[i]) === 1) { neighborScore += 0.05; break; }
       }
     }
 
@@ -2949,20 +2966,26 @@ function scoreSSQBlueNumbers(last, allBlues) {
     var cycle = cycleAnalysis(n, blueHistory);
     var cycleScore = cycle.score;
 
-    // 蓝球遗漏回补评分
+    // 蓝球遗漏回补评分：加入遗漏1-2期隔期回补+重号信号
     var lastMissBlue = 0;
     if (last.blue !== n) {
+      var blueMiss = 0;
       for (var bmi = 0; bmi < allBlues.length; bmi++) {
         if (allBlues[bmi] === n) break;
+        blueMiss++;
       }
-      var blueMiss = bmi;
-      if (blueMiss >= 3 && blueMiss <= 6) lastMissBlue = 0.95;
-      else if (blueMiss >= 7 && blueMiss <= 10) lastMissBlue = 0.80;
-      else if (blueMiss >= 11 && blueMiss <= 15) lastMissBlue = 0.55;
-      else if (blueMiss >= 16) lastMissBlue = 0.35;
+      if (blueMiss >= 1 && blueMiss <= 2) lastMissBlue = 0.98; // 隔期回补，最强信号
+      else if (blueMiss >= 3 && blueMiss <= 6) lastMissBlue = 0.90;
+      else if (blueMiss >= 7 && blueMiss <= 10) lastMissBlue = 0.75;
+      else if (blueMiss >= 11 && blueMiss <= 15) lastMissBlue = 0.50;
+      else if (blueMiss >= 16) lastMissBlue = 0.30;
+    } else {
+      lastMissBlue = 0.30; // 上期已出，隔期回升信号
     }
+    // 蓝球重号评分：双色球蓝球也有重号现象
+    var blueRepeatScore = last.blue === n ? 0.80 : 0.40;
 
-    var totalScore = wf * 0.22 + mpScore * 0.22 + mkScore * 0.06 + oddScore * 0.10 + sizeScore * 0.10 + tailScore * 0.08 + maScore * 0.04 + cycleScore * 0.04 + lastMissBlue * 0.14;
+    var totalScore = wf * 0.15 + mpScore * 0.15 + mkScore * 0.05 + oddScore * 0.08 + sizeScore * 0.08 + tailScore * 0.06 + maScore * 0.04 + cycleScore * 0.04 + lastMissBlue * 0.20 + blueRepeatScore * 0.15;
 
     var reasons = [];
     if (wf > 0.2) reasons.push('高频');
@@ -2971,10 +2994,12 @@ function scoreSSQBlueNumbers(last, allBlues) {
     if (oddScore > 0.7) reasons.push('奇偶');
     if (sizeScore > 0.7) reasons.push('大小');
     if (tailScore > 0.7) reasons.push('尾数');
+    if (lastMissBlue > 0.7) reasons.push('遗漏回补');
+    if (blueRepeatScore > 0.7) reasons.push('蓝球重号');
     if (ma.trend === 'up') reasons.push('趋势升');
     if (cycleScore > 0.85) reasons.push('周期到');
 
-    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, tailScore: tailScore, maScore: maScore, cycleScore: cycleScore, totalScore: totalScore, reasons: reasons });
+    scores.push({ num: n, wf: wf, currentGap: dist.currentGap, mp: mp, mkScore: mkScore, oddScore: oddScore, sizeScore: sizeScore, tailScore: tailScore, maScore: maScore, cycleScore: cycleScore, lastMissBlue: lastMissBlue, blueRepeatScore: blueRepeatScore, totalScore: totalScore, reasons: reasons });
   }
   return scores.sort(function(a, b) { return b.totalScore - a.totalScore; });
 }
