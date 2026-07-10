@@ -1208,6 +1208,9 @@ tr:hover td { background: var(--bg3); }
         <button class="dlt-sidebar-btn" onclick="switchKL8Tab('kl8-tab7', this)">
           <span class="badge-sm" style="background:var(--accent4);color:#fff">7</span>每日推荐命中
         </button>
+        <button class="dlt-sidebar-btn" onclick="switchKL8Tab('kl8-tab8', this)">
+          <span class="badge-sm" style="background:var(--accent);color:#000">8</span>每日推荐号码
+        </button>
       </div>
 
       <div class="dlt-content">
@@ -1348,6 +1351,21 @@ tr:hover td { background: var(--bg3); }
             <div id="kl8-today-predictions"></div>
             <div id="kl8-prediction-stats"></div>
             <div id="kl8-prediction-history"></div>
+          </div>
+        </div>
+        <!-- Tab 8: 每日推荐号码 -->
+        <div class="dlt-tab" id="kl8-tab8">
+          <div class="card">
+            <div class="card-title"><span class="icon">&#128203;</span> 8. 每日推荐号码</div>
+            <div style="font-size:0.8rem;color:var(--muted);margin-bottom:1rem">
+              每日生成的推荐号码自动保存在此，更新开奖后可在此验证命中。数据保存在本地，不会丢失。
+            </div>
+            <div style="display:flex;gap:0.5rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-primary" onclick="renderDailyRecommendations()" style="padding:0.4rem 1rem;border-radius:8px;font-size:0.8rem">&#128260; 刷新</button>
+              <button class="btn btn-secondary" onclick="clearDailyRecommendations()" style="padding:0.4rem 1rem;border-radius:8px;font-size:0.8rem;background:var(--bg3);color:var(--ink);border:1px solid var(--rule)">&#128465; 清除全部</button>
+              <button class="btn btn-secondary" onclick="manualVerifyDaily()" style="padding:0.4rem 1rem;border-radius:8px;font-size:0.8rem;background:var(--accent3);color:#000;border:1px solid var(--accent3)">&#9989; 手动验证今日</button>
+            </div>
+            <div id="kl8-daily-recommendations"></div>
           </div>
         </div>
       </div>
@@ -1737,10 +1755,10 @@ tr:hover td { background: var(--bg3); }
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
 <script src="assets/charts.js?v=3"></script>
 <script src="assets/pl-charts.js?v=3"></script>
-<script src="assets/engine.js?v=2026071005"></script>
-<script src="assets/pl-data.js?v=2026071005"></script>
-<script src="assets/pl-engine.js?v=2026071005"></script>
-<script src="assets/auto-review.js?v=2026071005"></script>
+<script src="assets/engine.js?v=2026071006"></script>
+<script src="assets/pl-data.js?v=2026071006"></script>
+<script src="assets/pl-engine.js?v=2026071006"></script>
+<script src="assets/auto-review.js?v=2026071006"></script>
 <script src="assets/ticket-flower.js?v=5"></script>
 <script>
 // Auto-load sample data on page load (但不自动分析，用户点击玩法进入后才分析)
@@ -1789,13 +1807,17 @@ function switchSSQTab(tabId, btn) {
 
 function switchKL8Tab(tabId, btn) {
   document.querySelectorAll('#kl8-sidebar .dlt-sidebar-btn').forEach(function(b){ b.classList.remove('active'); });
-  document.querySelectorAll('#kl8-tab0, #kl8-tab1, #kl8-tab2, #kl8-tab3, #kl8-tab4, #kl8-tab5, #kl8-tab6, #kl8-tab7').forEach(function(t){ t.classList.remove('active'); });
+  document.querySelectorAll('#kl8-tab0, #kl8-tab1, #kl8-tab2, #kl8-tab3, #kl8-tab4, #kl8-tab5, #kl8-tab6, #kl8-tab7, #kl8-tab8').forEach(function(t){ t.classList.remove('active'); });
   if (btn) btn.classList.add('active');
   var tab = document.getElementById(tabId);
   if (tab) tab.classList.add('active');
   // Tab7自动刷新预测记录
   if (tabId === 'kl8-tab7' && typeof renderKL8PredictionHistory === 'function') {
     setTimeout(renderKL8PredictionHistory, 100);
+  }
+  // Tab8自动刷新每日推荐
+  if (tabId === 'kl8-tab8' && typeof renderDailyRecommendations === 'function') {
+    setTimeout(renderDailyRecommendations, 100);
   }
 }
 function switchPL3Tab(tabId, btn) {
