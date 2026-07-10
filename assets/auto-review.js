@@ -1874,65 +1874,80 @@ function autoReviewSSQ() {
   var simScores = scoreSSQNumbers(simLast, simAllReds);
   var simBackScores = scoreSSQBlueNumbers(simLast, simAllBlues);
 
-  // 优先使用 localStorage 保存的上期推荐（确保回测号码与上期实际推荐一致，避免重新计算导致差异）
+  // 读取保存的上期模型推荐（必须是用户实际看到的推荐号码）
   var savedRecs = null;
+  var savedDate = '';
+  var savedLastDraw = '';
   try {
     var saved = localStorage.getItem('ssq_previous_recommendations');
     if (saved) {
       var parsed = JSON.parse(saved);
-      savedRecs = parsed.recommendations;
+      if (parsed.recommendations && parsed.recommendations.length >= 1) {
+        savedRecs = parsed.recommendations;
+        savedDate = parsed.date || '';
+        savedLastDraw = parsed.lastDraw || '';
+      }
     }
   } catch(e) {}
 
-  var simRecommendations;
-  if (savedRecs && savedRecs.length >= 3) {
-    // 使用保存的上期推荐，确保回测号码与上期页面显示完全一致
-    simRecommendations = [];
-    for (var si = 0; si < savedRecs.length; si++) {
-      var combo = savedRecs[si].combos[0];
-      simRecommendations.push({
-        red: combo.reds,
-        blue: combo.blue
-      });
+  // 如果没有保存的上期推荐，显示提示
+  if (!savedRecs) {
+    var container = document.getElementById('ssq-auto-review');
+    if (container) {
+      container.innerHTML = '<div style="padding:1rem;text-align:center;color:var(--muted);border:1px dashed var(--rule);border-radius:8px">暂无上期模型推荐记录。请先在"推荐分析"中生成推荐号码，下期开奖后可自动验证命中。</div>';
     }
-  } else {
-    // 无保存数据时回退到重新计算
-    simRecommendations = generateSSQSimPicks(simScores, simBackScores);
+    return;
   }
 
+  // 验证上期推荐与实际开奖的命中（使用完整的策略+所有组合）
   var reviewResults = [];
   var bestHitRate = 0;
 
-  for (var set = 0; set < simRecommendations.length; set++) {
-    var redHits = simRecommendations[set].red.filter(function(n) { return actualRed.indexOf(n) >= 0; });
-    var blueHit = simRecommendations[set].blue === actualBlue;
-    var hitRate = (redHits.length * 10 + (blueHit ? 15 : 0));
+  for (var si = 0; si < savedRecs.length; si++) {
+    var strategy = savedRecs[si];
+    var strategyResults = [];
+    for (var ci = 0; ci < strategy.combos.length; ci++) {
+      var combo = strategy.combos[ci];
+      var redHits = combo.reds.filter(function(n) { return actualRed.indexOf(n) >= 0; });
+      var blueHit = combo.blue === actualBlue;
+      var hitRate = (redHits.length * 10 + (blueHit ? 15 : 0));
+      strategyResults.push({
+        reds: combo.reds,
+        blue: combo.blue,
+        redHits: redHits,
+        blueHit: blueHit,
+        hitRate: hitRate
+      });
+      if (hitRate > bestHitRate) bestHitRate = hitRate;
+    }
     reviewResults.push({
-      set: set + 1,
-      red: simRecommendations[set].red,
-      blue: simRecommendations[set].blue,
-      redHits: redHits,
-      blueHit: blueHit,
-      hitRate: hitRate
+      strategyName: strategy.name,
+      strategyDesc: strategy.desc,
+      combos: strategyResults
     });
-    if (hitRate > bestHitRate) bestHitRate = hitRate;
   }
 
-  var optimizedWeights = optimizeSSQWeights(reviewResults, simScores);
-
-  var fullReds = [actualRed].concat(simAllReds);
-  var fullBlues = [actualBlue].concat(simAllBlues);
-  var optScores = scoreSSQNumbersOptimized({ red: actualRed, blue: actualBlue }, fullReds, optimizedWeights);
-  var optBackScores = scoreSSQBlueNumbersOptimized({ red: actualRed, blue: actualBlue }, fullBlues, optimizedWeights);
+  // 计算整体命中统计
+  var totalRedHits = 0, totalBlueHits = 0, totalCombos = 0;
+  reviewResults.forEach(function(s) {
+    s.combos.forEach(function(c) {
+      totalRedHits += c.redHits.length;
+      if (c.blueHit) totalBlueHits++;
+      totalCombos++;
+    });
+  });
+  var avgRedHits = totalCombos > 0 ? (totalRedHits / totalCombos).toFixed(1) : '0';
 
   // ===== 自适应学习：分析命中/未命中号码的维度差异，调整下期权重 =====
   (function() {
     var hitNums = [];
     var allPicks = [];
-    for (var set = 0; set < reviewResults.length; set++) {
-      hitNums = hitNums.concat(reviewResults[set].redHits);
-      allPicks = allPicks.concat(reviewResults[set].red);
-    }
+    reviewResults.forEach(function(s) {
+      s.combos.forEach(function(c) {
+        c.redHits.forEach(function(n) { hitNums.push(n); });
+        c.reds.forEach(function(n) { allPicks.push(n); });
+      });
+    });
     hitNums = unique(hitNums);
     allPicks = unique(allPicks);
     var missNums = [];
@@ -1996,7 +2011,22 @@ function autoReviewSSQ() {
     } catch(e) {}
   })();
 
-  renderAutoReviewSSQ(reviewResults, optimizedWeights, optScores, optBackScores, actualRed, actualBlue);
+  // 标记已验证
+  try {
+    var prevData = JSON.parse(localStorage.getItem('ssq_previous_recommendations') || '{}');
+    prevData.reviewed = true;
+    prevData.actualRed = actualRed;
+    prevData.actualBlue = actualBlue;
+    localStorage.setItem('ssq_previous_recommendations', JSON.stringify(prevData));
+  } catch(e) {}
+
+  // 获取期号
+  var actualPeriod = '';
+  if (typeof ssqSampleMeta !== 'undefined' && ssqSampleMeta.length > 0) {
+    actualPeriod = ssqSampleMeta[0].period;
+  }
+
+  renderAutoReviewSSQ(reviewResults, savedDate, savedLastDraw, actualPeriod, actualRed, actualBlue, avgRedHits, totalBlueHits, totalCombos);
 }
 
 function generateSSQSimPicks(scores, backScores) {
@@ -2169,7 +2199,7 @@ function scoreSSQBlueNumbersOptimized(last, allBlues, w) {
   return scores;
 }
 
-function renderAutoReviewSSQ(reviewResults, weights, optScores, optBackScores, actualRed, actualBlue) {
+function renderAutoReviewSSQ(reviewResults, savedDate, savedLastDraw, actualPeriod, actualRed, actualBlue, avgRedHits, totalBlueHits, totalCombos) {
   var card = document.getElementById('ssq-auto-review-card');
   var container = document.getElementById('ssq-auto-review');
   if (!card || !container) return;
@@ -2178,8 +2208,17 @@ function renderAutoReviewSSQ(reviewResults, weights, optScores, optBackScores, a
 
   var html = '';
 
+  // 统计面板
+  html += '<div style="padding:0.6rem 0.8rem;background:var(--bg2);border-radius:8px;border:1px solid var(--rule);margin-bottom:1rem;font-size:0.8rem;display:flex;gap:1.5rem;flex-wrap:wrap">';
+  html += '<div><span style="color:var(--muted)">推荐日期：</span><strong>'+savedDate+'</strong></div>';
+  if (actualPeriod) html += '<div><span style="color:var(--muted)">验证期号：</span><strong>第'+actualPeriod+'期</strong></div>';
+  html += '<div><span style="color:var(--muted)">红球均命中：</span><strong style="color:var(--accent3)">'+avgRedHits+'个</strong></div>';
+  html += '<div><span style="color:var(--muted)">蓝球命中：</span><strong style="color:'+(totalBlueHits>0?'var(--accent3)':'var(--muted)')+'">'+totalBlueHits+'/'+totalCombos+'</strong></div>';
+  html += '</div>';
+
+  // 实际开奖号码
   html += '<div style="margin-bottom:1rem">';
-  html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">实际开奖号码（最新一期）</div>';
+  html += '<div style="color:var(--muted);font-size:0.85rem;margin-bottom:0.5rem">实际开奖号码</div>';
   html += '<div class="ball-row">';
   for (var i = 0; i < actualRed.length; i++) {
     html += '<div class="ball red">' + pad(actualRed[i]) + '</div>';
@@ -2188,51 +2227,38 @@ function renderAutoReviewSSQ(reviewResults, weights, optScores, optBackScores, a
   html += '<div class="ball blue">' + pad(actualBlue) + '</div>';
   html += '</div></div>';
 
+  // 上期推荐 vs 实际开奖对比
   html += '<div style="margin-bottom:1.25rem">';
-  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.25rem">【历史回测验证】双色球（周二/四/日开奖）上期推荐 vs 实际开奖对比</div>';
-  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">金色号码表示命中实际开奖，灰色号码表示未命中。双色球每周开奖3期，回测基于上期实际推荐号码验证。</div>';
+  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.25rem">上期模型推荐 vs 实际开奖对比</div>';
+  html += '<div style="font-size:0.75rem;color:var(--muted);margin-bottom:0.75rem">金色号码表示命中实际开奖，灰色号码表示未命中。基于上次生成推荐时保存的号码验证。</div>';
 
-  for (var set = 0; set < reviewResults.length; set++) {
-    var r = reviewResults[set];
-    var hitColor = r.hitRate >= 50 ? 'var(--accent3)' : r.hitRate >= 20 ? 'var(--accent)' : 'var(--muted)';
+  for (var si = 0; si < reviewResults.length; si++) {
+    var strategy = reviewResults[si];
     html += '<div style="background:var(--bg3);border:1px solid var(--rule);border-radius:8px;padding:0.75rem;margin-bottom:0.5rem">';
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.4rem">';
-    html += '<span style="color:var(--muted);font-size:0.82rem">回测方案 ' + r.set + '</span>';
-    html += '<span style="color:' + hitColor + ';font-weight:700;font-size:0.85rem">得分 ' + r.hitRate + '</span>';
-    html += '</div>';
-    html += '<div class="ball-row" style="margin-bottom:0.25rem">';
-    for (var i = 0; i < r.red.length; i++) {
-      var isHit = r.redHits.indexOf(r.red[i]) >= 0;
-      html += '<div class="ball ' + (isHit ? 'gold' : 'gray') + '">' + pad(r.red[i]) + '</div>';
+    html += '<div style="font-weight:600;color:var(--ink);font-size:0.85rem;margin-bottom:0.4rem">' + strategy.strategyName + '</div>';
+    html += '<div style="font-size:0.7rem;color:var(--muted);margin-bottom:0.5rem">' + (strategy.strategyDesc || '') + '</div>';
+
+    for (var ci = 0; ci < strategy.combos.length; ci++) {
+      var c = strategy.combos[ci];
+      var hitColor = c.hitRate >= 50 ? 'var(--accent3)' : c.hitRate >= 20 ? 'var(--accent)' : 'var(--muted)';
+      html += '<div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.3rem;padding:0.3rem 0.5rem;background:var(--bg);border-radius:6px">';
+      html += '<span style="color:var(--muted);font-size:0.75rem;min-width:40px">方案'+(ci+1)+'</span>';
+      html += '<div style="display:flex;gap:3px;flex-wrap:wrap">';
+      for (var ri = 0; ri < c.reds.length; ri++) {
+        var isHit = c.redHits.indexOf(c.reds[ri]) >= 0;
+        html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;font-size:0.7rem;'+(isHit?'background:var(--accent3);color:#000;font-weight:700;box-shadow:0 0 0 2px var(--accent3);':'background:var(--muted);color:#fff;')+'">'+pad(c.reds[ri])+'</span>';
+      }
+      html += '<span style="margin:0 2px;color:var(--muted)">+</span>';
+      html += '<span style="display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;border-radius:50%;font-size:0.7rem;'+(c.blueHit?'background:var(--accent3);color:#000;font-weight:700;box-shadow:0 0 0 2px var(--accent3);':'background:var(--muted);color:#fff;')+'">'+pad(c.blue)+'</span>';
+      html += '</div>';
+      html += '<span style="margin-left:auto;color:'+hitColor+';font-weight:600;font-size:0.75rem">'+(c.redHits.length>0?'红球'+c.redHits.length:'')+(c.blueHit?' 蓝球':'')+(c.redHits.length===0&&!c.blueHit?' 未命中':'')+'</span>';
+      html += '</div>';
     }
-    html += '<span style="margin:0 0.5rem;color:var(--muted)">+</span>';
-    html += '<div class="ball ' + (r.blueHit ? 'gold' : 'gray') + '">' + pad(r.blue) + '</div>';
-    html += '</div>';
-    var hitDesc = [];
-    if (r.redHits.length > 0) hitDesc.push('红球命中' + r.redHits.length + '个');
-    if (r.blueHit) hitDesc.push('蓝球命中');
-    if (hitDesc.length === 0) hitDesc.push('未命中');
-    html += '<div style="font-size:0.75rem;color:var(--muted)">' + hitDesc.join('，') + '</div>';
     html += '</div>';
   }
   html += '</div>';
 
-  html += '<div style="margin-bottom:1.25rem">';
-  html += '<div style="font-size:0.9rem;font-weight:700;color:var(--ink);margin-bottom:0.75rem">权重优化详情</div>';
-  var baseWeights = { freq: 25, miss: 20, repeat: 15, zone: 15, adj: 5, tail: 3, oddEven: 2 };
-  var weightLabels = { freq: '频率', miss: '遗漏', repeat: '重号', zone: '区间', adj: '连号', tail: '尾数', oddEven: '奇偶' };
-  html += '<div class="stat-grid">';
-  for (var key in weights) {
-    var diff = weights[key] - baseWeights[key];
-    var diffStr = diff > 0 ? '<span style="color:var(--accent3)">+' + diff + '</span>' : diff < 0 ? '<span style="color:var(--accent4)">' + diff + '</span>' : '<span style="color:var(--muted)">0</span>';
-    html += '<div class="stat-item">';
-    html += '<div class="stat-value" style="font-size:1.1rem">' + weights[key] + ' ' + diffStr + '</div>';
-    html += '<div class="stat-label">' + weightLabels[key] + '权重</div>';
-    html += '</div>';
-  }
-  html += '</div></div>';
-
-  // 优化后精准推荐：使用5层AI引擎（与综合推荐算法完全不同）
+  // 下期预测推荐（AI五层融合引擎）
   var lastParts2 = ssqSampleHistory[0].split('|');
   var lastDraw2 = { red: lastParts2[0].split(',').map(Number), blue: parseInt(lastParts2[1], 10) };
   var smartRecs = smartRecommendSSQ(ssqSampleHistory, lastDraw2);

@@ -3235,13 +3235,23 @@ function renderSSQRecommend(last, allReds, allBlues) {
     if (currentSaved) {
       var currentParsed = JSON.parse(currentSaved);
       if (currentParsed.lastDraw !== newLastDraw) {
-        localStorage.setItem('ssq_previous_recommendations', currentSaved);
+        // 上期推荐和本期不同，保存为"上期推荐"供复盘使用
+        var prevRec = JSON.parse(currentSaved);
+        prevRec.reviewed = false; // 标记为未验证
+        // 获取期号
+        var period = '';
+        if (typeof ssqSampleMeta !== 'undefined' && ssqSampleMeta.length > 1) {
+          period = ssqSampleMeta[0].period; // 当前最新期号
+        }
+        prevRec.verifyPeriod = period;
+        localStorage.setItem('ssq_previous_recommendations', JSON.stringify(prevRec));
       }
     }
     var recsData = {
       date: new Date().toISOString().split('T')[0],
       lastDraw: newLastDraw,
-      recommendations: strategies
+      recommendations: strategies,
+      reviewed: false
     };
     localStorage.setItem('ssq_recommendations', JSON.stringify(recsData));
   } catch(e) {
